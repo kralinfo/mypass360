@@ -1,6 +1,6 @@
 {
-  "name": "App Ingresso",
-  "short_name": "Ingresso",
+  "name": "MyPass360",
+  "short_name": "MyPass360",
   "description": "Compre e gerencie seus ingressos para eventos",
   "start_url": "/",
   "display": "standalone",

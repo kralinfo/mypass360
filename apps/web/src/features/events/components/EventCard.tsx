@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { Event } from '@app-ingresso/types'
+import type { Event } from '@mypass360/types'
 
 interface EventCardProps {
   event: Event

@@ -1,4 +1,4 @@
-# App Ingresso
+# MyPass360
 
 Plataforma de venda de ingressos para eventos — monorepo com **Next.js PWA** + **NestJS API** + **Supabase**.
 
@@ -56,8 +56,8 @@ npx supabase start
 pnpm dev
 
 # Individualmente
-pnpm --filter @app-ingresso/web dev    # http://localhost:3000
-pnpm --filter @app-ingresso/api dev    # http://localhost:3001/api/v1
+pnpm --filter @mypass360/web dev    # http://localhost:3000
+pnpm --filter @mypass360/api dev    # http://localhost:3001/api/v1
 ```
 
 ## Scripts
@@ -100,8 +100,8 @@ pnpm --filter @app-ingresso/api dev    # http://localhost:3001/api/v1
 
 | Pacote | Conteúdo |
 |---|---|
-| `@app-ingresso/types` | Interfaces TypeScript (Event, Order, Ticket, User) |
-| `@app-ingresso/validation` | Schemas Zod para validação de entrada |
+| `@mypass360/types` | Interfaces TypeScript (Event, Order, Ticket, User) |
+| `@mypass360/validation` | Schemas Zod para validação de entrada |
 
 ## Banco de dados
 

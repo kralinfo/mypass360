@@ -1,5 +1,5 @@
 {
-  "name": "@app-ingresso/api",
+  "name": "@mypass360/api",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -12,8 +12,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@app-ingresso/types": "workspace:*",
-    "@app-ingresso/validation": "workspace:*",
+    "@mypass360/types": "workspace:*",
+    "@mypass360/validation": "workspace:*",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.0.0",
     "@nestjs/core": "^10.0.0",

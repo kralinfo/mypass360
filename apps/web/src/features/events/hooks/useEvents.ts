@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Event } from '@app-ingresso/types'
+import type { Event } from '@mypass360/types'
 import { fetchEvents } from '../services/events.service'
 
 interface UseEventsResult {

@@ -3,15 +3,15 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'App Ingresso',
-    template: '%s | App Ingresso',
+    default: 'MyPass360',
+    template: '%s | MyPass360',
   },
   description: 'Compre e gerencie seus ingressos para eventos',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'App Ingresso',
+    title: 'MyPass360',
   },
 }
 

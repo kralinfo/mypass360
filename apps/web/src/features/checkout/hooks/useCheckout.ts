@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { CreateOrderInput } from '@app-ingresso/types'
+import type { CreateOrderInput } from '@mypass360/types'
 import { processCheckout } from '../services/checkout.service'
 
 interface UseCheckoutResult {

@@ -1,5 +1,5 @@
 {
-  "name": "@app-ingresso/types",
+  "name": "@mypass360/types",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",

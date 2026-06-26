@@ -1,5 +1,5 @@
 {
-  "name": "@app-ingresso/validation",
+  "name": "@mypass360/validation",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "zod": "^3.23.0",
-    "@app-ingresso/types": "workspace:*"
+    "@mypass360/types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.0"
