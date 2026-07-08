@@ -17,4 +17,14 @@ export class PaymentsService {
   create(dto: CreatePaymentDto) {
     return this.paymentsRepository.create(dto)
   }
+
+  async confirm(id: string) {
+    const payment = await this.paymentsRepository.findById(id)
+
+    if (!payment) {
+      throw new NotFoundException(`Pagamento '${id}' não encontrado`)
+    }
+
+    return this.paymentsRepository.confirm(id)
+  }
 }

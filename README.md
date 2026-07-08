@@ -116,6 +116,19 @@ Gerenciado pelo Supabase. Tabelas principais:
 
 > Crie as migrations com `npx supabase migration new <nome>`.
 
+### Migrações importantes do checkout/PIX
+
+- A migração `supabase/migrations/20260708010500_add_pix_columns_to_payments.sql` adiciona as colunas `pix_code` e `pix_expires_at`.
+- Se a tabela `payments` já existia antes dessa alteração, execute essa migração no projeto Supabase antes de testar `POST /payments`.
+- Sem essas colunas, a API retorna erro semelhante a `Could not find the 'pix_code' column of 'payments' in the schema cache`.
+
+### Fluxo atual de compra
+
+- O checkout cria primeiro o pedido em `orders`.
+- A tela `/checkout/pagamento` mostra o método de pagamento.
+- No MVP, apenas `PIX` está habilitado.
+- Ao escolher `PIX`, a API cria a cobrança mockada e retorna o código copia e cola.
+
 ## Deploy
 
 | Serviço | Destino sugerido |
@@ -123,4 +136,3 @@ Gerenciado pelo Supabase. Tabelas principais:
 | `apps/web` | Vercel ou Netlify |
 | `apps/api` | Railway, Render ou Fly.io |
 | Banco | Supabase (gerenciado) |
-# mnticket

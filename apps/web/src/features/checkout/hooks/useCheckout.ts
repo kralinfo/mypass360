@@ -25,7 +25,7 @@ interface UseCheckoutResult {
   error: string | null
   loadCheckout: (eventId: string) => Promise<void>
   setTicketQuantity: (ticketType: CheckoutTicketType, quantity: number) => void
-  handleSubmit: (eventId: string) => Promise<{ orderId: string } | null>
+  handleSubmit: (eventId: string) => Promise<{ orderId: string; amount: number } | null>
 }
 
 export function useCheckout(): UseCheckoutResult {
@@ -77,7 +77,7 @@ export function useCheckout(): UseCheckoutResult {
     })
   }, [])
 
-  const handleSubmit = useCallback(async (eventId: string): Promise<{ orderId: string } | null> => {
+  const handleSubmit = useCallback(async (eventId: string): Promise<{ orderId: string; amount: number } | null> => {
     if (selectedItems.length === 0) {
       setError('Selecione ao menos um ingresso para continuar.')
       return null
@@ -103,14 +103,14 @@ export function useCheckout(): UseCheckoutResult {
         items: selectedItems,
       })
 
-      return { orderId: order.id }
+      return { orderId: order.id, amount: total }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao processar checkout')
       return null
     } finally {
       setIsSubmitting(false)
     }
-  }, [selectedItems])
+  }, [selectedItems, total])
 
   return {
     event,

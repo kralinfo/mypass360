@@ -15,4 +15,9 @@ export class PaymentsController {
   create(@Body() dto: CreatePaymentDto) {
     return this.paymentsService.create(dto)
   }
+
+  @Post(':id/confirm')
+  confirm(@Param('id') id: string) {
+    return this.paymentsService.confirm(id)
+  }
 }

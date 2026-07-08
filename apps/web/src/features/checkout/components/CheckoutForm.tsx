@@ -32,7 +32,9 @@ export function CheckoutForm({ eventId }: CheckoutFormProps) {
     const result = await handleSubmit(eventId)
 
     if (result?.orderId) {
-      router.push(`/eventos/${event?.slug ?? ''}`)
+      router.push(
+        `/checkout/pagamento?orderId=${result.orderId}&eventId=${eventId}&amount=${result.amount}`
+      )
       router.refresh()
     }
   }
