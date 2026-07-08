@@ -14,6 +14,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return response.json() as Promise<T>
   } catch (error) {
     console.error(`API request failed for ${path}:`, error)
+    if (error instanceof TypeError) {
+      throw new Error(
+        'Não foi possível conectar com a API. Inicie o backend em http://localhost:3001 e tente novamente.'
+      )
+    }
+
     throw error
   }
 }
