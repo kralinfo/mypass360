@@ -25,6 +25,7 @@ interface UseCheckoutResult {
   error: string | null
   loadCheckout: (eventId: string) => Promise<void>
   setTicketQuantity: (ticketType: CheckoutTicketType, quantity: number) => void
+  hydrateSelectedItems: (items: SelectedTicketType[]) => void
   handleSubmit: (eventId: string) => Promise<{ orderId: string; amount: number } | null>
 }
 
@@ -34,7 +35,7 @@ export function useCheckout(): UseCheckoutResult {
   const [error, setError] = useState<string | null>(null)
   const [event, setEvent] = useState<Event | null>(null)
   const [ticketTypes, setTicketTypes] = useState<CheckoutTicketType[]>([])
-  const [selectedItems, setSelectedItems] = useState<SelectedTicketType[]>([])
+  const [selectedItems, setSelectedItemsState] = useState<SelectedTicketType[]>([])
 
   const total = selectedItems.reduce(
     (accumulator, item) => accumulator + item.quantity * item.unitPrice,
@@ -59,7 +60,7 @@ export function useCheckout(): UseCheckoutResult {
   const setTicketQuantity = useCallback((ticketType: CheckoutTicketType, quantity: number): void => {
     if (quantity < 0) return
 
-    setSelectedItems((previous) => {
+    setSelectedItemsState((previous) => {
       const withoutCurrent = previous.filter((item) => item.ticketTypeId !== ticketType.id)
 
       if (quantity === 0) {
@@ -75,6 +76,10 @@ export function useCheckout(): UseCheckoutResult {
         },
       ]
     })
+  }, [])
+
+  const hydrateSelectedItems = useCallback((items: SelectedTicketType[]): void => {
+    setSelectedItemsState(items)
   }, [])
 
   const handleSubmit = useCallback(async (eventId: string): Promise<{ orderId: string; amount: number } | null> => {
@@ -122,6 +127,7 @@ export function useCheckout(): UseCheckoutResult {
     error,
     loadCheckout,
     setTicketQuantity,
+    hydrateSelectedItems,
     handleSubmit,
   }
 }

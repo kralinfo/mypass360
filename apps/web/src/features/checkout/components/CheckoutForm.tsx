@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCheckout } from '../hooks/useCheckout'
+import { useCart } from '@/features/cart/cart-context'
 
 interface CheckoutFormProps {
   eventId: string
@@ -22,10 +23,34 @@ export function CheckoutForm({ eventId }: CheckoutFormProps) {
     handleSubmit,
   } = useCheckout()
   const router = useRouter()
+  const { getItemsForEvent } = useCart()
+  const hydratedFromCartRef = useRef(false)
 
   useEffect(() => {
     loadCheckout(eventId)
   }, [eventId, loadCheckout])
+
+  useEffect(() => {
+    if (!event || ticketTypes.length === 0 || hydratedFromCartRef.current) {
+      return
+    }
+
+    const cartItems = getItemsForEvent(eventId)
+
+    if (cartItems.length === 0) {
+      return
+    }
+
+    for (const cartItem of cartItems) {
+      const matchingTicketType = ticketTypes.find((ticketType) => ticketType.id === cartItem.ticketTypeId)
+
+      if (matchingTicketType) {
+        setTicketQuantity(matchingTicketType, cartItem.quantity)
+      }
+    }
+
+    hydratedFromCartRef.current = true
+  }, [event, eventId, getItemsForEvent, setTicketQuantity, ticketTypes])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
