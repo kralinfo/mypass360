@@ -16,18 +16,26 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [event, setEvent] = useState<Event | null>(null)
   const [ticketTypes, setTicketTypes] = useState<CheckoutTicketType[]>([])
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [notification, setNotification] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [warningMessage, setWarningMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { addToCart } = useCart()
 
   useEffect(() => {
-    if (!notification) return
+    if (!successMessage) return
 
-    const timeout = window.setTimeout(() => setNotification(null), 2000)
+    const timeout = window.setTimeout(() => setSuccessMessage(null), 2000)
     return () => window.clearTimeout(timeout)
-  }, [notification])
+  }, [successMessage])
+
+  useEffect(() => {
+    if (!warningMessage) return
+
+    const timeout = window.setTimeout(() => setWarningMessage(null), 2000)
+    return () => window.clearTimeout(timeout)
+  }, [warningMessage])
 
   useEffect(() => {
     params
@@ -100,10 +108,11 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     const currentEvent = event
 
     if (!currentEvent || quantity <= 0) {
-      setNotification('Escolha uma quantidade antes de adicionar ao carrinho.')
+      setWarningMessage('Escolha uma quantidade antes de adicionar ao carrinho.')
       return
     }
 
+    setWarningMessage(null)
     addToCart({
       eventId: currentEvent.id,
       eventSlug: currentEvent.slug,
@@ -117,7 +126,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
       quantity,
     })
 
-    setNotification(`${quantity} ingressos ${ticketType.name} adicionados ao carrinho.`)
+    setSuccessMessage(`${quantity} ingressos ${ticketType.name} adicionados ao carrinho.`)
   }
 
   function handleBuyNow(ticketType: CheckoutTicketType) {
@@ -129,7 +138,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
   return (
     <main style={{ position: 'relative', padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
-      {notification ? (
+      {successMessage ? (
         <div
           style={{
             position: 'fixed',
@@ -151,7 +160,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
           <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '2rem', height: '2rem', borderRadius: '999px', background: '#f59e0b', color: '#0f172a', fontSize: '1rem' }}>
             🛒
           </span>
-          <span style={{ fontSize: '0.95rem', lineHeight: 1.4 }}>{notification}</span>
+          <span style={{ fontSize: '0.95rem', lineHeight: 1.4 }}>{successMessage}</span>
         </div>
       ) : null}
 
@@ -218,6 +227,21 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
           <p style={{ color: '#64748b' }}>
             Selecione a quantidade, adicione ao carrinho ou siga direto para o checkout.
           </p>
+          {warningMessage ? (
+            <div
+              style={{
+                marginTop: '0.5rem',
+                padding: '0.8rem 1rem',
+                borderRadius: '10px',
+                background: '#fef3c7',
+                color: '#92400e',
+                fontSize: '0.95rem',
+                border: '1px solid #fde68a',
+              }}
+            >
+              {warningMessage}
+            </div>
+          ) : null}
         </div>
 
         {ticketTypes.length === 0 ? (
