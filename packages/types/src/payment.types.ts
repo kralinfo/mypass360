@@ -19,5 +19,7 @@ export interface CreatePaymentInput {
   orderId: string
   provider: PaymentProvider
   amount: number
+  payerEmail: string
+  payerDocument: string
   externalId?: string
 }
