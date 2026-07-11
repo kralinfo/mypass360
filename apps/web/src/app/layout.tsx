@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
+import { CartProvider } from '@/features/cart/cart-context'
 
 export const metadata: Metadata = {
   title: {
@@ -25,8 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body style={{ margin: 0, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
-        <div style={{ flex: 1 }}>{children}</div>
+        <CartProvider>
+          <Navbar />
+          <div style={{ flex: 1, paddingTop: '76px' }}>{children}</div>
+        </CartProvider>
         <Footer />
       </body>
     </html>
