@@ -127,12 +127,83 @@ Gerenciado pelo Supabase. Tabelas principais:
 - O checkout cria primeiro o pedido em `orders`.
 - A tela `/checkout/pagamento` mostra o método de pagamento.
 - No MVP, apenas `PIX` está habilitado.
-- Ao escolher `PIX`, a API cria a cobrança mockada e retorna o código copia e cola.
+- Ao continuar, o backend cria uma **Preferência (Checkout Pro)** no Mercado Pago e o comprador é redirecionado para o ambiente seguro do Mercado Pago para concluir o pagamento (PIX, cartão, boleto, etc).
+- Após o pagamento, o Mercado Pago redireciona de volta para `/checkout/pagamento` e o **webhook** confirma e atualiza o pedido para `paid`.
+
+> Usamos o Checkout Pro (`Preference`) em vez da API de Pagamentos direta porque contas novas/não totalmente verificadas do Mercado Pago costumam receber o erro `Unauthorized use of live credentials` ao tentar criar pagamentos PIX diretamente. O Checkout Pro não tem essa restrição.
+
+### Configuração de pagamentos
+
+```bash
+cp apps/api/.env.example apps/api/.env
+```
+
+Preencha:
+- `MERCADO_PAGO_ACCESS_TOKEN` com a credencial do seu aplicativo Mercado Pago.
+- `WEB_APP_URL` com o domínio público do frontend (ex: `https://app.mypass360.com`). **Não funciona com `localhost`** — o Mercado Pago rejeita `back_urls` locais.
+- `API_PUBLIC_URL` com o domínio público do backend, usado para informar o `notification_url` do webhook automaticamente.
+
+> Em desenvolvimento local, se `WEB_APP_URL` continuar como `localhost`, o backend simplesmente omite `back_urls`/`auto_return` para evitar erro do Mercado Pago — o comprador ainda consegue pagar, só não retorna automaticamente ao site.
+
+> O checkout depende do e-mail do comprador autenticado no Supabase.
+> Sem um usuário logado com e-mail válido, a criação da preferência é bloqueada.
+
+### Webhook do Mercado Pago
+
+- Configure no painel do Mercado Pago a URL:
+
+```text
+http://localhost:3001/api/v1/payments/webhook/mercadopago
+```
+
+- Em produção, use a URL pública do backend com o mesmo caminho (ou deixe o backend informar automaticamente via `API_PUBLIC_URL`).
+- O webhook consulta o status do pagamento no Mercado Pago e atualiza o pedido para `paid` quando a cobrança é aprovada.
+
+### Endpoint de Checkout Pro
+
+- `POST /api/v1/payments/preference` recebe `{ orderId, amount, payerEmail }` e retorna `{ preferenceId, initPoint }`.
+- O frontend redireciona o navegador para `initPoint`, que é a página hospedada pelo Mercado Pago para concluir o pagamento.
 
 ## Deploy
 
-| Serviço | Destino sugerido |
+| Serviço | Destino atual |
 |---|---|
-| `apps/web` | Vercel ou Netlify |
-| `apps/api` | Railway, Render ou Fly.io |
+| `apps/web` | Vercel |
+| `apps/api` | Render |
 | Banco | Supabase (gerenciado) |
+
+### Deploy do `apps/api` (Render)
+
+- **Root Directory:** `.` (raiz do monorepo)
+- **Build Command:**
+  ```bash
+  pnpm install --frozen-lockfile && pnpm --filter @mypass360/api build
+  ```
+- **Start Command:**
+  ```bash
+  node apps/api/dist/main.js
+  ```
+- **Environment Variables:** as mesmas de `apps/api/.env`, mais:
+  - `CORS_ORIGIN` → domínio de produção do `apps/web` (Vercel)
+  - `WEB_APP_URL` → domínio de produção do `apps/web` (Vercel)
+  - `API_PUBLIC_URL` → domínio do próprio serviço no Render (ex: `https://mypass360.onrender.com`)
+
+> A raiz `/` não existe — todas as rotas ficam sob `/api/v1`. Teste com `/api/v1/events`.
+
+### Deploy do `apps/web` (Vercel)
+
+- **Root Directory:** `apps/web`
+- **Build Command:**
+  ```bash
+  cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @mypass360/web build
+  ```
+- **Environment Variables:**
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `NEXT_PUBLIC_API_URL` → URL pública da API no Render
+  - `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY`
+
+### Depois de publicar os dois
+
+1. Atualize `CORS_ORIGIN` e `WEB_APP_URL` no Render com a URL final da Vercel.
+2. Cadastre o webhook no painel do Mercado Pago com a URL pública do Render (`/api/v1/payments/webhook/mercadopago`).

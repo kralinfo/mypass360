@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { Payment } from '@mypass360/types'
-import { confirmPayment, createPixPayment, fetchPaymentById } from '../services/payment.service'
+import { createClient } from '@/lib/supabase/client'
+import { confirmPayment, createCheckoutPreference, fetchPaymentById } from '../services/payment.service'
 
 interface PaymentStatusCardProps {
   paymentId?: string
@@ -14,7 +15,6 @@ interface PaymentStatusCardProps {
 
 export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: PaymentStatusCardProps) {
   const [payment, setPayment] = useState<Payment | null>(null)
-  const [selectedMethod, setSelectedMethod] = useState<'pix' | 'credit_card' | 'boleto'>('pix')
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
@@ -50,25 +50,48 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
     }
   }, [paymentId])
 
+  useEffect(() => {
+    if (!payment?.id || payment.status !== 'pending') {
+      return
+    }
+
+    const refreshPayment = window.setInterval(() => {
+      fetchPaymentById(payment.id)
+        .then((data) => {
+          setPayment(data)
+        })
+        .catch(() => undefined)
+    }, 5000)
+
+    return () => {
+      window.clearInterval(refreshPayment)
+    }
+  }, [payment?.id, payment?.status])
+
   async function handleCreatePayment() {
     setIsCreating(true)
     setError(null)
 
     try {
-      if (selectedMethod !== 'pix') {
-        setError('Neste MVP, apenas PIX está habilitado.')
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user?.email) {
+        setError('Você precisa estar logado com um e-mail válido para gerar o pagamento.')
         return
       }
 
-      const created = await createPixPayment({
+      const preference = await createCheckoutPreference({
         orderId,
-        provider: 'pix',
         amount,
+        payerEmail: user.email,
       })
 
-      setPayment(created)
+      window.location.href = preference.initPoint
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao gerar cobrança PIX')
+      setError(err instanceof Error ? err.message : 'Erro ao iniciar pagamento')
     } finally {
       setIsCreating(false)
     }
@@ -121,38 +144,9 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
           <strong>{amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
         </div>
 
-        <div>
-          <p style={{ marginBottom: '0.75rem', fontWeight: 600 }}>Escolha o método de pagamento</p>
-
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {[
-              { id: 'pix', title: 'PIX', description: 'Pagamento instantâneo com QR Code e copia e cola.' },
-              { id: 'credit_card', title: 'Cartão de crédito', description: 'Em breve.' },
-              { id: 'boleto', title: 'Boleto', description: 'Em breve.' },
-            ].map((method) => (
-              <button
-                key={method.id}
-                type="button"
-                onClick={() => setSelectedMethod(method.id as 'pix' | 'credit_card' | 'boleto')}
-                style={{
-                  textAlign: 'left',
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  border:
-                    selectedMethod === method.id ? '2px solid #0f172a' : '1px solid #d1d5db',
-                  background: '#fff',
-                  cursor: 'pointer',
-                  opacity: method.id === 'pix' ? 1 : 0.7,
-                }}
-              >
-                <strong>{method.title}</strong>
-                <p style={{ marginTop: '0.35rem', color: '#6b7280', fontSize: '0.9rem' }}>
-                  {method.description}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
+        <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+          Ao continuar, você será redirecionado para o ambiente seguro do Mercado Pago, onde poderá escolher entre PIX, cartão de crédito, boleto e outros meios disponíveis.
+        </p>
 
         {error && <p style={{ color: '#dc2626' }}>{error}</p>}
 
@@ -169,7 +163,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
             cursor: isCreating ? 'not-allowed' : 'pointer',
           }}
         >
-          {isCreating ? 'Gerando cobrança...' : 'Continuar para pagamento'}
+          {isCreating ? 'Redirecionando...' : 'Continuar para pagamento'}
         </button>
       </section>
     )
