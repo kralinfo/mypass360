@@ -34,6 +34,7 @@ create table if not exists ticket_types (
   name text not null,
   price numeric(10,2) not null,
   quantity int not null check (quantity >= 0),
+  description text,
   sold int not null default 0 check (sold >= 0),
   created_at timestamptz not null default now()
 );

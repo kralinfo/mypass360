@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { GoogleSignInButton } from '@/features/auth/components/GoogleSignInButton'
+import { BackButton } from '@/components/BackButton'
 
 export default function RegisterPage() {
   return (
@@ -11,6 +12,7 @@ export default function RegisterPage() {
         padding: '2rem 1rem',
       }}
     >
+      <BackButton href="/eventos" style={{ position: 'absolute', top: '6rem', left: '2rem' }} />
       <section
         style={{
           width: '100%',

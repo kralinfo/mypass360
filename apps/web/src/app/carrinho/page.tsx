@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/features/cart/cart-context'
+import { BackButton } from '@/components/BackButton'
 
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -24,11 +25,12 @@ export default function CartPage() {
   const { eventGroups, totalAmount, totalQuantity, setItemQuantity, removeItem, clearCart } = useCart()
 
   const handleCheckout = (eventId: string) => {
-    router.push(`/checkout?eventId=${eventId}`)
+    router.push(`/checkout?eventId=${eventId}&from=cart`)
   }
 
   return (
     <main style={{ padding: '2rem 1rem', maxWidth: '1100px', margin: '0 auto' }}>
+      <BackButton href="/eventos" style={{ marginBottom: '1rem' }} />
       <header style={{ marginBottom: '1.5rem' }}>
         <h1 style={{ marginBottom: '0.5rem', fontSize: '2rem', color: '#0f172a' }}>Carrinho</h1>
         <p style={{ color: '#64748b' }}>
