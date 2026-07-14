@@ -146,27 +146,33 @@ alter table tickets enable row level security;
 alter table payments enable row level security;
 
 -- Políticas de leitura pública para eventos publicados
+drop policy if exists "Eventos publicados são visíveis" on events;
 create policy "Eventos publicados são visíveis"
   on events for select
   using (status = 'published');
 
+drop policy if exists "Tipos de ingresso visíveis" on ticket_types;
 create policy "Tipos de ingresso visíveis"
   on ticket_types for select
   using (true);
 
 -- Políticas para usuários autenticados
+drop policy if exists "Usuários veem próprios pedidos" on orders;
 create policy "Usuários veem próprios pedidos"
   on orders for select
   using (auth.uid() = user_id or user_id is null);
 
+drop policy if exists "Usuários podem criar pedidos" on orders;
 create policy "Usuários podem criar pedidos"
   on orders for insert
   with check (auth.uid() = user_id or user_id is null);
 
+drop policy if exists "Usuários veem próprios ingressos" on tickets;
 create policy "Usuários veem próprios ingressos"
   on tickets for select
   using (auth.uid() = user_id or user_id is null);
 
+drop policy if exists "Usuários veem próprios pagamentos" on payments;
 create policy "Usuários veem próprios pagamentos"
   on payments for select
   using (
