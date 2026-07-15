@@ -68,6 +68,11 @@ export function Navbar() {
           Eventos
         </Link>
         {user && (
+          <Link href="/meus-eventos" style={{ color: '#cbd5e1', textDecoration: 'none' }}>
+            Meus Eventos
+          </Link>
+        )}
+        {user && (
           <Link
             href="/eventos/cadastrar"
             style={{

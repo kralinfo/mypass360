@@ -1,13 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BackButton } from '@/components/BackButton'
+import { createEvent, updateEvent, fetchEventById } from '@/features/events/services/my-events.service'
 
-export default function CadastrarEventoPage() {
+function CadastrarEventoForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
+  const isEditMode = Boolean(editId)
+
   const [loading, setLoading] = useState(false)
+  const [loadingEvent, setLoadingEvent] = useState(isEditMode)
   const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
@@ -24,6 +30,59 @@ export default function CadastrarEventoPage() {
       { name: 'Meia-entrada', price: '', quantity: '0', description: '' },
     ],
   })
+
+  // Carregar dados do evento em modo edição
+  useEffect(() => {
+    if (!editId) return
+
+    async function loadEvent() {
+      setLoadingEvent(true)
+      try {
+        const supabase = createClient()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (!session) {
+          router.push('/login?next=/meus-eventos')
+          return
+        }
+
+        const event = await fetchEventById(editId!, session.access_token)
+
+        // Extrair data e hora separadamente
+        const eventDate = new Date(event.date)
+        const dateStr = eventDate.toISOString().split('T')[0]
+        const timeStr = eventDate.toTimeString().slice(0, 5)
+
+        setFormData({
+          title: event.title,
+          slug: event.slug,
+          description: event.description ?? '',
+          date: dateStr,
+          time: timeStr,
+          location: event.location,
+          capacity: String(event.capacity),
+          price: String(event.price),
+          ticketTypes: [
+            { name: 'Inteira', price: String(event.price), quantity: '0', description: '' },
+            {
+              name: 'Meia-entrada',
+              price: String(event.price / 2),
+              quantity: '0',
+              description: '',
+            },
+          ],
+        })
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar evento')
+      } finally {
+        setLoadingEvent(false)
+      }
+    }
+
+    void loadEvent()
+  }, [editId, router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -99,68 +158,68 @@ export default function CadastrarEventoPage() {
     setError(null)
 
     try {
-      // Obter usuário logado
       const supabase = createClient()
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
+        data: { session },
+      } = await supabase.auth.getSession()
 
-      if (!user) {
-        setError('Você precisa estar logado para cadastrar um evento')
+      if (!session) {
+        setError('Você precisa estar logado para gerenciar eventos')
         setLoading(false)
         return
       }
 
-      // Combinar data e hora
+      const token = session.access_token
       const dateTime = `${formData.date}T${formData.time}:00`
 
-      // Enviar para o backend
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/v1/events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          slug: formData.slug,
-          description: formData.description,
-          date: dateTime,
-          location: formData.location,
-          organizer_id: user.id,
-          capacity: parseInt(formData.capacity, 10),
-          price: formData.price ? parseFloat(formData.price) : 0,
-          status: 'published',
-          ticket_types: formData.ticketTypes
-            .filter((ticketType) => ticketType.name.trim().length > 0)
-            .map((ticketType) => ({
-              name: ticketType.name.trim(),
-              price: parseFloat(ticketType.price) || 0,
-              quantity: parseInt(ticketType.quantity, 10) || 0,
-              description: ticketType.description?.trim() || null,
-            })),
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Erro ao cadastrar evento')
+      const payload = {
+        title: formData.title,
+        slug: formData.slug,
+        description: formData.description,
+        date: dateTime,
+        location: formData.location,
+        capacity: parseInt(formData.capacity, 10),
+        price: formData.price ? parseFloat(formData.price) : 0,
+        ticket_types: formData.ticketTypes
+          .filter((ticketType) => ticketType.name.trim().length > 0)
+          .map((ticketType) => ({
+            name: ticketType.name.trim(),
+            price: parseFloat(ticketType.price) || 0,
+            quantity: parseInt(ticketType.quantity, 10) || 0,
+            description: ticketType.description?.trim() || null,
+          })),
       }
 
-      // Redirecionar para a lista de eventos
-      router.push('/eventos')
+      if (isEditMode && editId) {
+        await updateEvent(editId, token, payload)
+      } else {
+        await createEvent(token, { ...payload, status: 'draft' })
+      }
+
+      router.push('/meus-eventos')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao cadastrar evento')
+      setError(err instanceof Error ? err.message : 'Erro ao salvar evento')
     } finally {
       setLoading(false)
     }
   }
 
+  if (loadingEvent) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '5rem' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+          <p style={{ color: '#64748b', textAlign: 'center' }}>Carregando evento...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '5rem' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
-        <BackButton href="/eventos" style={{ marginBottom: '1rem' }} />
+        <BackButton href={isEditMode ? '/meus-eventos' : '/eventos'} style={{ marginBottom: '1rem' }} />
         <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', color: '#0f172a' }}>
-          Cadastrar Novo Evento
+          {isEditMode ? 'Editar Evento' : 'Cadastrar Novo Evento'}
         </h1>
 
         {error && (
@@ -177,7 +236,7 @@ export default function CadastrarEventoPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
             <label htmlFor="title" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
               Título do Evento *
@@ -195,6 +254,7 @@ export default function CadastrarEventoPage() {
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 fontSize: '1rem',
+                boxSizing: 'border-box',
               }}
               placeholder="Ex: Festival de Música 2026"
             />
@@ -217,6 +277,7 @@ export default function CadastrarEventoPage() {
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 fontSize: '1rem',
+                boxSizing: 'border-box',
               }}
               placeholder="festival-de-musica-2026"
             />
@@ -243,6 +304,7 @@ export default function CadastrarEventoPage() {
                 borderRadius: '8px',
                 fontSize: '1rem',
                 resize: 'vertical',
+                boxSizing: 'border-box',
               }}
               placeholder="Descreva o evento..."
             />
@@ -266,6 +328,7 @@ export default function CadastrarEventoPage() {
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
                   fontSize: '1rem',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
@@ -287,6 +350,7 @@ export default function CadastrarEventoPage() {
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
                   fontSize: '1rem',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
@@ -309,6 +373,7 @@ export default function CadastrarEventoPage() {
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 fontSize: '1rem',
+                boxSizing: 'border-box',
               }}
               placeholder="Ex: São Paulo, SP — Allianz Parque"
             />
@@ -333,6 +398,7 @@ export default function CadastrarEventoPage() {
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
                   fontSize: '1rem',
+                  boxSizing: 'border-box',
                 }}
                 placeholder="1000"
               />
@@ -356,6 +422,7 @@ export default function CadastrarEventoPage() {
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
                   fontSize: '1rem',
+                  boxSizing: 'border-box',
                 }}
                 placeholder="150.00"
               />
@@ -428,6 +495,7 @@ export default function CadastrarEventoPage() {
                       padding: '0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
+                      boxSizing: 'border-box',
                     }}
                   />
                   <input
@@ -442,6 +510,7 @@ export default function CadastrarEventoPage() {
                       padding: '0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
+                      boxSizing: 'border-box',
                     }}
                   />
                   <input
@@ -455,6 +524,7 @@ export default function CadastrarEventoPage() {
                       padding: '0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
@@ -469,6 +539,7 @@ export default function CadastrarEventoPage() {
                     border: '1px solid #cbd5e1',
                     borderRadius: '8px',
                     resize: 'vertical',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>
@@ -490,12 +561,18 @@ export default function CadastrarEventoPage() {
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              {loading ? 'Cadastrando...' : 'Cadastrar Evento'}
+              {loading
+                ? isEditMode
+                  ? 'Salvando...'
+                  : 'Cadastrando...'
+                : isEditMode
+                  ? 'Salvar Alterações'
+                  : 'Cadastrar Evento'}
             </button>
 
             <button
               type="button"
-              onClick={() => router.push('/eventos')}
+              onClick={() => router.push(isEditMode ? '/meus-eventos' : '/eventos')}
               disabled={loading}
               style={{
                 padding: '0.875rem 2rem',
@@ -514,5 +591,19 @@ export default function CadastrarEventoPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function CadastrarEventoPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '5rem' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+          <p style={{ color: '#64748b' }}>Carregando...</p>
+        </div>
+      </div>
+    }>
+      <CadastrarEventoForm />
+    </Suspense>
   )
 }
