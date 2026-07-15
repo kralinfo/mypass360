@@ -1,4 +1,36 @@
-import { IsDateString, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import { Type } from 'class-transformer'
+import {
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator'
+
+export class CreateEventTicketTypeDto {
+  @IsString()
+  name!: string
+
+  @IsNumber()
+  @Min(0)
+  price!: number
+
+  @IsNumber()
+  @Min(0)
+  quantity!: number
+
+  @IsString()
+  @IsOptional()
+  description?: string
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  sold?: number
+}
 
 export class CreateEventDto {
   @IsString()
@@ -17,7 +49,7 @@ export class CreateEventDto {
   location!: string
 
   @IsString()
-  organizerId!: string
+  organizer_id!: string
 
   @IsNumber()
   @Min(1)
@@ -27,4 +59,15 @@ export class CreateEventDto {
   @IsOptional()
   @Min(0)
   price?: number
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['draft', 'published', 'cancelled', 'finished'])
+  status?: string
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateEventTicketTypeDto)
+  @IsOptional()
+  ticket_types?: CreateEventTicketTypeDto[]
 }

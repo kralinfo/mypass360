@@ -9,6 +9,7 @@ export interface CheckoutTicketType {
   price: number
   quantity: number
   sold: number
+  description?: string | null
 }
 
 export interface CheckoutData {

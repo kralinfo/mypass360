@@ -1,5 +1,6 @@
 'use client'
 
+import { BackButton } from '@/components/BackButton'
 import { useSupabaseEvents } from '@/features/events/hooks/useSupabaseEvents'
 import { EventCard } from '@/features/events/components/EventCard'
 
@@ -17,6 +18,7 @@ export default function EventsPage() {
 
   return (
     <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <BackButton href="/" style={{ marginBottom: '1rem' }} />
       <h1 style={{ fontSize: '2rem', marginBottom: '1.5rem' }}>Eventos</h1>
 
       {error && (

@@ -35,15 +35,46 @@ export class EventsRepository {
   }
 
   async create(dto: CreateEventDto) {
-    const { data, error } = await this.supabase
+    const { data: event, error: eventError } = await this.supabase
       .getClient()
       .from(this.table)
-      .insert(dto)
+      .insert({
+        title: dto.title,
+        slug: dto.slug,
+        description: dto.description,
+        date: dto.date,
+        location: dto.location,
+        organizer_id: dto.organizer_id,
+        capacity: dto.capacity,
+        price: dto.price ?? 0,
+        status: dto.status ?? 'draft',
+      })
       .select()
       .single()
 
-    if (error) throw new Error(error.message)
-    return data
+    if (eventError) throw new Error(eventError.message)
+
+    if (dto.ticket_types && dto.ticket_types.length > 0) {
+      const ticketTypesToInsert = dto.ticket_types.map((ticketType) => ({
+        event_id: event.id,
+        name: ticketType.name,
+        price: ticketType.price,
+        quantity: ticketType.quantity,
+        description: ticketType.description ?? null,
+        sold: ticketType.sold ?? 0,
+      }))
+
+      const { error: ticketsError } = await this.supabase
+        .getClient()
+        .from('ticket_types')
+        .insert(ticketTypesToInsert)
+
+      if (ticketsError) {
+        throw new Error(ticketsError.message)
+      }
+    }
+
+    return event
   }
 
   async update(id: string, dto: UpdateEventDto) {

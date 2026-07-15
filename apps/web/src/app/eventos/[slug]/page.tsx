@@ -7,6 +7,7 @@ import type { Event } from '@mypass360/types'
 import { fetchPublishedEventBySlug } from '@/features/events/services/supabase-events.service'
 import { fetchCheckoutData, type CheckoutTicketType } from '@/features/checkout/services/checkout.service'
 import { useCart } from '@/features/cart/cart-context'
+import { BackButton } from '@/components/BackButton'
 
 interface EventDetailPageProps {
   params: Promise<{ slug: string }>
@@ -62,6 +63,21 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
       })
       .finally(() => setIsLoading(false))
   }, [params])
+
+  function persistDirectCheckoutSelection(items: Array<{ ticketTypeId: string; quantity: number; unitPrice: number }>) {
+    if (typeof window === 'undefined' || !event) {
+      return
+    }
+
+    window.sessionStorage.setItem(
+      `mypass360-direct-checkout:${event.id}`,
+      JSON.stringify({
+        eventId: event.id,
+        eventSlug: event.slug,
+        items,
+      })
+    )
+  }
 
   if (isLoading) {
     return (
@@ -126,18 +142,97 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
       quantity,
     })
 
+    setQuantities((current) => ({
+      ...current,
+      [ticketType.id]: 0,
+    }))
+
     setSuccessMessage(`${quantity} ingressos ${ticketType.name} adicionados ao carrinho.`)
   }
 
-  function handleBuyNow(ticketType: CheckoutTicketType) {
-    handleAddToCart(ticketType)
-    if (event) {
-      router.push(`/checkout?eventId=${event.id}`)
+  function handleAddAllToCart() {
+    if (!event) return false
+
+    const itemsToAdd = ticketTypes
+      .filter((ticketType) => (quantities[ticketType.id] ?? 0) > 0)
+      .map((ticketType) => ({
+        eventId: event.id,
+        eventSlug: event.slug,
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventLocation: event.location,
+        ticketTypeId: ticketType.id,
+        ticketTypeName: ticketType.name,
+        unitPrice: ticketType.price,
+        available: Math.max(ticketType.quantity - ticketType.sold, 0),
+        quantity: quantities[ticketType.id] ?? 0,
+      }))
+
+    if (itemsToAdd.length === 0) {
+      setWarningMessage('Selecione ao menos um ingresso para adicionar ao carrinho.')
+      return false
     }
+
+    setWarningMessage(null)
+    itemsToAdd.forEach((item) => addToCart(item))
+    setQuantities((current) => {
+      const next = { ...current }
+      itemsToAdd.forEach((item) => {
+        next[item.ticketTypeId] = 0
+      })
+      return next
+    })
+
+    setSuccessMessage(`Adicionados ${itemsToAdd.reduce((sum, item) => sum + item.quantity, 0)} ingressos ao carrinho.`)
+    return true
+  }
+
+  function handleBuyAll() {
+    if (!event) return
+
+    const directItems = ticketTypes
+      .filter((ticketType) => (quantities[ticketType.id] ?? 0) > 0)
+      .map((ticketType) => ({
+        ticketTypeId: ticketType.id,
+        quantity: quantities[ticketType.id] ?? 0,
+        unitPrice: ticketType.price,
+      }))
+
+    if (directItems.length === 0) {
+      setWarningMessage('Selecione ao menos um ingresso para continuar.')
+      return
+    }
+
+    setWarningMessage(null)
+    persistDirectCheckoutSelection(directItems)
+    setSuccessMessage(null)
+    router.push(`/checkout?eventId=${event.id}&from=event&slug=${event.slug}`)
+  }
+
+  function handleBuyNow(ticketType: CheckoutTicketType) {
+    const quantity = quantities[ticketType.id] ?? 0
+
+    if (!event || quantity <= 0) {
+      setWarningMessage('Escolha uma quantidade antes de continuar.')
+      return
+    }
+
+    setWarningMessage(null)
+    persistDirectCheckoutSelection([
+      {
+        ticketTypeId: ticketType.id,
+        quantity,
+        unitPrice: ticketType.price,
+      },
+    ])
+    setSuccessMessage(null)
+    router.push(`/checkout?eventId=${event.id}&from=event&slug=${event.slug}`)
   }
 
   return (
     <main style={{ position: 'relative', padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
+      <BackButton href="/eventos" style={{ marginBottom: '1rem' }} />
+
       {successMessage ? (
         <div
           style={{
@@ -247,13 +342,14 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
         {ticketTypes.length === 0 ? (
           <p style={{ color: '#64748b' }}>Esse evento ainda não possui tipos de ingresso cadastrados.</p>
         ) : (
-          ticketTypes.map((ticketType) => {
-            const available = Math.max(ticketType.quantity - ticketType.sold, 0)
-            const quantity = quantities[ticketType.id] ?? 0
+          <>
+            {ticketTypes.map((ticketType) => {
+              const available = Math.max(ticketType.quantity - ticketType.sold, 0)
+              const quantity = quantities[ticketType.id] ?? 0
 
-            return (
-              <article
-                key={ticketType.id}
+              return (
+                <article
+                  key={ticketType.id}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -267,13 +363,18 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
               >
                 <div>
                   <h3 style={{ marginBottom: '0.25rem' }}>{ticketType.name}</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                  <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
                     {ticketType.price.toLocaleString('pt-BR', {
                       style: 'currency',
                       currency: 'BRL',
                     })}{' '}
                     • {available} disponíveis
                   </p>
+                  {ticketType.description ? (
+                    <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                      {ticketType.description}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
@@ -339,7 +440,42 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                 </div>
               </article>
             )
-          })
+          })}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={handleAddAllToCart}
+                style={{
+                  width: '100%',
+                  padding: '0.95rem 1rem',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Adicionar tudo ao carrinho
+              </button>
+              <button
+                type="button"
+                onClick={handleBuyAll}
+                style={{
+                  width: '100%',
+                  padding: '0.95rem 1rem',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Comprar tudo
+              </button>
+            </div>
+          </>
         )}
       </section>
     </main>
