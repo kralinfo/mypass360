@@ -11,5 +11,9 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  return NextResponse.redirect(`${origin}${next}`)
+  // NEXT_PUBLIC_SITE_URL garante a URL pública correta em produção/preview
+  // evitando que o Render use a porta interna (ex: localhost:10000)
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? origin
+
+  return NextResponse.redirect(`${baseUrl}${next}`)
 }
