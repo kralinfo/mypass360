@@ -7,9 +7,21 @@ import { useCart } from '@/features/cart/cart-context'
 
 interface CheckoutFormProps {
   eventId: string
+  from?: string
+  slug?: string
 }
 
-export function CheckoutForm({ eventId }: CheckoutFormProps) {
+interface DirectCheckoutSelection {
+  eventId: string
+  eventSlug: string
+  items: Array<{
+    ticketTypeId: string
+    quantity: number
+    unitPrice: number
+  }>
+}
+
+export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   const {
     event,
     ticketTypes,
@@ -20,18 +32,53 @@ export function CheckoutForm({ eventId }: CheckoutFormProps) {
     error,
     loadCheckout,
     setTicketQuantity,
+    hydrateSelectedItems,
     handleSubmit,
   } = useCheckout()
   const router = useRouter()
   const { getItemsForEvent } = useCart()
   const hydratedFromCartRef = useRef(false)
+  const hydratedFromDirectCheckoutRef = useRef(false)
 
   useEffect(() => {
     loadCheckout(eventId)
   }, [eventId, loadCheckout])
 
   useEffect(() => {
-    if (!event || ticketTypes.length === 0 || hydratedFromCartRef.current) {
+    if (from !== 'event' || hydratedFromDirectCheckoutRef.current || !event) {
+      return
+    }
+
+    const storageKey = `mypass360-direct-checkout:${eventId}`
+    const storedSelection = window.sessionStorage.getItem(storageKey)
+
+    if (!storedSelection) {
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(storedSelection) as DirectCheckoutSelection
+
+      if (parsed.eventId !== eventId) {
+        return
+      }
+
+      const validTicketTypes = new Set(ticketTypes.map((ticketType) => ticketType.id))
+      const directItems = parsed.items.filter((item) => validTicketTypes.has(item.ticketTypeId))
+
+      if (directItems.length === 0) {
+        return
+      }
+
+      hydrateSelectedItems(directItems)
+      hydratedFromDirectCheckoutRef.current = true
+    } catch {
+      window.sessionStorage.removeItem(storageKey)
+    }
+  }, [event, eventId, from, hydrateSelectedItems, ticketTypes])
+
+  useEffect(() => {
+    if (from === 'event' || !event || ticketTypes.length === 0 || hydratedFromCartRef.current) {
       return
     }
 
@@ -50,16 +97,26 @@ export function CheckoutForm({ eventId }: CheckoutFormProps) {
     }
 
     hydratedFromCartRef.current = true
-  }, [event, eventId, getItemsForEvent, setTicketQuantity, ticketTypes])
+  }, [event, eventId, from, getItemsForEvent, setTicketQuantity, ticketTypes])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const result = await handleSubmit(eventId)
 
     if (result?.orderId) {
-      router.push(
-        `/checkout/pagamento?orderId=${result.orderId}&eventId=${eventId}&amount=${result.amount}`
-      )
+      if (from === 'event') {
+        window.sessionStorage.removeItem(`mypass360-direct-checkout:${eventId}`)
+      }
+
+      const params = new URLSearchParams({
+        orderId: result.orderId,
+        eventId,
+        amount: String(result.amount),
+      })
+      if (from) params.append('from', from)
+      if (slug) params.append('slug', slug)
+
+      router.push(`/checkout/pagamento?${params.toString()}`)
       router.refresh()
     }
   }
@@ -73,6 +130,7 @@ export function CheckoutForm({ eventId }: CheckoutFormProps) {
   }
 
   const selectedById = new Map(selectedItems.map((item) => [item.ticketTypeId, item.quantity]))
+  const visibleTicketTypes = ticketTypes.filter((ticketType) => (selectedById.get(ticketType.id) ?? 0) > 0)
 
   return (
     <form
@@ -95,9 +153,11 @@ export function CheckoutForm({ eventId }: CheckoutFormProps) {
 
       {ticketTypes.length === 0 ? (
         <p>Esse evento ainda não possui tipos de ingresso cadastrados.</p>
+      ) : visibleTicketTypes.length === 0 ? (
+        <p>Nenhum ingresso foi selecionado para esta compra.</p>
       ) : (
         <section style={{ display: 'grid', gap: '0.75rem' }}>
-          {ticketTypes.map((ticketType) => {
+          {visibleTicketTypes.map((ticketType) => {
             const quantity = selectedById.get(ticketType.id) ?? 0
             const available = Math.max(ticketType.quantity - ticketType.sold, 0)
 
