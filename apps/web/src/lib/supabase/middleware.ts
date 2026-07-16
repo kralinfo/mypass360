@@ -29,7 +29,8 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/cadastro')
-  const isProtectedRoute = pathname.startsWith('/checkout')
+  const isProtectedRoute =
+    pathname.startsWith('/checkout') || pathname.startsWith('/meus-eventos')
 
   if (!session && isProtectedRoute) {
     const url = request.nextUrl.clone()
