@@ -7,10 +7,11 @@ export interface Event {
   description: string
   date: string
   location: string
-  organizerId: string
+  organizer_id: string
   capacity: number
   price: number
   status: EventStatus
-  createdAt: string
-  updatedAt: string
+  image_url?: string
+  created_at: string
+  updated_at: string
 }

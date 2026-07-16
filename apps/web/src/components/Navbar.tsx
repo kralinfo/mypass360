@@ -67,6 +67,21 @@ export function Navbar() {
         <Link href="/eventos" style={{ color: '#fff', textDecoration: 'none' }}>
           Eventos
         </Link>
+        {user && (
+          <Link
+            href="/eventos/cadastrar"
+            style={{
+              color: '#0f172a',
+              background: '#a78bfa',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              fontWeight: '500',
+            }}
+          >
+            + Cadastrar Evento
+          </Link>
+        )}
         <Link
           href="/carrinho"
           style={{
