@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import { Navbar } from '@/components/Navbar'
-import { Footer } from '@/components/Footer'
+import { AppShell } from '@/components/AppShell'
 import { CartProvider } from '@/features/cart/cart-context'
 
 export const metadata: Metadata = {
@@ -25,12 +24,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body style={{ margin: 0, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <body style={{ margin: 0, minHeight: '100vh' }}>
         <CartProvider>
-          <Navbar />
-          <div style={{ flex: 1, paddingTop: '76px' }}>{children}</div>
+          <AppShell>{children}</AppShell>
         </CartProvider>
-        <Footer />
       </body>
     </html>
   )
