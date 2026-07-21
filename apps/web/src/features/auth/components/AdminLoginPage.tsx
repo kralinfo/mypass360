@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 
 interface AdminLoginPageProps {
@@ -12,7 +12,9 @@ export function AdminLoginPage({ title = 'Login administrativo' }: AdminLoginPag
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const labelStyle = {
     display: 'block',
@@ -44,16 +46,22 @@ export function AdminLoginPage({ title = 'Login administrativo' }: AdminLoginPag
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
+    setErrorMsg(null)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      alert(`Erro ao autenticar: ${error.message}`)
-    } else {
-      router.push('/admin')
-      router.refresh()
+      setErrorMsg('Email ou senha incorretos. Verifique suas credenciais e tente novamente.')
+      setLoading(false)
+      return
     }
+
+    // After successful login, redirect to the intended destination.
+    // The middleware will reject non-admin accounts back to /admin-login.
+    const next = searchParams.get('next') ?? '/admin'
+    router.push(next)
+    router.refresh()
 
     setLoading(false)
   }
@@ -63,13 +71,28 @@ export function AdminLoginPage({ title = 'Login administrativo' }: AdminLoginPag
       <h2 style={{ margin: '0 0 0.75rem', fontSize: '2rem', lineHeight: 1.1, color: '#0f172a' }}>{title}</h2>
       <p style={helperStyle}>Use seu usuário interno para acessar o ambiente administrativo do MyPass360.</p>
 
+      {errorMsg && (
+        <div style={{
+          marginBottom: '1rem',
+          padding: '0.85rem 1rem',
+          borderRadius: '12px',
+          background: '#fee2e2',
+          border: '1px solid #fecaca',
+          color: '#991b1b',
+          fontSize: '0.9rem',
+          lineHeight: 1.45,
+        }}>
+          {errorMsg}
+        </div>
+      )}
+
       <form onSubmit={handleLogin}>
         <div style={{ marginBottom: '1rem' }}>
-          <label style={labelStyle} htmlFor="email">
-              Email
+          <label style={labelStyle} htmlFor="admin-email">
+            Email
           </label>
           <input
-            id="email"
+            id="admin-email"
             type="email"
             required
             placeholder="admin@mypass360.com"
@@ -80,11 +103,11 @@ export function AdminLoginPage({ title = 'Login administrativo' }: AdminLoginPag
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={labelStyle} htmlFor="password">
+          <label style={labelStyle} htmlFor="admin-password">
             Senha
           </label>
           <input
-            id="password"
+            id="admin-password"
             type="password"
             required
             placeholder="Digite sua senha"
@@ -110,9 +133,9 @@ export function AdminLoginPage({ title = 'Login administrativo' }: AdminLoginPag
             boxShadow: '0 16px 30px rgba(79, 70, 229, 0.22)',
           }}
         >
-          {loading ? 'Entrando...' : 'Entrar no painel'}
+          {loading ? 'Verificando...' : 'Entrar no painel'}
         </button>
       </form>
     </div>
   )
-}
+}
