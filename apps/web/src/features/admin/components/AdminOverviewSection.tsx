@@ -288,6 +288,180 @@ function FilteredTable({
   )
 }
 
+// ─── Overview Tabs ────────────────────────────────────────────────────────────
+type OverviewTab = 'visao' | 'eventos' | 'usuarios'
+
+type OverviewTabsProps = {
+  metrics: AdminDashboardData['metrics'] | undefined
+  topEvents: AdminDashboardData['events']
+  activeUsers: AdminDashboardData['users']
+}
+
+const overviewTabs: { id: OverviewTab; label: string; icon: string }[] = [
+  { id: 'visao', label: 'Visão executiva', icon: '◈' },
+  { id: 'eventos', label: 'Top eventos', icon: '◉' },
+  { id: 'usuarios', label: 'Usuários', icon: '◎' },
+]
+
+function OverviewTabs({ metrics, topEvents, activeUsers }: OverviewTabsProps) {
+  const [activeTab, setActiveTab] = useState<OverviewTab>('visao')
+
+  return (
+    <section
+      style={{
+        background: '#fff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '16px',
+        boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Tab bar */}
+      <div
+        style={{
+          display: 'flex',
+          borderBottom: '1px solid #f1f5f9',
+          background: '#fcfdff',
+          gap: 0,
+        }}
+      >
+        {overviewTabs.map((tab) => {
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: isActive ? '2px solid #6366f1' : '2px solid transparent',
+                color: isActive ? '#6366f1' : '#64748b',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                transition: 'all 0.18s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ fontSize: '0.85rem' }}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab content */}
+      <div style={{ padding: '1rem 1.1rem 1.1rem' }}>
+        {activeTab === 'visao' && (
+          <div style={{ display: 'grid', gap: '0.55rem' }}>
+            {metrics ? (
+              <>
+                <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.9rem' }}>Conversão operacional</strong>
+                  <span style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                    {metrics.totalOrders > 0
+                      ? `${Math.round((metrics.paidOrders / metrics.totalOrders) * 100)}% dos pedidos estão pagos.`
+                      : 'Ainda sem pedidos para medir conversão.'}
+                  </span>
+                </div>
+                <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.9rem' }}>Fila administrativa</strong>
+                  <span style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                    {metrics.draftEvents} eventos em rascunho e {metrics.pendingOrders} pedidos aguardando conclusão.
+                  </span>
+                </div>
+                <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.9rem' }}>Organizadores ativos</strong>
+                  <span style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                    {metrics.organizerUsers} usuários já cadastraram ao menos um evento.
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p style={{ color: '#64748b', margin: 0 }}>Sem dados suficientes para resumo.</p>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'eventos' && (
+          <div style={{ display: 'grid', gap: '0.65rem' }}>
+            {topEvents.length === 0 ? (
+              <p style={{ color: '#64748b', margin: 0 }}>Sem eventos para destacar.</p>
+            ) : null}
+            {topEvents.map((event) => (
+              <div
+                key={event.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: '0.5rem',
+                  alignItems: 'start',
+                  padding: '0.65rem 0',
+                  borderBottom: '1px solid #f1f5f9',
+                }}
+              >
+                <div>
+                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.9rem' }}>{event.title}</strong>
+                  <span style={{ display: 'block', marginTop: '0.15rem', color: '#94a3b8', fontSize: '0.8rem' }}>
+                    {formatDate(event.date)} • {event.location}
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <strong style={{ display: 'block', color: '#16a34a', fontSize: '0.88rem' }}>{formatCurrency(event.revenue)}</strong>
+                  <span style={{ display: 'block', color: '#64748b', fontSize: '0.8rem' }}>{event.paidOrders} pagos</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'usuarios' && (
+          <div style={{ display: 'grid', gap: '0.65rem' }}>
+            {activeUsers.length === 0 ? (
+              <p style={{ color: '#64748b', margin: 0 }}>Sem usuários ativos para exibir.</p>
+            ) : null}
+            {activeUsers.map((user) => (
+              <div
+                key={user.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.65rem 0',
+                  borderBottom: '1px solid #f1f5f9',
+                  gap: '0.75rem',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user.name}
+                  </strong>
+                  <span style={{ display: 'block', color: '#64748b', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user.email}
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <span style={{ display: 'block', color: '#0f172a', fontSize: '0.85rem', fontWeight: 700 }}>{user.createdEventsCount} eventos</span>
+                  <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.78rem' }}>
+                    login {formatDate(user.lastSignInAt)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function AdminOverviewSection({ dashboard }: AdminOverviewSectionProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>(null)
@@ -358,77 +532,7 @@ export function AdminOverviewSection({ dashboard }: AdminOverviewSectionProps) {
         />
       ) : null}
 
-      <section
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: 'minmax(0, 1.45fr) minmax(320px, 0.95fr)',
-          alignItems: 'start',
-        }}
-      >
-        <AdminPanelCard title="Visão executiva" subtitle="Resumo operacional para tomada de decisão rápida.">
-          {metrics ? (
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <strong style={{ display: 'block', color: '#0f172a' }}>Conversão operacional</strong>
-                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                  {metrics.totalOrders > 0
-                    ? `${Math.round((metrics.paidOrders / metrics.totalOrders) * 100)}% dos pedidos estão pagos.`
-                    : 'Ainda sem pedidos para medir conversão.'}
-                </span>
-              </div>
-              <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <strong style={{ display: 'block', color: '#0f172a' }}>Fila administrativa</strong>
-                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                  {metrics.draftEvents} eventos em rascunho e {metrics.pendingOrders} pedidos aguardando conclusão.
-                </span>
-              </div>
-              <div style={{ padding: '0.75rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <strong style={{ display: 'block', color: '#0f172a' }}>Organizadores ativos</strong>
-                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                  {metrics.organizerUsers} usuários já cadastraram ao menos um evento.
-                </span>
-              </div>
-            </div>
-          ) : (
-            <p style={{ color: '#64748b' }}>Sem dados suficientes para resumo.</p>
-          )}
-        </AdminPanelCard>
-
-        <div style={{ display: 'grid', gap: '0.85rem' }}>
-          <AdminPanelCard title="Top eventos" subtitle="Os eventos com maior retorno no momento.">
-            <div style={{ display: 'grid', gap: '0.8rem' }}>
-              {topEvents.length === 0 ? <p style={{ color: '#64748b' }}>Sem eventos para destacar.</p> : null}
-              {topEvents.map((event) => (
-                <div key={event.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '0.8rem' }}>
-                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.93rem' }}>{event.title}</strong>
-                  <span style={{ display: 'block', marginTop: '0.25rem', color: '#64748b', fontSize: '0.85rem' }}>
-                    {event.paidOrders} pagos • {formatCurrency(event.revenue)}
-                  </span>
-                  <span style={{ display: 'block', marginTop: '0.2rem', color: '#94a3b8', fontSize: '0.82rem' }}>
-                    {formatDate(event.date)} • {event.location}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </AdminPanelCard>
-
-          <AdminPanelCard title="Usuários em atividade" subtitle="Quem está operando ou criando eventos.">
-            <div style={{ display: 'grid', gap: '0.8rem' }}>
-              {activeUsers.length === 0 ? <p style={{ color: '#64748b' }}>Sem usuários ativos para exibir.</p> : null}
-              {activeUsers.map((user) => (
-                <div key={user.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '0.8rem' }}>
-                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.92rem' }}>{user.name}</strong>
-                  <span style={{ display: 'block', marginTop: '0.2rem', color: '#64748b', fontSize: '0.84rem' }}>{user.email}</span>
-                  <span style={{ display: 'block', marginTop: '0.2rem', color: '#94a3b8', fontSize: '0.82rem' }}>
-                    {user.createdEventsCount} eventos • último login {formatDate(user.lastSignInAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </AdminPanelCard>
-        </div>
-      </section>
+      <OverviewTabs metrics={metrics} topEvents={topEvents} activeUsers={activeUsers} />
     </div>
   )
 }

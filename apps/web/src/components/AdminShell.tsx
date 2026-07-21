@@ -76,7 +76,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#f8fafc' }}>
+    <div style={{ height: '100vh', display: 'flex', background: '#f8fafc', overflow: 'hidden' }}>
       <aside
         style={{
           width: menuAberto ? '220px' : '62px',
@@ -202,7 +202,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <header
           style={{
             position: 'sticky',
@@ -235,7 +235,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div style={{ flex: 1 }}>{children}</div>
+        <div style={{ flex: 1, overflowY: 'auto' }}>{children}</div>
       </div>
     </div>
   )
