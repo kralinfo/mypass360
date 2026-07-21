@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { AdminDashboardData } from '@mypass360/types'
 import { AdminPanelCard } from './AdminPanelCard'
 import { AdminSummaryCard } from './AdminSummaryCard'
@@ -13,16 +13,16 @@ type AdminOverviewSectionProps = {
 }
 
 // ─── Tabela: Receita / Pedidos Pagos ────────────────────────────────────────
-function RevenueTable({ dashboard }: { dashboard: AdminDashboardData }) {
-  const sorted = [...dashboard.events].sort((a, b) => b.revenue - a.revenue)
-  if (sorted.length === 0) return <p style={{ color: '#64748b', margin: 0 }}>Nenhum evento com receita registrada.</p>
+type AdminEventItem = AdminDashboardData['events'][number]
+type AdminUserItem = AdminDashboardData['users'][number]
 
+function RevenueTable({ events }: { events: AdminEventItem[] }) {
   const COLS = '2fr 1.2fr 0.8fr 0.8fr'
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ minWidth: '600px' }}>
         <TableHeader columns={['Evento', 'Data', 'Pedidos Pagos', 'Receita']} cols={COLS} />
-        {sorted.map((event) => (
+        {events.map((event) => (
           <div key={event.id} style={makeRowStyle(COLS)}>
             <div>
               <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.93rem' }}>{event.title}</strong>
@@ -39,16 +39,13 @@ function RevenueTable({ dashboard }: { dashboard: AdminDashboardData }) {
 }
 
 // ─── Tabela: Eventos Publicados ──────────────────────────────────────────────
-function PublishedEventsTable({ dashboard }: { dashboard: AdminDashboardData }) {
-  const filtered = dashboard.events.filter((e) => e.status === 'published')
-  if (filtered.length === 0) return <p style={{ color: '#64748b', margin: 0 }}>Nenhum evento publicado no momento.</p>
-
+function PublishedEventsTable({ events }: { events: AdminEventItem[] }) {
   const COLS = '2fr 1.5fr 0.8fr 0.6fr 0.8fr'
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ minWidth: '700px' }}>
         <TableHeader columns={['Evento', 'Data / Local', 'Status', 'Pedidos', 'Receita']} cols={COLS} />
-        {filtered.map((event) => (
+        {events.map((event) => (
           <div key={event.id} style={makeRowStyle(COLS)}>
             <div>
               <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.93rem' }}>{event.title}</strong>
@@ -81,19 +78,13 @@ function PublishedEventsTable({ dashboard }: { dashboard: AdminDashboardData }) 
 }
 
 // ─── Tabela: Pedidos Pendentes ───────────────────────────────────────────────
-function PendingOrdersTable({ dashboard }: { dashboard: AdminDashboardData }) {
-  const withPending = dashboard.events
-    .filter((e) => e.totalOrders - e.paidOrders > 0)
-    .sort((a, b) => (b.totalOrders - b.paidOrders) - (a.totalOrders - a.paidOrders))
-
-  if (withPending.length === 0) return <p style={{ color: '#64748b', margin: 0 }}>Nenhum pedido pendente encontrado.</p>
-
+function PendingOrdersTable({ events }: { events: AdminEventItem[] }) {
   const COLS = '2.5fr 0.9fr 0.8fr 0.8fr 0.8fr'
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ minWidth: '580px' }}>
         <TableHeader columns={['Evento', 'Status', 'Pendentes', 'Pagos', 'Total']} cols={COLS} />
-        {withPending.map((event) => {
+        {events.map((event) => {
           const pending = event.totalOrders - event.paidOrders
           return (
             <div key={event.id} style={makeRowStyle(COLS)}>
@@ -126,15 +117,13 @@ function PendingOrdersTable({ dashboard }: { dashboard: AdminDashboardData }) {
 }
 
 // ─── Tabela: Usuários ────────────────────────────────────────────────────────
-function UsersTable({ dashboard }: { dashboard: AdminDashboardData }) {
-  if (dashboard.users.length === 0) return <p style={{ color: '#64748b', margin: 0 }}>Nenhum usuário encontrado.</p>
-
+function UsersTable({ users }: { users: AdminUserItem[] }) {
   const COLS = '2fr 0.8fr 0.8fr 1.1fr 0.75fr'
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ minWidth: '680px' }}>
         <TableHeader columns={['Usuário', 'Provedor', 'Eventos criados', 'Último acesso', 'Status']} cols={COLS} />
-        {dashboard.users.map((user) => (
+        {users.map((user) => (
           <div key={user.id} style={makeRowStyle(COLS)}>
             <div>
               <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.93rem' }}>{user.name}</strong>
@@ -216,13 +205,55 @@ function FilteredTable({
   onClose: () => void
 }) {
   const config = filterConfig[filter]
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+
+  // Filter and sort items based on the active tab
+  const sortedItems = useMemo(() => {
+    switch (filter) {
+      case 'revenue':
+        return [...dashboard.events].sort((a, b) => b.revenue - a.revenue)
+      case 'published':
+        return dashboard.events.filter((e) => e.status === 'published')
+      case 'pending':
+        return dashboard.events
+          .filter((e) => e.totalOrders - e.paidOrders > 0)
+          .sort((a, b) => (b.totalOrders - b.paidOrders) - (a.totalOrders - a.paidOrders))
+      case 'users':
+        return dashboard.users
+      default:
+        return []
+    }
+  }, [filter, dashboard])
+
+  // Reset page when filter or page size changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filter, itemsPerPage])
+
+  const totalItems = sortedItems.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage))
+  
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems)
+  
+  const slicedItems = useMemo(() => {
+    return sortedItems.slice(startIndex, startIndex + itemsPerPage)
+  }, [sortedItems, startIndex, itemsPerPage])
 
   const content = (() => {
+    if (totalItems === 0) {
+      return <p style={{ color: '#64748b', margin: '1rem 0' }}>Nenhum registro encontrado.</p>
+    }
     switch (filter) {
-      case 'revenue':    return <RevenueTable dashboard={dashboard} />
-      case 'published':  return <PublishedEventsTable dashboard={dashboard} />
-      case 'pending':    return <PendingOrdersTable dashboard={dashboard} />
-      case 'users':      return <UsersTable dashboard={dashboard} />
+      case 'revenue':
+        return <RevenueTable events={slicedItems as AdminEventItem[]} />
+      case 'published':
+        return <PublishedEventsTable events={slicedItems as AdminEventItem[]} />
+      case 'pending':
+        return <PendingOrdersTable events={slicedItems as AdminEventItem[]} />
+      case 'users':
+        return <UsersTable users={slicedItems as AdminUserItem[]} />
     }
   })()
 
@@ -283,7 +314,97 @@ function FilteredTable({
       </div>
 
       {/* Body */}
-      <div style={{ padding: '1rem 1.25rem 1.25rem' }}>{content}</div>
+      <div style={{ padding: '1rem 1.25rem 0.75rem' }}>
+        {content}
+      </div>
+
+      {/* Pagination Footer */}
+      {totalItems > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '0.75rem 1.25rem',
+            borderTop: '1px solid #f1f5f9',
+            background: '#fcfdff',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Page size controller */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Itens por página:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              style={{
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '0.3rem 0.5rem',
+                background: '#fff',
+                fontSize: '0.82rem',
+                color: '#0f172a',
+                cursor: 'pointer',
+              }}
+            >
+              {[5, 10, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Info */}
+          <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+            Mostrando <strong>{startIndex + 1}</strong> a <strong>{endIndex}</strong> de <strong>{totalItems}</strong> registros
+          </span>
+
+          {/* Page buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              style={{
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '0.4rem 0.75rem',
+                background: currentPage === 1 ? '#f8fafc' : '#fff',
+                color: currentPage === 1 ? '#cbd5e1' : '#64748b',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              Anterior
+            </button>
+            <span style={{ fontSize: '0.82rem', color: '#64748b', minWidth: '4.5rem', textAlign: 'center' }}>
+              Pág. <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
+            </span>
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              style={{
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '0.4rem 0.75rem',
+                background: currentPage === totalPages ? '#f8fafc' : '#fff',
+                color: currentPage === totalPages ? '#cbd5e1' : '#64748b',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              Próximo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
