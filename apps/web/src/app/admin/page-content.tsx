@@ -73,8 +73,8 @@ export function AdminPageContent() {
     <main
       style={{
         minHeight: '100vh',
-        padding: '2rem 2rem 3rem',
-        maxWidth: '1440px',
+        padding: '1.25rem 1.5rem 2rem',
+        maxWidth: '1280px',
         margin: '0 auto',
       }}
     >
@@ -83,14 +83,14 @@ export function AdminPageContent() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          gap: '2rem',
-          marginBottom: '1.5rem',
+          gap: '1rem',
+          marginBottom: '1rem',
         }}
       >
         <div style={{ maxWidth: '56rem' }}>
-          <p style={{ margin: 0, color: '#6366f1', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.82rem' }}>{sectionHeader.eyebrow}</p>
-          <h1 style={{ margin: '0.55rem 0 0', fontSize: '2.3rem', color: '#020617', lineHeight: 1.08 }}>{sectionHeader.title}</h1>
-          <p style={{ margin: '0.9rem 0 0', color: '#64748b', maxWidth: '60rem', lineHeight: 1.6 }}>{sectionHeader.description}</p>
+          <p style={{ margin: 0, color: '#6366f1', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.78rem' }}>{sectionHeader.eyebrow}</p>
+          <h1 style={{ margin: '0.3rem 0 0', fontSize: '1.7rem', color: '#020617', lineHeight: 1.1 }}>{sectionHeader.title}</h1>
+          <p style={{ margin: '0.4rem 0 0', color: '#64748b', maxWidth: '60rem', lineHeight: 1.5, fontSize: '0.9rem' }}>{sectionHeader.description}</p>
         </div>
 
         <button
@@ -99,14 +99,15 @@ export function AdminPageContent() {
           disabled={isLoading}
           style={{
             border: '1px solid #cbd5e1',
-            borderRadius: '14px',
-            padding: '0.9rem 1.15rem',
+            borderRadius: '10px',
+            padding: '0.6rem 1rem',
             background: '#fff',
             cursor: isLoading ? 'not-allowed' : 'pointer',
             color: '#0f172a',
             fontWeight: 700,
-            minWidth: '170px',
-            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.05)',
+            fontSize: '0.88rem',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
           }}
         >
           {isLoading ? 'Atualizando...' : 'Atualizar painel'}

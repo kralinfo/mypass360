@@ -79,7 +79,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div style={{ minHeight: '100vh', display: 'flex', background: '#f8fafc' }}>
       <aside
         style={{
-          width: menuAberto ? '280px' : '84px',
+          width: menuAberto ? '220px' : '62px',
           transition: 'width 0.22s ease',
           borderRight: '1px solid #e2e8f0',
           background: '#020617',
@@ -91,25 +91,26 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           flexDirection: 'column',
           justifyContent: 'space-between',
           overflow: 'hidden',
+          flexShrink: 0,
         }}
       >
         <div>
           <div
             style={{
-              padding: '1rem 1rem 0.85rem',
+              padding: '0.75rem 0.85rem 0.65rem',
               borderBottom: '1px solid rgba(148, 163, 184, 0.16)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: menuAberto ? 'space-between' : 'center',
-              gap: '0.75rem',
+              gap: '0.5rem',
             }}
           >
             {menuAberto ? (
               <div>
-                <p style={{ margin: 0, fontSize: '0.78rem', letterSpacing: '0.08em', color: '#a78bfa', fontWeight: 700 }}>
+                <p style={{ margin: 0, fontSize: '0.72rem', letterSpacing: '0.08em', color: '#a78bfa', fontWeight: 700 }}>
                   MYPASS360
                 </p>
-                <strong style={{ display: 'block', marginTop: '0.3rem', fontSize: '1rem' }}>Administração</strong>
+                <strong style={{ display: 'block', marginTop: '0.2rem', fontSize: '0.9rem' }}>Administração</strong>
               </div>
             ) : null}
 
@@ -120,11 +121,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 border: '1px solid rgba(148, 163, 184, 0.24)',
                 background: 'rgba(148, 163, 184, 0.08)',
                 color: '#fff',
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
                 cursor: 'pointer',
-                fontSize: '1.1rem',
+                fontSize: '0.95rem',
+                flexShrink: 0,
               }}
               aria-label={menuAberto ? 'Recolher menu' : 'Expandir menu'}
             >
@@ -132,7 +134,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          <nav style={{ display: 'grid', gap: '0.35rem', padding: '1rem 0.85rem' }}>
+          <nav style={{ display: 'grid', gap: '0.25rem', padding: '0.75rem 0.65rem' }}>
             {adminMenuItems.map((item) => {
               const ativo = pathname.startsWith('/admin') && item.secao === secaoAtiva
 
@@ -143,18 +145,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.85rem',
+                    gap: '0.7rem',
                     textDecoration: 'none',
                     color: ativo ? '#fff' : '#cbd5e1',
                     background: ativo ? 'rgba(99, 102, 241, 0.22)' : 'transparent',
                     border: ativo ? '1px solid rgba(129, 140, 248, 0.32)' : '1px solid transparent',
-                    padding: '0.82rem 0.9rem',
-                    borderRadius: '14px',
+                    padding: '0.65rem 0.75rem',
+                    borderRadius: '12px',
                     fontWeight: 600,
+                    fontSize: '0.88rem',
                     justifyContent: menuAberto ? 'flex-start' : 'center',
                   }}
                 >
-                  <span style={{ fontSize: '1rem', minWidth: '18px', textAlign: 'center' }}>{item.icon}</span>
+                  <span style={{ fontSize: '0.9rem', minWidth: '16px', textAlign: 'center' }}>{item.icon}</span>
                   {menuAberto ? <span>{item.label}</span> : null}
                 </Link>
               )
@@ -162,18 +165,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div style={{ padding: '0.85rem', borderTop: '1px solid rgba(148, 163, 184, 0.16)' }}>
+        <div style={{ padding: '0.65rem', borderTop: '1px solid rgba(148, 163, 184, 0.16)' }}>
           {menuAberto ? (
             <div
               style={{
-                marginBottom: '0.85rem',
-                padding: '0.9rem',
-                borderRadius: '16px',
+                marginBottom: '0.65rem',
+                padding: '0.65rem 0.75rem',
+                borderRadius: '12px',
                 background: 'rgba(148, 163, 184, 0.08)',
               }}
             >
-              <span style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8' }}>Sessão ativa</span>
-              <strong style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.92rem', wordBreak: 'break-word' }}>
+              <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8' }}>Sessão ativa</span>
+              <strong style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.83rem', wordBreak: 'break-word' }}>
                 {usuario?.email ?? 'Administrador'}
               </strong>
             </div>
@@ -187,10 +190,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               border: '1px solid rgba(248, 113, 113, 0.32)',
               background: 'rgba(127, 29, 29, 0.15)',
               color: '#fecaca',
-              borderRadius: '14px',
-              padding: '0.85rem 1rem',
+              borderRadius: '12px',
+              padding: '0.65rem 0.75rem',
               cursor: 'pointer',
               fontWeight: 700,
+              fontSize: '0.83rem',
             }}
           >
             {menuAberto ? 'Sair da administração' : 'Sair'}
@@ -215,19 +219,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '1rem',
-              padding: '1rem 1.5rem',
+              padding: '0.65rem 1.25rem',
             }}
           >
             <div>
-              <span style={{ display: 'block', color: '#6366f1', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
+              <span style={{ display: 'block', color: '#6366f1', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.08em' }}>
                 MÓDULO INTERNO
               </span>
-              <strong style={{ display: 'block', marginTop: '0.25rem', color: '#0f172a', fontSize: '1.1rem' }}>
+              <strong style={{ display: 'block', marginTop: '0.15rem', color: '#0f172a', fontSize: '0.97rem' }}>
                 {tituloDaPagina}
               </strong>
             </div>
 
-            <span style={{ color: '#64748b', fontSize: '0.92rem' }}>{descricaoDaPagina}</span>
+            <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{descricaoDaPagina}</span>
           </div>
         </header>
 
