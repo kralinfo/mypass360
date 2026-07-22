@@ -46,6 +46,12 @@ export class MercadoPagoGatewayService {
           email: dto.payerEmail,
         },
         external_reference: dto.orderId,
+        payment_methods: {
+          installments: 12,
+          default_payment_method_id: 'pix',
+          excluded_payment_types: [],
+          excluded_payment_methods: [],
+        },
         ...(isLocalWebUrl
           ? {}
           : {
