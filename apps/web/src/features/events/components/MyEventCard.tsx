@@ -167,6 +167,19 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
 
   return (
     <>
+      <style>{`
+        .my-event-btn-action {
+          flex: 1;
+          justify-content: center;
+          min-width: 80px;
+        }
+        @media (max-width: 480px) {
+          .my-event-btn-action {
+            font-size: 0.78rem !important;
+            padding: 0.55rem 0.5rem !important;
+          }
+        }
+      `}</style>
       <article
         style={{
           background: '#fff',
@@ -217,7 +230,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           </span>
         </div>
 
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
           {/* Título */}
           <h2
             style={{
@@ -297,6 +310,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             {/* Editar */}
             <button
               type="button"
+              className="my-event-btn-action"
               onClick={() => router.push(`/eventos/cadastrar?edit=${event.id}`)}
               style={btnStyle}
             >
@@ -308,6 +322,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             {displayStatus === 'hidden' && (
               <button
                 type="button"
+                className="my-event-btn-action"
                 onClick={() => void handlePublish()}
                 disabled={loading === 'publish'}
                 style={btnStyle}
@@ -321,6 +336,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             {(displayStatus === 'published' || displayStatus === 'scheduled') && (
               <button
                 type="button"
+                className="my-event-btn-action"
                 onClick={() => void handleUnpublish()}
                 disabled={loading === 'unpublish'}
                 style={btnStyle}
@@ -334,6 +350,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             {displayStatus === 'hidden' && (
               <button
                 type="button"
+                className="my-event-btn-action"
                 onClick={() => setShowScheduleModal(true)}
                 style={btnStyle}
               >
