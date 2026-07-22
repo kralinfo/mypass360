@@ -31,9 +31,6 @@ export class MercadoPagoGatewayService {
     const apiUrl = this.config.get<string>('API_PUBLIC_URL')
     const isLocalWebUrl = webAppUrl.includes('localhost') || webAppUrl.includes('127.0.0.1')
 
-    const documentDigits = dto.payerDocument?.replace(/\D/g, '')
-    const documentType = documentDigits && documentDigits.length > 11 ? 'CNPJ' : 'CPF'
-
     const response = await preferenceClient.create({
       body: {
         items: [
@@ -47,16 +44,14 @@ export class MercadoPagoGatewayService {
         ],
         payer: {
           email: dto.payerEmail,
-          ...(documentDigits
-            ? {
-                identification: {
-                  type: documentType,
-                  number: documentDigits,
-                },
-              }
-            : {}),
         },
         external_reference: dto.orderId,
+        payment_methods: {
+          installments: 12,
+          default_payment_method_id: 'pix',
+          excluded_payment_types: [],
+          excluded_payment_methods: [],
+        },
         ...(isLocalWebUrl
           ? {}
           : {
