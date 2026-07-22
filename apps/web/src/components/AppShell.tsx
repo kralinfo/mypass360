@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             background: isAdminLoginRoute ? '#f8fafc' : '#fff',
           }}
         >
-          <main style={{ flex: 1, paddingTop: showPublicChrome ? '76px' : 0 }}>{children}</main>
+          <main className="app-main-content" style={{ flex: 1, paddingTop: showPublicChrome ? '76px' : 0 }}>{children}</main>
           {showPublicChrome ? <Footer /> : null}
         </div>
       )}

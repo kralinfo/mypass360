@@ -12,7 +12,10 @@ export default function LoginPage() {
         padding: '2rem 1rem',
       }}
     >
-      <BackButton href="/eventos" style={{ position: 'absolute', top: '6rem', left: '2rem' }} />
+      <BackButton
+        href="/eventos"
+        style={{ position: 'absolute', top: 'calc(6rem + env(safe-area-inset-top))', left: 'max(2rem, env(safe-area-inset-left))' }}
+      />
       <section
         style={{
           width: '100%',
