@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { AdminLoginPage } from '@/features/auth/components/AdminLoginPage'
 
@@ -70,7 +71,9 @@ export default function AdminLogin() {
             border: '1px solid #e5e7eb',
           }}
         >
-          <AdminLoginPage title="Entrar no painel" />
+          <Suspense fallback={<div style={{ padding: '1rem', color: '#64748b' }}>Carregando...</div>}>
+            <AdminLoginPage title="Entrar no painel" />
+          </Suspense>
 
           <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #e5e7eb' }}>
             <p style={{ margin: 0, color: '#6b7280', fontSize: '0.95rem' }}>

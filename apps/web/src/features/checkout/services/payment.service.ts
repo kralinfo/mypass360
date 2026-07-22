@@ -6,6 +6,7 @@ export interface CreateCheckoutPreferenceInput {
   amount: number
   payerEmail: string
   title?: string
+  payerDocument?: string
 }
 
 export interface CheckoutPreferenceResult {
