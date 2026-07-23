@@ -17,6 +17,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [event, setEvent] = useState<Event | null>(null)
   const [ticketTypes, setTicketTypes] = useState<CheckoutTicketType[]>([])
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [expandedTickets, setExpandedTickets] = useState<Record<string, boolean>>({})
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -51,6 +52,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
         const checkoutData = await fetchCheckoutData(data.id)
         setTicketTypes(checkoutData.ticketTypes)
+        if (checkoutData.ticketTypes.length > 0) {
+          setExpandedTickets({ [checkoutData.ticketTypes[0].id]: true })
+        }
         setQuantities(
           checkoutData.ticketTypes.reduce<Record<string, number>>((accumulator, ticketType) => {
             accumulator[ticketType.id] = 0
@@ -230,254 +234,378 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   }
 
   return (
-    <main style={{ position: 'relative', padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
-      <BackButton href="/eventos" style={{ marginBottom: '1rem' }} />
+    <>
+      <style>{`
+        .detail-banner {
+          height: 180px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          font-size: 3rem;
+          margin-bottom: 1.25rem;
+        }
+        .detail-title {
+          font-size: 1.85rem;
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 0.75rem;
+          letter-spacing: -0.02em;
+        }
+        .detail-info-grid {
+          display: flex;
+          gap: 1.25rem;
+          flex-wrap: wrap;
+          margin-bottom: 1.25rem;
+          padding: 0.85rem 1rem;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+        }
+        .detail-info-item {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          font-size: 0.88rem;
+          color: #475569;
+        }
+        .ticket-card {
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          background: #fff;
+          margin-bottom: 0.5rem;
+          overflow: hidden;
+          transition: all 0.2s ease;
+        }
+        .ticket-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.85rem 1rem;
+          cursor: pointer;
+          background: #fff;
+          user-select: none;
+        }
+        .ticket-header:hover {
+          background: #f8fafc;
+        }
+        .ticket-header-title {
+          margin: 0;
+          font-size: 0.98rem;
+          color: #0f172a;
+          font-weight: 700;
+        }
+        .ticket-header-price {
+          color: #10b981;
+          font-size: 0.92rem;
+          font-weight: 700;
+        }
+        .ticket-body {
+          padding: 1rem;
+          border-top: 1px solid #e2e8f0;
+          background: #fafafa;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .ticket-actions-group {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .chevron {
+          transition: transform 0.2s ease;
+          color: #64748b;
+          font-size: 0.8rem;
+        }
+        .chevron.expanded {
+          transform: rotate(180deg);
+        }
+        @media (max-width: 680px) {
+          .detail-banner {
+            height: 120px;
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+          }
+          .detail-title {
+            font-size: 1.5rem;
+          }
+          .detail-info-grid {
+            flex-direction: column;
+            gap: 0.6rem;
+            padding: 0.75rem;
+          }
+          .ticket-actions-group {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.5rem;
+            width: 100%;
+          }
+          .ticket-action-btn {
+            flex: 1;
+            padding: 0.6rem 0.5rem !important;
+            font-size: 0.78rem !important;
+            justify-content: center;
+          }
+        }
+      `}</style>
+      <main style={{ position: 'relative', maxWidth: '850px', margin: '0 auto', padding: '1rem 0.75rem' }}>
+        <BackButton href="/eventos" style={{ marginBottom: '1rem' }} />
 
-      {successMessage ? (
-        <div
+        {successMessage ? (
+          <div
+            style={{
+              position: 'fixed',
+              top: '1rem',
+              right: '1rem',
+              zIndex: 1000,
+              maxWidth: '300px',
+              padding: '0.85rem 1rem',
+              borderRadius: '12px',
+              background: '#0f172a',
+              color: '#fff',
+              boxShadow: '0 10px 25px rgba(15, 23, 42, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              animation: 'fadeIn 0.2s ease',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1.75rem', height: '1.75rem', borderRadius: '999px', background: '#f59e0b', color: '#0f172a', fontSize: '0.9rem' }}>
+              🛒
+            </span>
+            <span style={{ fontSize: '0.88rem', lineHeight: 1.35 }}>{successMessage}</span>
+          </div>
+        ) : null}
+
+        <div className="detail-banner">
+          🎵
+        </div>
+
+        <h1 className="detail-title">{event.title}</h1>
+
+        <div className="detail-info-grid">
+          <div className="detail-info-item">
+            <span>📅</span>
+            <time dateTime={event.date}>{formattedDate}</time>
+          </div>
+          <div className="detail-info-item">
+            <span>📍</span>
+            <span>{event.location}</span>
+          </div>
+          <div className="detail-info-item">
+            <span>👥</span>
+            <span>{event.capacity.toLocaleString('pt-BR')} lugares</span>
+          </div>
+        </div>
+
+        <p style={{ color: '#475569', lineHeight: '1.6', fontSize: '0.92rem', marginBottom: '1.5rem', padding: '0 0.25rem' }}>
+          {event.description}
+        </p>
+
+        <section
           style={{
-            position: 'fixed',
-            top: '1rem',
-            right: '1rem',
-            zIndex: 1000,
-            maxWidth: '320px',
-            padding: '1rem 1.1rem',
+            background: '#fff',
+            border: '1px solid #e2e8f0',
             borderRadius: '14px',
-            background: '#0f172a',
-            color: '#fff',
-            boxShadow: '0 14px 32px rgba(15, 23, 42, 0.18)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.6rem',
-            animation: 'fadeIn 0.25s ease',
+            padding: '1rem',
+            display: 'grid',
+            gap: '0.75rem',
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '2rem', height: '2rem', borderRadius: '999px', background: '#f59e0b', color: '#0f172a', fontSize: '1rem' }}>
-            🛒
-          </span>
-          <span style={{ fontSize: '0.95rem', lineHeight: 1.4 }}>{successMessage}</span>
-        </div>
-      ) : null}
-
-      <div
-        style={{
-          height: '200px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          fontSize: '3rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        🎵
-      </div>
-
-      <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{event.title}</h1>
-
-      <div
-        style={{
-          display: 'flex',
-          gap: '2rem',
-          flexWrap: 'wrap',
-          marginBottom: '1.5rem',
-          padding: '1rem',
-          background: '#f8fafc',
-          borderRadius: '8px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.25rem' }}>📅</span>
-          <time dateTime={event.date}>{formattedDate}</time>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.25rem' }}>📍</span>
-          <span>{event.location}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.25rem' }}>👥</span>
-          <span>{event.capacity.toLocaleString('pt-BR')} lugares</span>
-        </div>
-      </div>
-
-      <p style={{ color: '#64748b', lineHeight: '1.7', marginBottom: '2rem' }}>
-        {event.description}
-      </p>
-
-
-      <section
-        style={{
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          display: 'grid',
-          gap: '0.85rem',
-        }}
-      >
-        <div>
-          <h2 style={{ marginBottom: '0.25rem' }}>Adicionar ao carrinho</h2>
-          <p style={{ color: '#64748b' }}>
-            Selecione a quantidade, adicione ao carrinho ou siga direto para o checkout.
-          </p>
-          {warningMessage ? (
-            <div
-              style={{
-                marginTop: '0.5rem',
-                padding: '0.8rem 1rem',
-                borderRadius: '10px',
-                background: '#fef3c7',
-                color: '#92400e',
-                fontSize: '0.95rem',
-                border: '1px solid #fde68a',
-              }}
-            >
-              {warningMessage}
-            </div>
-          ) : null}
-        </div>
-
-        {ticketTypes.length === 0 ? (
-          <p style={{ color: '#64748b' }}>Esse evento ainda não possui tipos de ingresso cadastrados.</p>
-        ) : (
-          <>
-            {ticketTypes.map((ticketType) => {
-              const available = Math.max(ticketType.quantity - ticketType.sold, 0)
-              const quantity = quantities[ticketType.id] ?? 0
-
-              return (
-                <article
-                  key={ticketType.id}
+          <div>
+            <h2 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: 700, marginBottom: '0.15rem' }}>Tipos de Ingresso</h2>
+            <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
+              Toque no ingresso para expandir as opções de compra.
+            </p>
+            {warningMessage ? (
+              <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '10px',
-                  padding: '0.95rem',
-                  flexWrap: 'wrap',
+                  marginTop: '0.5rem',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '8px',
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  fontSize: '0.85rem',
+                  border: '1px solid #fde68a',
                 }}
               >
-                <div>
-                  <h3 style={{ marginBottom: '0.25rem' }}>{ticketType.name}</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
-                    {ticketType.price.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}{' '}
-                    • {available} disponíveis
-                  </p>
-                  {ticketType.description ? (
-                    <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                      {ticketType.description}
-                    </p>
-                  ) : null}
-                </div>
+                {warningMessage}
+              </div>
+            ) : null}
+          </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTicketQuantity(ticketType.id, quantity - 1, available)}
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      background: '#fff',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    -
-                  </button>
-                  <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: 600 }}>{quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => setTicketQuantity(ticketType.id, quantity + 1, available)}
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      background: '#fff',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddToCart(ticketType)}
-                    style={{
-                      background: '#f8fafc',
-                      color: '#0f172a',
-                      border: '1px solid #cbd5e1',
-                      padding: '0.7rem 1rem',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Adicionar ao carrinho
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleBuyNow(ticketType)}
-                    style={{
-                      background: '#0f172a',
-                      color: '#fff',
-                      border: 'none',
-                      padding: '0.7rem 1rem',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Comprar agora
-                  </button>
-                </div>
-              </article>
-            )
-          })}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-              <button
-                type="button"
-                onClick={handleAddAllToCart}
-                style={{
-                  width: '100%',
-                  padding: '0.95rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  background: '#f8fafc',
-                  color: '#0f172a',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Adicionar tudo ao carrinho
-              </button>
-              <button
-                type="button"
-                onClick={handleBuyAll}
-                style={{
-                  width: '100%',
-                  padding: '0.95rem 1rem',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: '#0f172a',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Comprar tudo
-              </button>
-            </div>
-          </>
-        )}
-      </section>
-    </main>
+          {ticketTypes.length === 0 ? (
+            <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Esse evento ainda não possui tipos de ingresso cadastrados.</p>
+          ) : (
+            <>
+              {ticketTypes.map((ticketType) => {
+                const available = Math.max(ticketType.quantity - ticketType.sold, 0)
+                const quantity = quantities[ticketType.id] ?? 0
+                const isExpanded = !!expandedTickets[ticketType.id]
+
+                return (
+                  <article key={ticketType.id} className="ticket-card">
+                    {/* Header clicável para expandir/recolher */}
+                    <div 
+                      className="ticket-header" 
+                      onClick={() => setExpandedTickets(prev => ({ ...prev, [ticketType.id]: !isExpanded }))}
+                    >
+                      <div>
+                        <h3 className="ticket-header-title">{ticketType.name}</h3>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{available} disponíveis</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span className="ticket-header-price">
+                          {ticketType.price.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                        <span className={`chevron ${isExpanded ? 'expanded' : ''}`}>▼</span>
+                      </div>
+                    </div>
+
+                    {/* Corpo que só renderiza quando expandido */}
+                    {isExpanded && (
+                      <div className="ticket-body">
+                        {ticketType.description && (
+                          <p style={{ color: '#475569', fontSize: '0.85rem', lineHeight: 1.45, margin: 0 }}>
+                            {ticketType.description}
+                          </p>
+                        )}
+
+                        <div className="ticket-actions-group">
+                          {/* Seleção de quantidade */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.25rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setTicketQuantity(ticketType.id, quantity - 1, available)}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                background: '#fff',
+                                cursor: 'pointer',
+                                fontSize: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              -
+                            </button>
+                            <span style={{ minWidth: '20px', textAlign: 'center', fontWeight: 700, fontSize: '0.9rem' }}>{quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => setTicketQuantity(ticketType.id, quantity + 1, available)}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                background: '#fff',
+                                cursor: 'pointer',
+                                fontSize: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            className="ticket-action-btn"
+                            onClick={() => handleAddToCart(ticketType)}
+                            style={{
+                              background: '#f8fafc',
+                              color: '#0f172a',
+                              border: '1px solid #cbd5e1',
+                              padding: '0.55rem 0.85rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Add ao Carrinho
+                          </button>
+                          <button
+                            type="button"
+                            className="ticket-action-btn"
+                            onClick={() => handleBuyNow(ticketType)}
+                            style={{
+                              background: '#0f172a',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '0.55rem 0.85rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Comprar Agora
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handleAddAllToCart}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                  }}
+                >
+                  Adicionar Tudo
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBuyAll}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#0f172a',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                  }}
+                >
+                  Comprar Tudo
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+      </main>
+    </>
   )
 }
+

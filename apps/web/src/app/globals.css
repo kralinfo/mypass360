@@ -9,4 +9,27 @@ body {
   max-width: 100vw;
   overflow-x: hidden;
   font-family: system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Global Responsive Adjustments for PWA / Mobile */
+@media (max-width: 768px) {
+  .app-main-content {
+    padding-top: calc(70px + 0.5rem) !important;
+  }
+
+  main {
+    padding: 1rem 0.75rem !important;
+  }
+
+  h1 {
+    font-size: 1.6rem !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+  }
 }
