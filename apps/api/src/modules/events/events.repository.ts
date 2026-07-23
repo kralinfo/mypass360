@@ -148,16 +148,67 @@ export class EventsRepository {
     // Remover campos que o usuário não deve poder alterar diretamente ou que não pertencem à tabela
     const { status: _s, ticket_types: _tt, ...safeDto } = dto
 
+    // Log para diagnóstico
+    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'fields:', Object.keys(safeDto))
+
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
-      .update(safeDto)
+      .update({ ...safeDto, updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('organizer_id', userId)
       .select()
       .single()
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('[EventsRepository.update] Supabase error:', error.message, error.details)
+      throw new Error(error.message)
+    }
+
+    if (!data) {
+      // 0 linhas atualizadas — provavelmente organizer_id não bate com userId
+      // Verificar se o evento existe e logar o organizer_id real
+      const { data: existing } = await this.supabase
+        .getClient()
+        .from(this.table)
+        .select('id, organizer_id')
+        .eq('id', id)
+        .single()
+
+      console.error(
+        '[EventsRepository.update] No rows updated.',
+        'Event organizer_id:', existing?.organizer_id,
+        'JWT userId:', userId,
+        'Match:', existing?.organizer_id === userId
+      )
+
+      throw new Error('Evento não encontrado ou você não tem permissão para editá-lo.')
+    }
+
+    // Atualizar ticket_types se fornecidos
+    if (dto.ticket_types && dto.ticket_types.length > 0) {
+      // Deletar tipos existentes e recriar
+      await this.supabase.getClient().from('ticket_types').delete().eq('event_id', id)
+
+      const ticketTypesToInsert = dto.ticket_types.map((tt) => ({
+        event_id: id,
+        name: tt.name,
+        price: tt.price,
+        quantity: tt.quantity,
+        description: tt.description ?? null,
+        sold: 0,
+      }))
+
+      const { error: ttError } = await this.supabase
+        .getClient()
+        .from('ticket_types')
+        .insert(ticketTypesToInsert)
+
+      if (ttError) {
+        console.warn('[EventsRepository.update] Could not update ticket_types:', ttError.message)
+      }
+    }
+
     return data
   }
 

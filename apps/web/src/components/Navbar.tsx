@@ -132,6 +132,11 @@ export function Navbar() {
             </Link>
           )}
           {user && (
+            <Link href="/meus-ingressos" style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '0.92rem', fontWeight: 500 }}>
+              Meus Ingressos
+            </Link>
+          )}
+          {user && (
             <Link
               href="/eventos/cadastrar"
               style={{
@@ -304,6 +309,15 @@ export function Navbar() {
             style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '1rem', fontWeight: 500, padding: '0.5rem 0' }}
           >
             Meus Eventos
+          </Link>
+        )}
+        {user && (
+          <Link 
+            href="/meus-ingressos" 
+            onClick={() => setMenuOpen(false)}
+            style={{ color: '#cbd5e1', textDecoration: 'none', fontSize: '1rem', fontWeight: 500, padding: '0.5rem 0' }}
+          >
+            🎫 Meus Ingressos
           </Link>
         )}
         
