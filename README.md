@@ -54,6 +54,7 @@ npx supabase start
 ```bash
 # Todos os apps juntos
 pnpm dev
+pnpm --dir apps/api exec nest start --watch
 
 # Individualmente
 pnpm --filter @mypass360/web dev    # http://localhost:3000

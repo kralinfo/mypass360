@@ -2,7 +2,6 @@ import { Type } from 'class-transformer'
 import {
   IsArray,
   IsDateString,
-  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -48,9 +47,6 @@ export class CreateEventDto {
   @IsString()
   location!: string
 
-  @IsString()
-  organizer_id!: string
-
   @IsNumber()
   @Min(1)
   capacity!: number
@@ -60,9 +56,10 @@ export class CreateEventDto {
   @Min(0)
   price?: number
 
+  // status é gerenciado pelo backend — não aceitar do frontend para novos eventos
+  // (mantido aqui apenas para compatibilidade com UpdateEventDto via PartialType)
   @IsString()
   @IsOptional()
-  @IsIn(['draft', 'published', 'cancelled', 'finished'])
   status?: string
 
   @IsArray()
