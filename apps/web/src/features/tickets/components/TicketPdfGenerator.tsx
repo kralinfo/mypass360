@@ -8,72 +8,86 @@ interface TicketPdfGeneratorProps {
   buyerName?: string
 }
 
+// ─── Dimensões do ingresso compacto (formato horizontal, tipo ingresso real) ──
+// 200mm x 75mm — proporcional a um ingresso físico real
+const TICKET_W = 200
+const TICKET_H = 75
+const STUB_W = 50   // largura do "canhoto" (stub direito)
+const MAIN_W = TICKET_W - STUB_W
+
 async function generatePdf(ticket: Ticket, buyerName?: string) {
-  // Importação dinâmica para evitar erros de SSR
   const { jsPDF } = await import('jspdf')
   const QRCode = await import('qrcode')
 
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
-    format: 'a4',
+    format: [TICKET_H, TICKET_W],
   })
 
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 20
-  const contentW = pageW - margin * 2
+  const H = TICKET_H
 
-  // ─── BACKGROUND ───────────────────────────────────────────────
-  doc.setFillColor(15, 23, 42) // #0f172a
-  doc.rect(0, 0, pageW, 60, 'F')
-
-  // ─── LOGO / HEADER ─────────────────────────────────────────────
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(28)
-  doc.setFont('helvetica', 'bold')
-  doc.text('MyPass360', margin, 30)
-
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(148, 163, 184) // slate-400
-  doc.text('Seu ingresso oficial', margin, 40)
-
-  // ─── NOME DO EVENTO ────────────────────────────────────────────
-  doc.setTextColor(15, 23, 42)
-  doc.setFontSize(22)
-  doc.setFont('helvetica', 'bold')
-  const eventTitle = ticket.event?.title ?? 'Evento'
-  const titleLines = doc.splitTextToSize(eventTitle, contentW) as string[]
-  doc.text(titleLines, margin, 80)
-
-  // ─── DIVISOR ───────────────────────────────────────────────────
-  const dividerY = 80 + titleLines.length * 10
-  doc.setDrawColor(226, 232, 240)
-  doc.setLineWidth(0.5)
-  doc.line(margin, dividerY, pageW - margin, dividerY)
-
-  // ─── INFORMAÇÕES DO EVENTO ─────────────────────────────────────
-  let infoY = dividerY + 10
-  const infoLineHeight = 8
-
-  function addInfoRow(label: string, value: string) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100, 116, 139) // slate-500
-    doc.text(label.toUpperCase(), margin, infoY)
-
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(15, 23, 42)
-    doc.text(value, margin, infoY + 5)
-    infoY += infoLineHeight + 6
+  // ── QR Code ─────────────────────────────────────────────────────────────────
+  let qrDataUrl: string
+  if (ticket.qrCode && ticket.qrCode.startsWith('data:image')) {
+    qrDataUrl = ticket.qrCode
+  } else {
+    qrDataUrl = await QRCode.toDataURL(ticket.id, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 200,
+    })
   }
+
+  // ── FUNDO GRADIENTE esquerdo (gradiente simulado com rects) ──────────────────
+  // jsPDF não suporta gradiente real, simulamos com faixas de cor (roxo → azul)
+  const steps = 40
+  for (let i = 0; i < steps; i++) {
+    const t = i / steps
+    const r = Math.round(99 + (37 - 99) * t)   // 6366f1 → 2563eb
+    const g = Math.round(102 + (99 - 102) * t)
+    const b = Math.round(241 + (235 - 241) * t)
+    doc.setFillColor(r, g, b)
+    doc.rect((MAIN_W / steps) * i, 0, MAIN_W / steps + 0.5, H, 'F')
+  }
+
+  // ── FUNDO STUB (azul escuro) ─────────────────────────────────────────────────
+  doc.setFillColor(30, 27, 75) // #1e1b4b
+  doc.rect(MAIN_W, 0, STUB_W, H, 'F')
+
+  // ── SEPARADOR PONTILHADO ─────────────────────────────────────────────────────
+  // Simulamos pontilhado manualmente com segmentos curtos
+  doc.setDrawColor(255, 255, 255)
+  doc.setLineWidth(0.4)
+  const dashLen = 1.5
+  const gapLen = 1.5
+  let dashY = 2
+  while (dashY < H - 2) {
+    const endY = Math.min(dashY + dashLen, H - 2)
+    doc.line(MAIN_W, dashY, MAIN_W, endY)
+    dashY += dashLen + gapLen
+  }
+
+  // ── SEMICÍRCULO DE CORTE (simulado com arco branco) ─────────────────────────
+  doc.setFillColor(255, 255, 255)
+  // círculo à esquerda (topo)
+  doc.circle(MAIN_W, 0, 4, 'F')
+  // círculo à esquerda (base)
+  doc.circle(MAIN_W, H, 4, 'F')
+
+
+
+  // ── SEÇÃO ESQUERDA — CONTEÚDO PRINCIPAL ─────────────────────────────────────
+  const px = 8   // padding horizontal
+  const eventTitle = ticket.event?.title ?? 'Evento'
+  const buyer = buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—'
+  const ticketType = ticket.ticketType?.name ?? '—'
+  const publicCode = ticket.publicCode
 
   const eventDate = ticket.event?.date
     ? new Date(ticket.event.date).toLocaleDateString('pt-BR', {
-        weekday: 'long',
         day: '2-digit',
-        month: 'long',
+        month: 'short',
         year: 'numeric',
       })
     : '—'
@@ -85,78 +99,88 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
       })
     : '—'
 
-  addInfoRow('Comprador', buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—')
-  addInfoRow('Tipo de ingresso', ticket.ticketType?.name ?? '—')
-  addInfoRow('Data', eventDate)
-  addInfoRow('Horário', eventTime)
-  addInfoRow('Local', ticket.event?.location ?? '—')
-  addInfoRow('Código do ingresso', ticket.publicCode)
-  addInfoRow(
-    'Data da compra',
-    new Date(ticket.issuedAt ?? ticket.createdAt).toLocaleDateString('pt-BR')
-  )
+  const eventLocation = ticket.event?.location ?? '—'
 
-  // ─── DIVISOR ───────────────────────────────────────────────────
-  doc.setDrawColor(226, 232, 240)
-  doc.line(margin, infoY + 5, pageW - margin, infoY + 5)
+  // Label pequeno acima do tipo
+  doc.setTextColor(200, 210, 255)
+  doc.setFontSize(6)
+  doc.setFont('helvetica', 'normal')
+  doc.text(ticketType.toUpperCase(), px, 10)
 
-  // ─── QR CODE (central, grande) ─────────────────────────────────
-  const qrY = infoY + 15
-  const qrSize = 70
+  // Título do evento
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  const titleLines = doc.splitTextToSize(eventTitle, MAIN_W - px * 2 - 10) as string[]
+  doc.text(titleLines, px, 18)
 
-  let qrDataUrl: string
+  // Divider fino
+  const afterTitle = 18 + titleLines.length * 7
+  doc.setDrawColor(255, 255, 255)
+  doc.setLineWidth(0.2)
+  doc.setGState(doc.GState({ opacity: 0.3 }))
+  doc.line(px, afterTitle + 1, MAIN_W - px, afterTitle + 1)
+  doc.setGState(doc.GState({ opacity: 1 }))
 
-  // Verifica se o qr_code já é um data URL ou se precisamos gerar
-  if (ticket.qrCode && ticket.qrCode.startsWith('data:image')) {
-    qrDataUrl = ticket.qrCode
-  } else {
-    // Fallback: gera QR a partir do ID do ticket
-    qrDataUrl = await QRCode.toDataURL(ticket.id, {
-      errorCorrectionLevel: 'H',
-      margin: 2,
-      width: 300,
-    })
-  }
+  // Label NOME
+  doc.setTextColor(200, 210, 255)
+  doc.setFontSize(6)
+  doc.setFont('helvetica', 'normal')
+  doc.text('COMPRADOR', px, afterTitle + 7)
 
-  const qrX = (pageW - qrSize) / 2
+  // Nome do comprador
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  const buyerLines = doc.splitTextToSize(buyer.toUpperCase(), MAIN_W - px * 2 - 10) as string[]
+  doc.text(buyerLines, px, afterTitle + 13)
+
+  // Código
+  doc.setTextColor(200, 210, 255)
+  doc.setFontSize(6.5)
+  doc.setFont('helvetica', 'normal')
+  doc.text('CÓDIGO', px, afterTitle + 22)
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.text(publicCode, px + 14, afterTitle + 22)
+
+  // Rodapé esquerdo: data | hora | local
+  const footerY = H - 6
+  doc.setTextColor(200, 210, 255)
+  doc.setFontSize(6)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`DATA  ${eventDate}`, px, footerY)
+  doc.text(`HORA  ${eventTime}`, px + 52, footerY)
+
+  const locShort = eventLocation.length > 28 ? eventLocation.slice(0, 28) + '…' : eventLocation
+  doc.text(`LOCAL  ${locShort}`, px, footerY + 5)
+
+  // ── SEÇÃO DIREITA — STUB ─────────────────────────────────────────────────────
+  const stubX = MAIN_W + 3
+  const qrSize = 28
+  const qrX = MAIN_W + (STUB_W - qrSize) / 2
+  const qrY = (H - qrSize) / 2 - 2
+
   doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize)
 
-  // Código textual abaixo do QR
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(15, 23, 42)
-  doc.text(ticket.publicCode, pageW / 2, qrY + qrSize + 8, { align: 'center' })
-
-  // ─── INSTRUÇÃO ─────────────────────────────────────────────────
-  doc.setFontSize(9)
+  // Código abaixo do QR
+  doc.setTextColor(200, 210, 255)
+  doc.setFontSize(5)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(100, 116, 139)
-  const instruction =
-    'Apresente este QR Code na entrada do evento. Guarde este ingresso com segurança.'
-  const instructionLines = doc.splitTextToSize(instruction, contentW) as string[]
-  doc.text(instructionLines, pageW / 2, qrY + qrSize + 18, { align: 'center' })
+  doc.text(publicCode, MAIN_W + STUB_W / 2, qrY + qrSize + 4, { align: 'center' })
 
-  // ─── ESPAÇO RESERVADO PARA FUTURAS INFORMAÇÕES ─────────────────
-  const reservedY = qrY + qrSize + 35
-  doc.setFillColor(248, 250, 252) // slate-50
-  doc.roundedRect(margin, reservedY, contentW, 30, 3, 3, 'F')
-  doc.setDrawColor(226, 232, 240)
-  doc.roundedRect(margin, reservedY, contentW, 30, 3, 3, 'S')
+  // Tipo do ingresso no stub (vertical, rodado)
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(6.5)
+  doc.setFont('helvetica', 'bold')
+  doc.text(ticketType.toUpperCase(), stubX + 3, qrY - 4)
 
-  doc.setFontSize(8)
-  doc.setTextColor(148, 163, 184)
-  doc.text('Portão / Check-in / Observações', margin + 5, reservedY + 10)
-  doc.setTextColor(203, 213, 225)
-  doc.text('Reservado para informações de check-in', margin + 5, reservedY + 18)
-
-  // ─── RODAPÉ ────────────────────────────────────────────────────
-  const footerY = doc.internal.pageSize.getHeight() - 15
-  doc.setFontSize(8)
-  doc.setTextColor(148, 163, 184)
-  doc.text('MyPass360 © ' + new Date().getFullYear() + ' — Plataforma de ingressos', pageW / 2, footerY, {
-    align: 'center',
-  })
-  doc.text(`ID: ${ticket.id}`, pageW / 2, footerY + 5, { align: 'center' })
+  // MyPass360 no stub
+  doc.setTextColor(200, 210, 255)
+  doc.setFontSize(5.5)
+  doc.setFont('helvetica', 'normal')
+  doc.text('MyPass360', MAIN_W + STUB_W / 2, H - 4, { align: 'center' })
 
   return doc
 }
@@ -164,7 +188,7 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
 export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
-  
+
   // States for HTML Preview
   const [showPreview, setShowPreview] = useState(false)
   const [previewQr, setPreviewQr] = useState<string | null>(null)
@@ -173,9 +197,8 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
 
   const eventDate = ticket.event?.date
     ? new Date(ticket.event.date).toLocaleDateString('pt-BR', {
-        weekday: 'long',
         day: '2-digit',
-        month: 'long',
+        month: 'short',
         year: 'numeric',
       })
     : '—'
@@ -186,6 +209,10 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
         minute: '2-digit',
       })
     : '—'
+
+  const buyer = buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—'
+  const ticketType = ticket.ticketType?.name ?? '—'
+  const eventLocation = ticket.event?.location ?? '—'
 
   const getFileName = () => {
     const eventTitle = (ticket.event?.title ?? 'ingresso')
@@ -199,14 +226,13 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
     setIsGenerating(true)
     setGenError(null)
     try {
-      // Em vez de gerar o PDF inteiro, renderizamos o HTML idêntico para 100% de compatibilidade PWA iOS
       let qrDataUrl = ticket.qrCode
       if (!qrDataUrl || !qrDataUrl.startsWith('data:image')) {
         const QRCode = await import('qrcode')
         qrDataUrl = await QRCode.toDataURL(ticket.id, {
           errorCorrectionLevel: 'H',
-          margin: 2,
-          width: 300,
+          margin: 1,
+          width: 200,
         })
       }
       setPreviewQr(qrDataUrl)
@@ -308,7 +334,7 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
 
         {isGenerating && (
           <span style={{ fontSize: '0.8rem', color: '#64748b', alignSelf: 'center' }}>
-            Gerando PDF...
+            Gerando...
           </span>
         )}
       </div>
@@ -319,132 +345,181 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
         </p>
       )}
 
+      {/* ── MODAL DE PREVIEW ─────────────────────────────────────────────── */}
       {showPreview && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 9999,
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: '2rem',
-            backdropFilter: 'blur(6px)'
+            backdropFilter: 'blur(8px)',
           }}
           onClick={() => setShowPreview(false)}
         >
+          {/* Cartão do ingresso */}
           <div
+            onClick={e => e.stopPropagation()}
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: '420px',
-              height: '85vh',
-              background: '#fff',
-              borderRadius: '16px',
-              overflowY: 'auto',
+              maxWidth: '680px',
               display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-              WebkitOverflowScrolling: 'touch'
+              flexDirection: 'row',
+              borderRadius: '16px',
+              overflow: 'visible',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
+              fontFamily: 'Inter, Helvetica, sans-serif',
             }}
-            onClick={e => e.stopPropagation()}
           >
+            {/* ── BOTÃO FECHAR ── */}
             <button
               onClick={() => setShowPreview(false)}
-              style={{ 
+              style={{
                 position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: 'rgba(255, 255, 255, 0.2)', 
+                top: '-48px',
+                right: 0,
+                background: 'rgba(255,255,255,0.15)',
                 backdropFilter: 'blur(4px)',
-                border: 'none', 
-                cursor: 'pointer', 
-                color: '#fff', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '50%',
                 width: '36px',
                 height: '36px',
-                borderRadius: '50%',
+                cursor: 'pointer',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 zIndex: 10,
-                transition: 'background 0.2s'
               }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-              onMouseOut={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
               title="Fechar"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
-            
-            {/* HTML REPLICA DO INGRESSO PARA BYPASSAR O BUG DE PDF DO IOS PWA */}
-            <div style={{ background: '#0f172a', padding: '1.5rem', color: '#fff', flexShrink: 0 }}>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: '0 0 0.25rem 0', fontFamily: 'helvetica, sans-serif' }}>MyPass360</h2>
-              <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.85rem' }}>Seu ingresso oficial</p>
-            </div>
-            
-            <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0f172a', margin: '0 0 1rem 0' }}>
+
+            {/* ── LADO ESQUERDO: CONTEÚDO PRINCIPAL ── */}
+            <div
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 40%, #2563eb 100%)',
+                borderRadius: '16px 0 0 16px',
+                padding: '1.75rem 1.5rem',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Círculo decorativo de fundo */}
+              <div style={{
+                position: 'absolute',
+                top: '-40px', right: '-20px',
+                width: '180px', height: '180px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.06)',
+                pointerEvents: 'none',
+              }} />
+              <div style={{
+                position: 'absolute',
+                bottom: '-60px', right: '60px',
+                width: '220px', height: '220px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.04)',
+                pointerEvents: 'none',
+              }} />
+
+              {/* Tipo do ingresso */}
+              <p style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.9)', letterSpacing: '0.1em', fontWeight: 700, margin: '0 0 0.3rem 0', textTransform: 'uppercase' }}>
+                {ticketType}
+              </p>
+
+              {/* Nome do evento */}
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: '0 0 1rem 0', lineHeight: 1.2, maxWidth: '340px' }}>
                 {ticket.event?.title ?? 'Evento'}
-              </h1>
-              
-              <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '0 0 1rem 0' }} />
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem', marginBottom: '1.5rem' }}>
+              </h2>
+
+              {/* Divider */}
+              <div style={{ borderTop: '1px dashed rgba(255,255,255,0.25)', marginBottom: '1rem' }} />
+
+              {/* Nome do comprador */}
+              <p style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.8)', letterSpacing: '0.08em', fontWeight: 600, margin: '0 0 0.2rem 0' }}>COMPRADOR</p>
+              <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: '0 0 1.2rem 0', letterSpacing: '0.02em' }}>
+                {buyer.toUpperCase()}
+              </p>
+
+              {/* Código */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                <span style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.8)', fontWeight: 600, letterSpacing: '0.08em' }}>CÓDIGO</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff', fontFamily: 'monospace', letterSpacing: '0.1em' }}>{publicCode}</span>
+              </div>
+
+              {/* Rodapé */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '0.75rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>COMPRADOR</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—'}</p>
+                  <p style={{ fontSize: '0.55rem', color: 'rgba(200,210,255,0.7)', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.15rem 0' }}>DATA</p>
+                  <p style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 700, margin: 0 }}>{eventDate}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>TIPO DE INGRESSO</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{ticket.ticketType?.name ?? '—'}</p>
+                  <p style={{ fontSize: '0.55rem', color: 'rgba(200,210,255,0.7)', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.15rem 0' }}>HORA</p>
+                  <p style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 700, margin: 0 }}>{eventTime}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>DATA</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{eventDate}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>HORÁRIO</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{eventTime}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>LOCAL</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{ticket.event?.location ?? '—'}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>CÓDIGO DO INGRESSO</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{publicCode}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: '0.65rem', color: '#64748b', margin: '0 0 0.15rem 0', fontWeight: 600, letterSpacing: '0.05em' }}>DATA DA COMPRA</p>
-                  <p style={{ fontSize: '0.9rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>{new Date(ticket.issuedAt ?? ticket.createdAt).toLocaleDateString('pt-BR')}</p>
+                  <p style={{ fontSize: '0.55rem', color: 'rgba(200,210,255,0.7)', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.15rem 0' }}>LOCAL</p>
+                  <p style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 700, margin: 0 }}>
+                    {eventLocation.length > 30 ? eventLocation.slice(0, 30) + '…' : eventLocation}
+                  </p>
                 </div>
               </div>
-              
-              <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '0 0 1.5rem 0' }} />
-              
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
-                {previewQr && <img src={previewQr} alt="QR Code" style={{ width: '180px', height: '180px', marginBottom: '0.5rem' }} />}
-                <p style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.5rem 0' }}>{publicCode}</p>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', margin: 0, maxWidth: '250px' }}>
-                  Apresente este QR Code na entrada do evento. Guarde este ingresso com segurança.
-                </p>
-              </div>
-              
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 0.25rem 0', fontWeight: 600 }}>Portão / Check-in / Observações</p>
-                <p style={{ fontSize: '0.75rem', color: '#cbd5e1', margin: 0 }}>Reservado para informações de check-in</p>
-              </div>
-              
-              <div style={{ marginTop: 'auto', textAlign: 'center', paddingTop: '1rem' }}>
-                <p style={{ fontSize: '0.65rem', color: '#94a3b8', margin: '0 0 0.25rem 0' }}>
-                  MyPass360 © {new Date().getFullYear()} — Plataforma de ingressos
-                </p>
-                <p style={{ fontSize: '0.6rem', color: '#cbd5e1', margin: 0 }}>ID: {ticket.id}</p>
-              </div>
+            </div>
+
+            {/* Efeito de corte (semicírculo) */}
+            <div style={{ position: 'relative', width: '0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
+              <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(15,23,42,0.9)', marginTop: '-8px', flexShrink: 0 }} />
+              <div style={{
+                flex: 1,
+                borderLeft: '2px dashed rgba(255,255,255,0.3)',
+                margin: '4px 0',
+              }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(15,23,42,0.9)', marginBottom: '-8px', flexShrink: 0 }} />
+            </div>
+
+            {/* ── CANHOTO DIREITO ── */}
+            <div
+              style={{
+                width: '140px',
+                background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 100%)',
+                borderRadius: '0 16px 16px 0',
+                padding: '1.25rem 1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.6rem',
+                flexShrink: 0,
+              }}
+            >
+              <p style={{ fontSize: '0.55rem', color: 'rgba(200,210,255,0.7)', letterSpacing: '0.1em', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', margin: 0 }}>
+                {ticket.event?.title ?? 'Evento'}
+              </p>
+              <p style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.9)', fontWeight: 700, textAlign: 'center', margin: 0 }}>
+                {ticketType.toUpperCase()}
+              </p>
+              {previewQr && (
+                <img
+                  src={previewQr}
+                  alt="QR Code"
+                  style={{ width: '80px', height: '80px', borderRadius: '8px', background: '#fff', padding: '4px' }}
+                />
+              )}
+              <p style={{ fontSize: '0.5rem', color: 'rgba(200,210,255,0.6)', fontFamily: 'monospace', letterSpacing: '0.05em', textAlign: 'center', margin: 0 }}>
+                {publicCode}
+              </p>
+              <p style={{ fontSize: '0.5rem', color: 'rgba(160,180,255,0.4)', margin: 0, textAlign: 'center' }}>MyPass360</p>
             </div>
           </div>
         </div>
