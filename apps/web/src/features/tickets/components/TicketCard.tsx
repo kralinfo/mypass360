@@ -35,9 +35,8 @@ export function TicketCard({ ticket, buyerName }: TicketCardProps) {
     : null
 
   const issuedAt = ticket.issuedAt ?? ticket.createdAt
-  const issuedDate = issuedAt
-    ? new Date(issuedAt).toLocaleDateString('pt-BR')
-    : null
+  const issuedDateStr = issuedAt ? new Date(issuedAt).toLocaleDateString('pt-BR') : null
+  const issuedTimeStr = issuedAt ? new Date(issuedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
     <article
@@ -153,12 +152,15 @@ export function TicketCard({ ticket, buyerName }: TicketCardProps) {
               {ticket.publicCode}
             </p>
           </div>
-          {issuedDate && (
-            <div style={{ textAlign: 'right' }}>
+          {issuedDateStr && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.15rem' }}>
                 EMITIDO EM
               </p>
-              <p style={{ fontSize: '0.85rem', color: '#475569' }}>{issuedDate}</p>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.1rem' }}>{issuedDateStr}</p>
+                <p style={{ fontSize: '0.75rem', color: '#64748b' }}>às {issuedTimeStr}</p>
+              </div>
             </div>
           )}
         </div>
