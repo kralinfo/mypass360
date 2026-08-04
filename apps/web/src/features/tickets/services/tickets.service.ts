@@ -5,7 +5,66 @@ import type { Ticket } from '@mypass360/types'
  * Normaliza a resposta do backend (snake_case) para o formato esperado (camelCase).
  * O Supabase retorna campos em snake_case e precisamos mapear para o tipo Ticket.
  */
-function normalizeTicket(raw: any): Ticket {
+interface RawTicket {
+  id: string
+  public_code?: string
+  publicCode?: string
+  order_id?: string
+  orderId?: string
+  order_item_id?: string
+  orderItemId?: string
+  event_id?: string
+  eventId?: string
+  ticket_type_id?: string
+  ticketTypeId?: string
+  user_id?: string
+  userId?: string
+  buyer_name?: string
+  buyerName?: string
+  buyer_email?: string
+  buyerEmail?: string
+  qr_code?: string
+  qrCode?: string
+  status?: Ticket['status']
+  issued_at?: string
+  issuedAt?: string
+  checked_in_at?: string
+  checkedInAt?: string
+  checked_in_by?: string
+  checkedInBy?: string
+  validation_token?: string
+  validationToken?: string
+  created_at?: string
+  createdAt?: string
+  event?: {
+    id: string
+    title: string
+    date: string
+    location: string
+    slug: string
+    image_url?: string
+    imageUrl?: string
+  }
+  ticketType?: {
+    id: string
+    name: string
+    price: number
+    description?: string
+  }
+  ticket_type?: {
+    id: string
+    name: string
+    price: number
+    description?: string
+  }
+}
+
+/**
+ * Normaliza a resposta do backend (snake_case) para o formato esperado (camelCase).
+ * O Supabase retorna campos em snake_case e precisamos mapear para o tipo Ticket.
+ */
+function normalizeTicket(raw: RawTicket): Ticket {
+  const rawTicketType = raw.ticketType ?? raw.ticket_type
   return {
     id: raw.id,
     publicCode: raw.public_code ?? raw.publicCode ?? '',
@@ -34,12 +93,12 @@ function normalizeTicket(raw: any): Ticket {
           imageUrl: raw.event.image_url ?? raw.event.imageUrl,
         }
       : undefined,
-    ticketType: raw.ticketType ?? raw.ticket_type
+    ticketType: rawTicketType
       ? {
-          id: (raw.ticketType ?? raw.ticket_type).id,
-          name: (raw.ticketType ?? raw.ticket_type).name,
-          price: (raw.ticketType ?? raw.ticket_type).price,
-          description: (raw.ticketType ?? raw.ticket_type).description,
+          id: rawTicketType.id,
+          name: rawTicketType.name,
+          price: rawTicketType.price,
+          description: rawTicketType.description,
         }
       : undefined,
   }
@@ -50,7 +109,7 @@ function normalizeTicket(raw: any): Ticket {
  * O backend valida ownership — apenas tickets do próprio usuário são retornados.
  */
 export async function fetchMyTickets(token: string): Promise<Ticket[]> {
-  const raw = await apiWithAuth(token).get<any[]>('/tickets/my')
+  const raw = await apiWithAuth(token).get<RawTicket[]>('/tickets/my')
   return Array.isArray(raw) ? raw.map(normalizeTicket) : []
 }
 
@@ -59,6 +118,6 @@ export async function fetchMyTickets(token: string): Promise<Ticket[]> {
  * O backend valida ownership — retorna 404 se não for do usuário.
  */
 export async function fetchTicketById(id: string, token: string): Promise<Ticket> {
-  const raw = await apiWithAuth(token).get<any>(`/tickets/${id}`)
+  const raw = await apiWithAuth(token).get<RawTicket>(`/tickets/${id}`)
   return normalizeTicket(raw)
 }
