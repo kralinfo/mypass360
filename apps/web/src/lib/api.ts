@@ -20,7 +20,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       throw new Error(message)
     }
 
-    return response.json() as Promise<T>
+    const text = await response.text()
+    return text ? (JSON.parse(text) as T) : (undefined as unknown as T)
   } catch (error) {
     console.error(`API request failed for ${path}:`, error)
     if (error instanceof TypeError) {

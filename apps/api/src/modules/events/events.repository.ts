@@ -280,6 +280,11 @@ export class EventsRepository {
       .eq('id', id)
       .eq('organizer_id', userId)
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      if (error.code === '23503') {
+        throw new Error('foreign_key_violation')
+      }
+      throw new Error(error.message)
+    }
   }
 }
