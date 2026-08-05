@@ -17,6 +17,7 @@ const statusConfig: Record<string, { label: string; bg: string; color: string; b
 
 export function TicketCard({ ticket, buyerName }: TicketCardProps) {
   const status = statusConfig[ticket.status] ?? statusConfig['PENDING']
+  const finalBuyerName = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
 
   const eventDate = ticket.event?.date
     ? new Date(ticket.event.date).toLocaleDateString('pt-BR', {
@@ -131,6 +132,16 @@ export function TicketCard({ ticket, buyerName }: TicketCardProps) {
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e2e8f0', flexShrink: 0 }} />
           <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+        </div>
+
+        {/* Portador do ingresso */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
+            PORTADOR
+          </p>
+          <p style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: 700, margin: 0 }}>
+            {finalBuyerName}
+          </p>
         </div>
 
         {/* Código público */}

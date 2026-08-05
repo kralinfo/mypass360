@@ -11,6 +11,7 @@ export interface OrderItemForTicketGeneration {
   unitPrice: number
   ticketTypeName?: string
   ticketTypeDescription?: string
+  nomineeNames?: string[]
 }
 
 @Injectable()
@@ -179,6 +180,8 @@ export class TicketsRepository {
           width: 300,
         })
 
+        const nomineeName = item.nomineeNames?.[i] || null
+
         ticketsToInsert.push({
           id: ticketId,
           public_code: publicCode,
@@ -186,6 +189,7 @@ export class TicketsRepository {
           order_item_id: item.id,
           ticket_type_id: item.ticketTypeId,
           user_id: userId,
+          buyer_name: nomineeName,
           buyer_email: userEmail,
           event_id: eventId ?? null,
           qr_code: qrCodeDataUrl,

@@ -33,6 +33,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
     loadCheckout,
     setTicketQuantity,
     hydrateSelectedItems,
+    updateNomineeName,
     handleSubmit,
   } = useCheckout()
   const router = useRouter()
@@ -160,6 +161,8 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
           {visibleTicketTypes.map((ticketType) => {
             const quantity = selectedById.get(ticketType.id) ?? 0
             const available = Math.max(ticketType.quantity - ticketType.sold, 0)
+            const itemState = selectedItems.find((item) => item.ticketTypeId === ticketType.id)
+            const nomineeNames = itemState?.nomineeNames ?? []
 
             return (
               <article
@@ -169,53 +172,84 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                   borderRadius: '10px',
                   padding: '0.85rem',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '1rem',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
                 }}
               >
-                <div>
-                  <h3 style={{ marginBottom: '0.25rem', fontSize: '1rem' }}>{ticketType.name}</h3>
-                  <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-                    {ticketType.price.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}{' '}
-                    • {available} disponíveis
-                  </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', width: '100%' }}>
+                  <div>
+                    <h3 style={{ marginBottom: '0.25rem', fontSize: '1rem' }}>{ticketType.name}</h3>
+                    <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                      {ticketType.price.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}{' '}
+                      • {available} disponíveis
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTicketQuantity(ticketType, Math.max(quantity - 1, 0))}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      -
+                    </button>
+                    <span style={{ minWidth: '24px', textAlign: 'center' }}>{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setTicketQuantity(ticketType, Math.min(quantity + 1, available))}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTicketQuantity(ticketType, Math.max(quantity - 1, 0))}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      background: '#fff',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    -
-                  </button>
-                  <span style={{ minWidth: '24px', textAlign: 'center' }}>{quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => setTicketQuantity(ticketType, Math.min(quantity + 1, available))}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      background: '#fff',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
+                {quantity > 0 && (
+                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: '0 0 0.25rem' }}>
+                      Nome do Portador (Opcional)
+                    </p>
+                    {Array.from({ length: quantity }).map((_, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <label htmlFor={`nominee-${ticketType.id}-${idx}`} style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          Ingresso #{idx + 1}
+                        </label>
+                        <input
+                          id={`nominee-${ticketType.id}-${idx}`}
+                          type="text"
+                          value={nomineeNames[idx] ?? ''}
+                          onChange={(e) => updateNomineeName(ticketType.id, idx, e.target.value)}
+                          placeholder="Nome completo do portador"
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            transition: 'border-color 0.15s ease',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </article>
             )
           })}

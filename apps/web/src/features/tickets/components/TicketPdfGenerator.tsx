@@ -80,7 +80,7 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
   // ── SEÇÃO ESQUERDA — CONTEÚDO PRINCIPAL ─────────────────────────────────────
   const px = 8   // padding horizontal
   const eventTitle = ticket.event?.title ?? 'Evento'
-  const buyer = buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—'
+  const buyer = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
   const ticketType = ticket.ticketType?.name ?? '—'
   const publicCode = ticket.publicCode
 
@@ -210,7 +210,7 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
       })
     : '—'
 
-  const buyer = buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—'
+  const buyer = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
   const ticketType = ticket.ticketType?.name ?? '—'
   const eventLocation = ticket.event?.location ?? '—'
 
