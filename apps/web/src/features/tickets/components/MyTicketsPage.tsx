@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { useMyTickets } from '../hooks/useMyTickets'
 import { TicketCard } from './TicketCard'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export function MyTicketsPage() {
   const { tickets, isLoading, error } = useMyTickets()
   const [userName, setUserName] = useState<string | undefined>(undefined)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -17,6 +18,30 @@ export function MyTicketsPage() {
       setUserName(meta?.full_name ?? meta?.name ?? data.user?.email)
     })
   }, [])
+
+  const events = useMemo(() => {
+    const eventMap = new Map<string, { id: string; title: string }>()
+    tickets.forEach((ticket) => {
+      if (!eventMap.has(ticket.eventId)) {
+        eventMap.set(ticket.eventId, {
+          id: ticket.eventId,
+          title: ticket.event?.title || 'Evento Desconhecido',
+        })
+      }
+    })
+    return Array.from(eventMap.values())
+  }, [tickets])
+
+  useEffect(() => {
+    if (events.length > 0 && (!selectedEventId || !events.find(e => e.id === selectedEventId))) {
+      setSelectedEventId(events[0].id)
+    }
+  }, [events, selectedEventId])
+
+  const filteredTickets = useMemo(() => {
+    if (!selectedEventId) return []
+    return tickets.filter((ticket) => ticket.eventId === selectedEventId)
+  }, [tickets, selectedEventId])
 
   return (
     <>
@@ -30,6 +55,9 @@ export function MyTicketsPage() {
           .my-tickets-grid {
             grid-template-columns: 1fr;
           }
+        }
+        .events-tabs-container::-webkit-scrollbar {
+          display: none;
         }
       `}</style>
 
@@ -173,14 +201,49 @@ export function MyTicketsPage() {
           </div>
         )}
 
-        {/* Grid de tickets */}
+        {/* Abas e Grid de tickets */}
         {!isLoading && !error && tickets.length > 0 && (
           <>
+            <div
+              className="events-tabs-container"
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                overflowX: 'auto',
+                paddingBottom: '0.75rem',
+                marginBottom: '1.5rem',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
+              {events.map((ev) => (
+                <button
+                  key={ev.id}
+                  onClick={() => setSelectedEventId(ev.id)}
+                  style={{
+                    padding: '0.5rem 1.25rem',
+                    borderRadius: '999px',
+                    border: 'none',
+                    background: selectedEventId === ev.id ? '#0f172a' : '#f1f5f9',
+                    color: selectedEventId === ev.id ? '#fff' : '#475569',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease',
+                    boxShadow: selectedEventId === ev.id ? '0 4px 12px rgba(15, 23, 42, 0.15)' : 'none',
+                  }}
+                >
+                  {ev.title}
+                </button>
+              ))}
+            </div>
+
             <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-              {tickets.length} {tickets.length === 1 ? 'ingresso encontrado' : 'ingressos encontrados'}
+              {filteredTickets.length} {filteredTickets.length === 1 ? 'ingresso' : 'ingressos'} neste evento
             </p>
             <div className="my-tickets-grid">
-              {tickets.map((ticket) => (
+              {filteredTickets.map((ticket) => (
                 <TicketCard key={ticket.id} ticket={ticket} buyerName={userName} />
               ))}
             </div>

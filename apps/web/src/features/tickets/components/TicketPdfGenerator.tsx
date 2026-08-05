@@ -289,13 +289,15 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
   const btnBase: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
     gap: '0.35rem',
-    padding: '0.5rem 0.85rem',
+    padding: '0.5rem 0.5rem',
     borderRadius: '8px',
     border: '1px solid #e2e8f0',
     background: '#fff',
     color: '#334155',
-    fontSize: '0.8rem',
+    fontSize: '0.75rem',
     fontWeight: 600,
     cursor: isGenerating ? 'not-allowed' : 'pointer',
     opacity: isGenerating ? 0.6 : 1,
@@ -305,7 +307,7 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', width: '100%' }}>
         <button type="button" onClick={handleView} disabled={isGenerating} style={btnBase} title="Visualizar ingresso">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -320,7 +322,7 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          Baixar PDF
+          Baixar
         </button>
 
         <button type="button" onClick={handlePrint} disabled={isGenerating} style={btnBase} title="Imprimir">
@@ -333,7 +335,7 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
         </button>
 
         {isGenerating && (
-          <span style={{ fontSize: '0.8rem', color: '#64748b', alignSelf: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: '#64748b', alignSelf: 'center', position: 'absolute', marginTop: '40px' }}>
             Gerando...
           </span>
         )}
