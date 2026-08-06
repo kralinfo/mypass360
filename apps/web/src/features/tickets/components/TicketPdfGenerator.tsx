@@ -142,13 +142,19 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
     doc.text(buyerLines, px, afterTitle + 13)
     afterTitle += 14
   } else {
-    // Se for 'none', desenha o divider, mas pula a seção de nome
+    // Se for 'none', desenha o divider
     doc.setDrawColor(255, 255, 255)
     doc.setLineWidth(0.2)
     doc.setGState(doc.GState({ opacity: 0.3 }))
-    doc.line(px, afterTitle + 3, MAIN_W - px, afterTitle + 3)
+    doc.line(px, afterTitle + 1, MAIN_W - px, afterTitle + 1)
     doc.setGState(doc.GState({ opacity: 1 }))
-    afterTitle += 4
+
+    // Adiciona o indicador de INGRESSO TRANSFERÍVEL em itálico de tom claro
+    doc.setTextColor(200, 210, 255)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'oblique')
+    doc.text('INGRESSO PORTADOR / TRANSFERÍVEL', px, afterTitle + 8)
+    afterTitle += 10
   }
 
   // Código
@@ -370,6 +376,7 @@ export function TicketPdfGenerator({ ticket, buyerName, buyerCpf }: TicketPdfGen
   const ticketType = ticket.ticketType?.name ?? '—'
   const eventLocation = ticket.event?.location ?? '—'
   const isFormalPdf = ticket.event?.ticket_layout === 'formal_pdf'
+  const isAnonymous = ticket.event?.participant_id_type === 'none'
 
   const getFileName = () => {
     const eventTitle = (ticket.event?.title ?? 'ingresso')
@@ -615,11 +622,24 @@ export function TicketPdfGenerator({ ticket, buyerName, buyerCpf }: TicketPdfGen
               {/* Divider */}
               <div style={{ borderTop: '1px dashed rgba(255,255,255,0.25)', marginBottom: '1rem' }} />
 
-              {/* Nome do comprador */}
-              <p style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.8)', letterSpacing: '0.08em', fontWeight: 600, margin: '0 0 0.2rem 0' }}>COMPRADOR</p>
-              <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: '0 0 1.2rem 0', letterSpacing: '0.02em' }}>
-                {buyer.toUpperCase()}
-              </p>
+              {/* Nome do comprador (apenas se participant_id_type não for 'none') */}
+              {!isAnonymous ? (
+                <>
+                  <p style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.8)', letterSpacing: '0.08em', fontWeight: 600, margin: '0 0 0.2rem 0' }}>COMPRADOR</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: '0 0 1.2rem 0', letterSpacing: '0.02em' }}>
+                    {buyer.toUpperCase()}
+                  </p>
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1.2rem' }}>
+                  <p style={{ fontSize: '0.6rem', color: 'rgba(200,210,255,0.8)', letterSpacing: '0.08em', fontWeight: 600, margin: 0 }}>PORTADOR</p>
+                  <div style={{ display: 'inline-flex', alignSelf: 'flex-start', background: 'rgba(255, 255, 255, 0.12)', border: '1px solid rgba(255, 255, 255, 0.25)', borderRadius: '6px', padding: '0.35rem 0.6rem', marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 700, letterSpacing: '0.02em' }}>
+                      🎫 INGRESSO AO PORTADOR / TRANSFERÍVEL
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Código */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>

@@ -235,8 +235,8 @@ function CadastrarEventoForm() {
 
   if (loadingEvent) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '5rem' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+      <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: 0 }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem 1rem 1.5rem' }}>
           <p style={{ color: '#64748b', textAlign: 'center' }}>Carregando evento...</p>
         </div>
       </div>
@@ -244,8 +244,8 @@ function CadastrarEventoForm() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '1.5rem' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 1rem 1.5rem' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: 0 }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem 1rem 1.5rem' }}>
         <BackButton href={isEditMode ? '/meus-eventos' : '/eventos'} style={{ marginBottom: '1rem' }} />
         <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '1.25rem', color: '#0f172a', letterSpacing: '-0.02em' }}>
           {isEditMode ? 'Editar Evento' : 'Cadastrar Novo Evento'}

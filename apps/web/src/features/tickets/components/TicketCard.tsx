@@ -176,7 +176,7 @@ export function TicketCard({ ticket, buyerName, onNameUpdated }: TicketCardProps
         </div>
 
         {/* Portador do ingresso - Ocultar se o tipo de identificação for 'none' */}
-        {ticket.event?.participant_id_type !== 'none' && (
+        {ticket.event?.participant_id_type !== 'none' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
@@ -222,6 +222,17 @@ export function TicketCard({ ticket, buyerName, onNameUpdated }: TicketCardProps
                 {displayName}
               </p>
             )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
+              PORTADOR
+            </p>
+            <div style={{ display: 'inline-flex', alignSelf: 'flex-start', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.3rem 0.55rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
+                🎫 Ingresso ao Portador / Transferível
+              </span>
+            </div>
           </div>
         )}
 
