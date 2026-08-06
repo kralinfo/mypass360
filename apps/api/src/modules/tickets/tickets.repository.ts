@@ -39,7 +39,6 @@ export class TicketsRepository {
    * NUNCA retorna tickets de outros usuários.
    */
   async findByUserId(userId: string) {
-    console.log('[TicketsRepository.findByUserId] Iniciando busca para userId:', userId)
     const { data: tickets, error } = await this.supabase
       .getClient()
       .from(this.table)
@@ -48,29 +47,19 @@ export class TicketsRepository {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('[TicketsRepository.findByUserId] Erro na busca de tickets:', error.message, error.hint)
       throw new Error(`Erro ao buscar ingressos: ${error.message}`)
     }
-
-    console.log(`[TicketsRepository.findByUserId] Encontrados ${tickets?.length || 0} tickets para o usuário.`)
 
     if (!tickets || tickets.length === 0) return []
 
     // Buscar orders para resolver event_id quando ticket.event_id é nulo
     const orderIds = [...new Set(tickets.map((t: any) => t.order_id).filter(Boolean))]
-    console.log('[TicketsRepository.findByUserId] Order IDs únicos nos tickets:', orderIds)
     
     let ordersResult = { data: [] as any[], error: null as any }
     if (orderIds.length > 0) {
       const res = await this.supabase.getClient().from('orders').select('id, event_id').in('id', orderIds)
       ordersResult.data = res.data ?? []
       ordersResult.error = res.error
-    }
-
-    if (ordersResult.error) {
-      console.error('[TicketsRepository.findByUserId] Erro ao buscar ordens:', ordersResult.error.message)
-    } else {
-      console.log('[TicketsRepository.findByUserId] Ordens resolvidas:', ordersResult.data)
     }
 
     const orderEventMap = new Map((ordersResult.data ?? []).map((o: any) => [o.id, o.event_id]))
@@ -80,10 +69,8 @@ export class TicketsRepository {
       ...tickets.map((t: any) => t.event_id).filter(Boolean),
       ...(ordersResult.data ?? []).map((o: any) => o.event_id).filter(Boolean),
     ])]
-    console.log('[TicketsRepository.findByUserId] Event IDs únicos a buscar:', eventIds)
 
     const ticketTypeIds = [...new Set(tickets.map((t: any) => t.ticket_type_id).filter(Boolean))]
-    console.log('[TicketsRepository.findByUserId] TicketType IDs únicos a buscar:', ticketTypeIds)
 
     const [eventsResult, ticketTypesResult] = await Promise.all([
       eventIds.length > 0
@@ -94,25 +81,12 @@ export class TicketsRepository {
         : Promise.resolve({ data: [], error: null as any }),
     ])
 
-    if (eventsResult.error) {
-      console.error('[TicketsRepository.findByUserId] Erro ao buscar eventos:', eventsResult.error.message)
-    } else {
-      console.log('[TicketsRepository.findByUserId] Eventos encontrados no Supabase:', eventsResult.data)
-    }
-    if (ticketTypesResult.error) {
-      console.error('[TicketsRepository.findByUserId] Erro ao buscar tipos de ingressos:', ticketTypesResult.error.message)
-    } else {
-      console.log('[TicketsRepository.findByUserId] Tipos de ingressos encontrados no Supabase:', ticketTypesResult.data)
-    }
-
     const eventsMap = new Map((eventsResult.data ?? []).map((e: any) => [e.id, e]))
     const ticketTypesMap = new Map((ticketTypesResult.data ?? []).map((tt: any) => [tt.id, tt]))
 
     const mappedTickets = tickets.map((ticket: any) => {
       const effectiveEventId = ticket.event_id ?? orderEventMap.get(ticket.order_id)
       const resolvedEvent = eventsMap.get(effectiveEventId) ?? null
-      console.log(`[TicketsRepository.findByUserId] Mapeando ticket ${ticket.id}: effectiveEventId=${effectiveEventId}, resolvedEvent=${resolvedEvent ? resolvedEvent.title : 'NULL'}`)
-      
       return {
         ...ticket,
         event: resolvedEvent,
@@ -170,6 +144,20 @@ export class TicketsRepository {
   ) {
     const ticketsToInsert = []
 
+    // Buscar participant_id_type UMA vez antes do loop (evita N queries desnecessárias)
+    let pIdType = 'name'
+    if (eventId) {
+      const { data: eventData } = await this.supabase
+        .getClient()
+        .from('events')
+        .select('participant_id_type')
+        .eq('id', eventId)
+        .single()
+      if (eventData) {
+        pIdType = eventData.participant_id_type
+      }
+    }
+
     for (const item of orderItems) {
       for (let i = 0; i < item.quantity; i++) {
         const ticketId = randomUUID()
@@ -182,28 +170,13 @@ export class TicketsRepository {
           width: 300,
         })
 
-        // Obter a regra de identificação do evento antes de criar o ticket
-        let pIdType = 'name'
-        if (eventId) {
-          const { data: eventData } = await this.supabase
-            .getClient()
-            .from('events')
-            .select('participant_id_type')
-            .eq('id', eventId)
-            .single()
-          if (eventData) {
-            pIdType = eventData.participant_id_type
-          }
-        }
-
-        // Definir o nome do portador com base na regra
+        // Definir o nome do portador com base na regra do evento
         let nomineeName: string | null = null
 
         if (pIdType === 'none') {
-          // Se o evento é sem nome (transferível), não gravamos nome no ingresso
+          // Evento sem nome (transferível) — não grava nome
           nomineeName = null
         } else {
-          // Se for "com nome" (opcional) ou "formal_pdf" (obrigatório)
           nomineeName = item.nomineeNames?.[i]?.trim() || buyerDisplayName || null
         }
 

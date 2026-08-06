@@ -1,7 +1,7 @@
 'use client'
 
 import type { Ticket } from '@mypass360/types'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TicketPdfGenerator } from './TicketPdfGenerator'
 import { updateTicketBuyerName } from '../services/tickets.service'
@@ -9,7 +9,7 @@ import { updateTicketBuyerName } from '../services/tickets.service'
 interface TicketCardProps {
   ticket: Ticket
   buyerName?: string
-  onNameUpdated?: (ticketId: string, newName: string) => void
+  onNameUpdated?: () => void
 }
 
 const statusConfig: Record<string, { label: string; bg: string; color: string; border: string }> = {
@@ -29,6 +29,23 @@ export function TicketCard({ ticket, buyerName, onNameUpdated }: TicketCardProps
   const [editNameValue, setEditNameValue] = useState(isAnonymous ? '' : (ticket.buyerName ?? buyerName ?? ''))
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
+
+  // Efetivamente escutar mudanças na prop do ticket
+  const propBuyerName = ticket.buyerName
+  const propBuyerEmail = ticket.buyerEmail
+  const propParticipantType = ticket.event?.participant_id_type
+  
+  // Sincronizar prop com os estados locais do card
+  useEffect(() => {
+    if (propParticipantType === 'none') {
+      setDisplayName('')
+      setEditNameValue('')
+    } else {
+      const nextDisplay = propBuyerName ?? buyerName ?? propBuyerEmail ?? '—'
+      setDisplayName(nextDisplay)
+      setEditNameValue(propBuyerName ?? buyerName ?? '')
+    }
+  }, [propBuyerName, buyerName, propBuyerEmail, propParticipantType])
 
   // Só permite editar nome em ingressos do modelo Ticket (não PDF Formal)
   const canEditName = ticket.event?.ticket_layout !== 'formal_pdf'
@@ -69,7 +86,7 @@ export function TicketCard({ ticket, buyerName, onNameUpdated }: TicketCardProps
       const newDisplay = editNameValue.trim() || ticket.buyerEmail || '—'
       setDisplayName(newDisplay)
       setIsEditingName(false)
-      onNameUpdated?.(ticket.id, editNameValue.trim())
+      onNameUpdated?.()
     } catch (err) {
       setNameError(err instanceof Error ? err.message : 'Erro ao salvar nome.')
     } finally {

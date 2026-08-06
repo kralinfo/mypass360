@@ -82,7 +82,7 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
   const px = 8   // padding horizontal
   const eventTitle = ticket.event?.title ?? 'Evento'
   const isAnonymous = ticket.event?.participant_id_type === 'none'
-  const buyer = isAnonymous ? '' : (ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—')
+  const buyer = isAnonymous ? '' : (buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—')
   const ticketType = ticket.ticketType?.name ?? '—'
   const publicCode = ticket.publicCode
 
@@ -371,8 +371,7 @@ export function TicketPdfGenerator({ ticket, buyerName, buyerCpf }: TicketPdfGen
         minute: '2-digit',
       })
     : '—'
-
-  const buyer = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
+  const buyer = buyerName ?? ticket.buyerName ?? ticket.buyerEmail ?? '—'
   const ticketType = ticket.ticketType?.name ?? '—'
   const eventLocation = ticket.event?.location ?? '—'
   const isFormalPdf = ticket.event?.ticket_layout === 'formal_pdf'

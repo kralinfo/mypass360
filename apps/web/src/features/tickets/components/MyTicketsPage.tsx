@@ -7,7 +7,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export function MyTicketsPage() {
-  const { tickets, isLoading, error } = useMyTickets()
+  const { tickets, isLoading, error, refetch } = useMyTickets()
   const [userName, setUserName] = useState<string | undefined>(undefined)
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
 
@@ -244,7 +244,7 @@ export function MyTicketsPage() {
             </p>
             <div className="my-tickets-grid">
               {filteredTickets.map((ticket) => (
-                <TicketCard key={ticket.id} ticket={ticket} buyerName={userName} />
+                <TicketCard key={ticket.id} ticket={ticket} buyerName={userName} onNameUpdated={refetch} />
               ))}
             </div>
           </>
