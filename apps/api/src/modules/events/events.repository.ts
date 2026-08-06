@@ -188,27 +188,74 @@ export class EventsRepository {
       throw new Error('Evento não encontrado ou você não tem permissão para editá-lo.')
     }
 
-    // Atualizar ticket_types se fornecidos
+    // Sincronizar ticket_types de forma inteligente
     if (dto.ticket_types && dto.ticket_types.length > 0) {
-      // Deletar tipos existentes e recriar
-      await this.supabase.getClient().from('ticket_types').delete().eq('event_id', id)
-
-      const ticketTypesToInsert = dto.ticket_types.map((tt) => ({
-        event_id: id,
-        name: tt.name,
-        price: tt.price,
-        quantity: tt.quantity,
-        description: tt.description ?? null,
-        sold: 0,
-      }))
-
-      const { error: ttError } = await this.supabase
+      // 1. Buscar tipos atuais no banco
+      const { data: existingTypes } = await this.supabase
         .getClient()
         .from('ticket_types')
-        .insert(ticketTypesToInsert)
+        .select('*')
+        .eq('event_id', id)
 
-      if (ttError) {
-        console.warn('[EventsRepository.update] Could not update ticket_types:', ttError.message)
+      const existingMap = new Map((existingTypes ?? []).map((t) => [t.name.trim().toLowerCase(), t]))
+
+      const toInsert = []
+      const toUpdate = []
+      const processedNames = new Set<string>()
+
+      for (const tt of dto.ticket_types) {
+        const key = tt.name.trim().toLowerCase()
+        processedNames.add(key)
+
+        const existing = existingMap.get(key)
+        if (existing) {
+          // Já existe -> Atualiza (quantidade, preço, descrição)
+          toUpdate.push({
+            id: existing.id,
+            name: tt.name.trim(),
+            price: tt.price,
+            quantity: tt.quantity,
+            description: tt.description ?? null,
+          })
+        } else {
+          // Novo -> Insere
+          toInsert.push({
+            event_id: id,
+            name: tt.name.trim(),
+            price: tt.price,
+            quantity: tt.quantity,
+            description: tt.description ?? null,
+            sold: 0,
+          })
+        }
+      }
+
+      // Executar Updates individuais
+      for (const item of toUpdate) {
+        await this.supabase
+          .getClient()
+          .from('ticket_types')
+          .update({
+            price: item.price,
+            quantity: item.quantity,
+            description: item.description,
+          })
+          .eq('id', item.id)
+      }
+
+      // Executar Inserts em lote
+      if (toInsert.length > 0) {
+        await this.supabase.getClient().from('ticket_types').insert(toInsert)
+      }
+
+      // Executar Deletes apenas dos tipos que foram removidos e não possuem vendas
+      const toDelete = (existingTypes ?? []).filter(
+        (t) => !processedNames.has(t.name.trim().toLowerCase()) && (t.sold ?? 0) === 0
+      )
+
+      if (toDelete.length > 0) {
+        const idsToDelete = toDelete.map((t) => t.id)
+        await this.supabase.getClient().from('ticket_types').delete().in('id', idsToDelete)
       }
     }
 

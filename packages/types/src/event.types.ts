@@ -27,6 +27,13 @@ export interface Event {
   ticket_layout?: TicketLayout
   /** Tipo de identificação do participante. Aplica-se quando ticket_layout = 'ticket'. Padrão: 'name' */
   participant_id_type?: ParticipantIdType
+  ticket_types?: Array<{
+    id: string
+    name: string
+    price: number
+    quantity: number
+    description?: string
+  }>
   created_at: string
   updated_at: string
 }
