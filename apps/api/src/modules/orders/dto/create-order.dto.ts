@@ -17,6 +17,11 @@ export class CreateOrderItemDto {
   @IsArray()
   @IsString({ each: true })
   nomineeNames?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  nomineeCpfs?: string[]
 }
 
 export class CreateOrderDto {

@@ -8,6 +8,7 @@ type OrderItemInsert = {
   quantity: number
   unit_price: number
   nominee_names?: string[]
+  nominee_cpfs?: string[]
 }
 
 @Injectable()
@@ -59,6 +60,7 @@ export class OrdersRepository {
       quantity: item.quantity,
       unit_price: item.unitPrice,
       nominee_names: item.nomineeNames ?? [],
+      nominee_cpfs: item.nomineeCpfs ?? [],
     }))
 
     const { error: itemsError } = await this.supabase.getClient().from('order_items').insert(itemsToInsert)

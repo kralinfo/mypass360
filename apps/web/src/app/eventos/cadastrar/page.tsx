@@ -25,6 +25,8 @@ function CadastrarEventoForm() {
     location: '',
     capacity: '',
     price: '',
+    ticketLayout: '' as '' | 'ticket' | 'formal_pdf',
+    participantIdType: '' as '' | 'none' | 'name',
     ticketTypes: [
       { name: 'Inteira', price: '', quantity: '0', description: '' },
       { name: 'Meia-entrada', price: '', quantity: '0', description: '' },
@@ -64,6 +66,8 @@ function CadastrarEventoForm() {
           location: event.location,
           capacity: String(event.capacity),
           price: String(event.price),
+        ticketLayout: (event.ticket_layout ?? '') as '' | 'ticket' | 'formal_pdf',
+        participantIdType: (event.participant_id_type === 'name_cpf' ? '' : (event.participant_id_type ?? '')) as '' | 'none' | 'name',
           ticketTypes: [
             { name: 'Inteira', price: String(event.price), quantity: '0', description: '' },
             {
@@ -157,6 +161,19 @@ function CadastrarEventoForm() {
     setLoading(true)
     setError(null)
 
+    // Validação: modelo de ingresso obrigatório
+    if (!formData.ticketLayout) {
+      setError('Selecione o modelo de ingresso (Ticket ou PDF Formal).')
+      setLoading(false)
+      return
+    }
+
+    if (formData.ticketLayout === 'ticket' && !formData.participantIdType) {
+      setError('Selecione o tipo de identificação do participante (Sem nome ou Com nome).')
+      setLoading(false)
+      return
+    }
+
     try {
       const supabase = createClient()
       const {
@@ -180,6 +197,8 @@ function CadastrarEventoForm() {
         location: formData.location,
         capacity: parseInt(formData.capacity, 10),
         price: formData.price ? parseFloat(formData.price) : 0,
+        ticket_layout: formData.ticketLayout,
+        participant_id_type: formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType,
         ticket_types: formData.ticketTypes
           .filter((ticketType) => ticketType.name.trim().length > 0)
           .map((ticketType) => ({
@@ -544,6 +563,109 @@ function CadastrarEventoForm() {
                 />
               </div>
             ))}
+          </section>
+
+          {/* Seção: Modelo do Ingresso */}
+          <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
+            <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
+              Modelo do Ingresso <span style={{ color: '#ef4444' }}>*</span>
+            </h2>
+            <p style={{ margin: '0 0 1rem', color: '#64748b', fontSize: '0.95rem' }}>
+              Define a aparência e as informações exigidas do participante na compra.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Ticket */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: `2px solid ${formData.ticketLayout === 'ticket' ? '#0f172a' : '#e2e8f0'}`,
+                  background: formData.ticketLayout === 'ticket' ? '#f8fafc' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="ticketLayout"
+                  value="ticket"
+                  checked={formData.ticketLayout === 'ticket'}
+                  onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'ticket', participantIdType: '' }))}
+                  style={{ marginTop: '3px' }}
+                />
+                <div>
+                  <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 0.2rem' }}>🎫 Ticket</p>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Ingresso compacto no estilo ticket físico com QR Code. Modelo padrão.
+                  </p>
+                  {/* Sub-opção de identificação */}
+                  {formData.ticketLayout === 'ticket' && (
+                    <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '0.5rem', borderLeft: '3px solid #e2e8f0' }}>
+                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
+                        Identificação do Participante <span style={{ color: '#ef4444' }}>*</span>
+                      </p>
+                      {[
+                        { value: 'none', label: 'Sem nome', desc: 'Ingresso transferível, sem identificação' },
+                        { value: 'name', label: 'Com nome (opcional)', desc: 'Comprador pode informar o nome do portador' },
+                      ].map(opt => (
+                        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', background: formData.participantIdType === opt.value ? '#f0fdf4' : '#fff', border: `1px solid ${formData.participantIdType === opt.value ? '#bbf7d0' : '#e2e8f0'}` }}>
+                          <input
+                            type="radio"
+                            name="participantIdType"
+                            value={opt.value}
+                            checked={formData.participantIdType === opt.value}
+                            onChange={() => setFormData(prev => ({ ...prev, participantIdType: opt.value as 'none' | 'name' }))}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <div>
+                            <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>{opt.label}</p>
+                            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>{opt.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* PDF Formal */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: `2px solid ${formData.ticketLayout === 'formal_pdf' ? '#0369a1' : '#e2e8f0'}`,
+                  background: formData.ticketLayout === 'formal_pdf' ? '#f0f9ff' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="ticketLayout"
+                  value="formal_pdf"
+                  checked={formData.ticketLayout === 'formal_pdf'}
+                  onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'formal_pdf', participantIdType: '' }))}
+                  style={{ marginTop: '3px' }}
+                />
+                <div>
+                  <p style={{ fontWeight: 700, color: '#0369a1', margin: '0 0 0.2rem' }}>📄 PDF Formal</p>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    PDF A4 profissional com nome e CPF obrigatórios por ingresso. Ideal para eventos corporativos e seminários.
+                  </p>
+                  {formData.ticketLayout === 'formal_pdf' && (
+                    <p style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 600, margin: '0.5rem 0 0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      Nome completo e CPF serão solicitados para cada ingresso no checkout
+                    </p>
+                  )}
+                </div>
+              </label>
+            </div>
           </section>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>

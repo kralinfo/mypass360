@@ -6,6 +6,7 @@ import type { Ticket } from '@mypass360/types'
 interface TicketPdfGeneratorProps {
   ticket: Ticket
   buyerName?: string
+  buyerCpf?: string
 }
 
 // ─── Dimensões do ingresso compacto (formato horizontal, tipo ingresso real) ──
@@ -80,7 +81,8 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
   // ── SEÇÃO ESQUERDA — CONTEÚDO PRINCIPAL ─────────────────────────────────────
   const px = 8   // padding horizontal
   const eventTitle = ticket.event?.title ?? 'Evento'
-  const buyer = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
+  const isAnonymous = ticket.event?.participant_id_type === 'none'
+  const buyer = isAnonymous ? '' : (ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—')
   const ticketType = ticket.ticketType?.name ?? '—'
   const publicCode = ticket.publicCode
 
@@ -114,36 +116,50 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
   const titleLines = doc.splitTextToSize(eventTitle, MAIN_W - px * 2 - 10) as string[]
   doc.text(titleLines, px, 18)
 
-  // Divider fino
-  const afterTitle = 18 + titleLines.length * 7
-  doc.setDrawColor(255, 255, 255)
-  doc.setLineWidth(0.2)
-  doc.setGState(doc.GState({ opacity: 0.3 }))
-  doc.line(px, afterTitle + 1, MAIN_W - px, afterTitle + 1)
-  doc.setGState(doc.GState({ opacity: 1 }))
+  // Label e Nome do portador (apenas se participant_id_type não for 'none')
+  const hasParticipantName = ticket.event?.participant_id_type !== 'none'
+  let afterTitle = 18 + titleLines.length * 7
 
-  // Label NOME
-  doc.setTextColor(200, 210, 255)
-  doc.setFontSize(6)
-  doc.setFont('helvetica', 'normal')
-  doc.text('COMPRADOR', px, afterTitle + 7)
+  if (hasParticipantName) {
+    // Divider fino
+    doc.setDrawColor(255, 255, 255)
+    doc.setLineWidth(0.2)
+    doc.setGState(doc.GState({ opacity: 0.3 }))
+    doc.line(px, afterTitle + 1, MAIN_W - px, afterTitle + 1)
+    doc.setGState(doc.GState({ opacity: 1 }))
 
-  // Nome do comprador
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
-  const buyerLines = doc.splitTextToSize(buyer.toUpperCase(), MAIN_W - px * 2 - 10) as string[]
-  doc.text(buyerLines, px, afterTitle + 13)
+    // Label PORTADOR
+    doc.setTextColor(200, 210, 255)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.text('PORTADOR', px, afterTitle + 7)
+
+    // Nome do portador
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    const buyerLines = doc.splitTextToSize(buyer.toUpperCase(), MAIN_W - px * 2 - 10) as string[]
+    doc.text(buyerLines, px, afterTitle + 13)
+    afterTitle += 14
+  } else {
+    // Se for 'none', desenha o divider, mas pula a seção de nome
+    doc.setDrawColor(255, 255, 255)
+    doc.setLineWidth(0.2)
+    doc.setGState(doc.GState({ opacity: 0.3 }))
+    doc.line(px, afterTitle + 3, MAIN_W - px, afterTitle + 3)
+    doc.setGState(doc.GState({ opacity: 1 }))
+    afterTitle += 4
+  }
 
   // Código
   doc.setTextColor(200, 210, 255)
   doc.setFontSize(6.5)
   doc.setFont('helvetica', 'normal')
-  doc.text('CÓDIGO', px, afterTitle + 22)
+  doc.text('CÓDIGO', px, afterTitle + 6)
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(8)
   doc.setFont('helvetica', 'bold')
-  doc.text(publicCode, px + 14, afterTitle + 22)
+  doc.text(publicCode, px + 14, afterTitle + 6)
 
   // Rodapé esquerdo: data | hora | local
   const footerY = H - 6
@@ -185,7 +201,147 @@ async function generatePdf(ticket: Ticket, buyerName?: string) {
   return doc
 }
 
-export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProps) {
+/** Gera PDF A4 formal com identidade MyPass360 */
+async function generateFormalPdf(ticket: Ticket, buyerName?: string, buyerCpf?: string) {
+  const { jsPDF } = await import('jspdf')
+  const QRCode = await import('qrcode')
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const W = 210
+  const buyer = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
+  const cpf = ticket.buyerCpf ?? buyerCpf ?? '—'
+  const publicCode = ticket.publicCode || ticket.id.slice(0, 8).toUpperCase()
+  const eventTitle = ticket.event?.title ?? 'Evento'
+  const ticketType = ticket.ticketType?.name ?? '—'
+  const eventDate = ticket.event?.date
+    ? new Date(ticket.event.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '—'
+  const eventTime = ticket.event?.date
+    ? new Date(ticket.event.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : '—'
+  const eventLocation = ticket.event?.location ?? '—'
+
+  // Header gradiente simulado
+  const hdrSteps = 30
+  for (let i = 0; i < hdrSteps; i++) {
+    const t = i / hdrSteps
+    const r = Math.round(15 + (30 - 15) * t)
+    const g = Math.round(23 + (41 - 23) * t)
+    const b = Math.round(42 + (82 - 42) * t)
+    doc.setFillColor(r, g, b)
+    doc.rect(0, (40 / hdrSteps) * i, W, 40 / hdrSteps + 0.5, 'F')
+  }
+
+  // Logo / marca — texto no header
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text('MyPass360', 15, 14)
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(160, 190, 230)
+  doc.text('INGRESSO OFICIAL', 15, 20)
+
+  // Tipo de ingresso e título
+  doc.setTextColor(160, 190, 230)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.text(ticketType.toUpperCase(), 15, 30)
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  const titleLines = doc.splitTextToSize(eventTitle, W - 30) as string[]
+  doc.text(titleLines, 15, 38)
+
+  // Corpo do documento
+  let y = 55
+  const section = (label: string) => {
+    doc.setFillColor(248, 250, 252)
+    doc.rect(10, y - 3, W - 20, 8, 'F')
+    doc.setTextColor(100, 116, 139)
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.text(label, 14, y + 2)
+    y += 10
+  }
+  const row = (label: string, value: string, rightLabel?: string, rightValue?: string) => {
+    doc.setTextColor(100, 116, 139)
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.text(label, 14, y)
+    if (rightLabel) doc.text(rightLabel, W / 2, y)
+    doc.setTextColor(15, 23, 42)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text(value, 14, y + 6)
+    if (rightLabel && rightValue) doc.text(rightValue, W / 2, y + 6)
+    y += 16
+  }
+  const divider = () => {
+    doc.setDrawColor(226, 232, 240)
+    doc.setLineWidth(0.3)
+    doc.line(10, y, W - 10, y)
+    y += 8
+  }
+
+  // Dados do participante
+  section('DADOS DO PARTICIPANTE')
+  row('NOME COMPLETO', buyer)
+  row('CPF', cpf)
+  divider()
+
+  // Dados do evento
+  section('INFORMAÇÕES DO EVENTO')
+  row('DATA', eventDate, 'HORÁRIO', eventTime)
+  row('LOCAL', doc.splitTextToSize(eventLocation, 80)[0] as string)
+  divider()
+
+  // Tipo e código
+  section('INGRESSO')
+  row('TIPO DE INGRESSO', ticketType, 'CÓDIGO', publicCode)
+  divider()
+
+  // QR Code
+  let qrDataUrl: string
+  if (ticket.qrCode && ticket.qrCode.startsWith('data:image')) {
+    qrDataUrl = ticket.qrCode
+  } else {
+    qrDataUrl = await QRCode.toDataURL(ticket.id, { errorCorrectionLevel: 'H', margin: 1, width: 200 })
+  }
+
+  const qrSize = 45
+  const qrX = (W - qrSize) / 2
+  doc.addImage(qrDataUrl, 'PNG', qrX, y, qrSize, qrSize)
+  y += qrSize + 4
+
+  doc.setTextColor(100, 116, 139)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.text(publicCode, W / 2, y, { align: 'center' })
+  y += 10
+
+  // Instruções
+  divider()
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  const instrText = 'Apresente este ingresso (impresso ou digital) na entrada do evento. O QR Code será escaneado para validação. Este ingresso é pessoal e intransferível.'
+  const instrLines = doc.splitTextToSize(instrText, W - 20) as string[]
+  doc.text(instrLines, 14, y)
+  y += instrLines.length * 4 + 6
+
+  // Footer
+  doc.setFillColor(15, 23, 42)
+  doc.rect(0, 282, W, 15, 'F')
+  doc.setTextColor(148, 163, 184)
+  doc.setFontSize(7)
+  doc.text('MyPass360 — Plataforma de Ingressos', W / 2, 290, { align: 'center' })
+  doc.text('mypass360.com.br', W / 2, 294, { align: 'center' })
+
+  return doc
+}
+
+export function TicketPdfGenerator({ ticket, buyerName, buyerCpf }: TicketPdfGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
 
@@ -213,6 +369,7 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
   const buyer = ticket.buyerName ?? buyerName ?? ticket.buyerEmail ?? '—'
   const ticketType = ticket.ticketType?.name ?? '—'
   const eventLocation = ticket.event?.location ?? '—'
+  const isFormalPdf = ticket.event?.ticket_layout === 'formal_pdf'
 
   const getFileName = () => {
     const eventTitle = (ticket.event?.title ?? 'ingresso')
@@ -226,17 +383,23 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
     setIsGenerating(true)
     setGenError(null)
     try {
-      let qrDataUrl = ticket.qrCode
-      if (!qrDataUrl || !qrDataUrl.startsWith('data:image')) {
-        const QRCode = await import('qrcode')
-        qrDataUrl = await QRCode.toDataURL(ticket.id, {
-          errorCorrectionLevel: 'H',
-          margin: 1,
-          width: 200,
-        })
+      if (isFormalPdf) {
+        // Para PDF formal: abrir PDF diretamente em nova aba
+        const ticketForPdf = { ...ticket, publicCode }
+        const doc = await generateFormalPdf(ticketForPdf, buyerName, buyerCpf)
+        const blob = doc.output('blob')
+        const url = URL.createObjectURL(blob)
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 30000)
+      } else {
+        let qrDataUrl = ticket.qrCode
+        if (!qrDataUrl || !qrDataUrl.startsWith('data:image')) {
+          const QRCode = await import('qrcode')
+          qrDataUrl = await QRCode.toDataURL(ticket.id, { errorCorrectionLevel: 'H', margin: 1, width: 200 })
+        }
+        setPreviewQr(qrDataUrl)
+        setShowPreview(true)
       }
-      setPreviewQr(qrDataUrl)
-      setShowPreview(true)
     } catch (err) {
       setGenError(err instanceof Error ? err.message : 'Erro ao carregar ingresso')
     } finally {
@@ -249,7 +412,9 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
     setGenError(null)
     try {
       const ticketForPdf = { ...ticket, publicCode }
-      const doc = await generatePdf(ticketForPdf, buyerName)
+      const doc = isFormalPdf
+        ? await generateFormalPdf(ticketForPdf, buyerName, buyerCpf)
+        : await generatePdf(ticketForPdf, buyerName)
       doc.save(getFileName())
     } catch (err) {
       setGenError(err instanceof Error ? err.message : 'Erro ao gerar PDF')
@@ -263,7 +428,9 @@ export function TicketPdfGenerator({ ticket, buyerName }: TicketPdfGeneratorProp
     setGenError(null)
     try {
       const ticketForPdf = { ...ticket, publicCode }
-      const doc = await generatePdf(ticketForPdf, buyerName)
+      const doc = isFormalPdf
+        ? await generateFormalPdf(ticketForPdf, buyerName, buyerCpf)
+        : await generatePdf(ticketForPdf, buyerName)
       const blob = doc.output('blob')
       const url = URL.createObjectURL(blob)
       const iframe = document.createElement('iframe')

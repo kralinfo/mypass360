@@ -49,12 +49,21 @@ export class TicketsService {
     userId: string,
     userEmail: string,
     orderItems: OrderItemForTicketGeneration[],
-    eventId?: string
+    eventId?: string,
+    buyerDisplayName?: string
   ) {
-    return this.ticketsRepository.generateForOrder(orderId, userId, userEmail, orderItems, eventId)
+    return this.ticketsRepository.generateForOrder(orderId, userId, userEmail, orderItems, eventId, buyerDisplayName)
   }
 
   validate(dto: ValidateTicketDto) {
     return this.ticketsRepository.validate(dto)
+  }
+
+  /**
+   * Atualiza o nome do portador do ingresso (apenas modelo Ticket).
+   * Valida ownership e impede edição em ingressos PDF Formal.
+   */
+  async updateBuyerName(ticketId: string, userId: string, newName: string) {
+    return this.ticketsRepository.updateBuyerName(ticketId, userId, newName)
   }
 }

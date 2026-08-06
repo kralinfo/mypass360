@@ -209,6 +209,7 @@ export class PaymentsService {
             quantity,
             unit_price,
             nominee_names,
+            nominee_cpfs,
             ticket_types (
               id,
               name,
@@ -224,12 +225,14 @@ export class PaymentsService {
         return
       }
 
-      // Buscar email do comprador
+      // Buscar email e nome do comprador
       const { data: userData } = await this.supabase
         .getClient()
         .auth.admin.getUserById(order.user_id)
 
       const userEmail = userData?.user?.email ?? ''
+      const userMeta = userData?.user?.user_metadata as Record<string, string> | undefined
+      const buyerDisplayName = userMeta?.full_name ?? userMeta?.name ?? userEmail
 
       const orderItems = (order.order_items ?? []).map((item: any) => ({
         id: item.id,
@@ -239,6 +242,7 @@ export class PaymentsService {
         ticketTypeName: item.ticket_types?.name,
         ticketTypeDescription: item.ticket_types?.description,
         nomineeNames: item.nominee_names,
+        nomineeCpfs: item.nominee_cpfs,
       }))
 
       const tickets = await this.ticketsService.generateForOrder(
@@ -246,7 +250,8 @@ export class PaymentsService {
         order.user_id,
         userEmail,
         orderItems,
-        order.event_id  // passa o event_id do pedido para cada ticket
+        order.event_id,
+        buyerDisplayName
       )
 
       this.logger.log(`${tickets.length} ticket(s) gerado(s) para o pedido ${orderId}`)

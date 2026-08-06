@@ -23,6 +23,8 @@ interface RawTicket {
   buyerName?: string
   buyer_email?: string
   buyerEmail?: string
+  buyer_cpf?: string
+  buyerCpf?: string
   qr_code?: string
   qrCode?: string
   status?: Ticket['status']
@@ -44,6 +46,8 @@ interface RawTicket {
     slug: string
     image_url?: string
     imageUrl?: string
+    ticket_layout?: 'ticket' | 'formal_pdf'
+    participant_id_type?: 'none' | 'name' | 'name_cpf'
   }
   ticketType?: {
     id: string
@@ -75,6 +79,7 @@ function normalizeTicket(raw: RawTicket): Ticket {
     userId: raw.user_id ?? raw.userId ?? '',
     buyerName: raw.buyer_name ?? raw.buyerName,
     buyerEmail: raw.buyer_email ?? raw.buyerEmail,
+    buyerCpf: raw.buyer_cpf ?? raw.buyerCpf,
     qrCode: raw.qr_code ?? raw.qrCode ?? '',
     status: raw.status ?? 'VALID',
     issuedAt: raw.issued_at ?? raw.issuedAt,
@@ -91,6 +96,8 @@ function normalizeTicket(raw: RawTicket): Ticket {
           location: raw.event.location,
           slug: raw.event.slug,
           imageUrl: raw.event.image_url ?? raw.event.imageUrl,
+          ticket_layout: raw.event.ticket_layout,
+          participant_id_type: raw.event.participant_id_type,
         }
       : undefined,
     ticketType: rawTicketType
@@ -120,4 +127,15 @@ export async function fetchMyTickets(token: string): Promise<Ticket[]> {
 export async function fetchTicketById(id: string, token: string): Promise<Ticket> {
   const raw = await apiWithAuth(token).get<RawTicket>(`/tickets/${id}`)
   return normalizeTicket(raw)
+}
+
+/**
+ * Atualiza o nome do portador de um ingresso (apenas modelo Ticket).
+ */
+export async function updateTicketBuyerName(
+  ticketId: string,
+  newName: string,
+  token: string
+): Promise<{ success: boolean }> {
+  return apiWithAuth(token).patch<{ success: boolean }>(`/tickets/${ticketId}/buyer-name`, { buyerName: newName })
 }

@@ -20,7 +20,7 @@ export interface CheckoutData {
 export interface CreateCheckoutOrderInput {
   eventId: string
   userId: string
-  items: Array<{ ticketTypeId: string; quantity: number; unitPrice: number }>
+  items: Array<{ ticketTypeId: string; quantity: number; unitPrice: number; nomineeNames?: string[]; nomineeCpfs?: string[] }>
 }
 
 export async function fetchCheckoutData(eventId: string): Promise<CheckoutData> {

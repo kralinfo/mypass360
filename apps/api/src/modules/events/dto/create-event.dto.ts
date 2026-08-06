@@ -2,6 +2,7 @@ import { Type } from 'class-transformer'
 import {
   IsArray,
   IsDateString,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -67,4 +68,12 @@ export class CreateEventDto {
   @Type(() => CreateEventTicketTypeDto)
   @IsOptional()
   ticket_types?: CreateEventTicketTypeDto[]
+
+  @IsOptional()
+  @IsIn(['ticket', 'formal_pdf'])
+  ticket_layout?: string
+
+  @IsOptional()
+  @IsIn(['none', 'name', 'name_cpf'])
+  participant_id_type?: string
 }

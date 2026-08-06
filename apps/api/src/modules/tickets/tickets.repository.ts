@@ -12,6 +12,7 @@ export interface OrderItemForTicketGeneration {
   ticketTypeName?: string
   ticketTypeDescription?: string
   nomineeNames?: string[]
+  nomineeCpfs?: string[]
 }
 
 @Injectable()
@@ -86,7 +87,7 @@ export class TicketsRepository {
 
     const [eventsResult, ticketTypesResult] = await Promise.all([
       eventIds.length > 0
-        ? this.supabase.getClient().from('events').select('id, title, date, location, slug').in('id', eventIds)
+        ? this.supabase.getClient().from('events').select('id, title, date, location, slug, ticket_layout, participant_id_type').in('id', eventIds)
         : Promise.resolve({ data: [], error: null as any }),
       ticketTypeIds.length > 0
         ? this.supabase.getClient().from('ticket_types').select('id, name, price, description').in('id', ticketTypeIds)
@@ -164,7 +165,8 @@ export class TicketsRepository {
     userId: string,
     userEmail: string,
     orderItems: OrderItemForTicketGeneration[],
-    eventId?: string
+    eventId?: string,
+    buyerDisplayName?: string
   ) {
     const ticketsToInsert = []
 
@@ -180,7 +182,32 @@ export class TicketsRepository {
           width: 300,
         })
 
-        const nomineeName = item.nomineeNames?.[i] || null
+        // Obter a regra de identificação do evento antes de criar o ticket
+        let pIdType = 'name'
+        if (eventId) {
+          const { data: eventData } = await this.supabase
+            .getClient()
+            .from('events')
+            .select('participant_id_type')
+            .eq('id', eventId)
+            .single()
+          if (eventData) {
+            pIdType = eventData.participant_id_type
+          }
+        }
+
+        // Definir o nome do portador com base na regra
+        let nomineeName: string | null = null
+
+        if (pIdType === 'none') {
+          // Se o evento é sem nome (transferível), não gravamos nome no ingresso
+          nomineeName = null
+        } else {
+          // Se for "com nome" (opcional) ou "formal_pdf" (obrigatório)
+          nomineeName = item.nomineeNames?.[i]?.trim() || buyerDisplayName || null
+        }
+
+        const nomineeCpf = item.nomineeCpfs?.[i] || null
 
         ticketsToInsert.push({
           id: ticketId,
@@ -191,6 +218,7 @@ export class TicketsRepository {
           user_id: userId,
           buyer_name: nomineeName,
           buyer_email: userEmail,
+          buyer_cpf: nomineeCpf,
           event_id: eventId ?? null,
           qr_code: qrCodeDataUrl,
           status: 'VALID',
@@ -276,5 +304,50 @@ export class TicketsRepository {
     if (error) throw new Error(error.message)
 
     return { valid: true, ticketId: ticket.id }
+  }
+
+  /**
+   * Atualiza o nome do portador do ingresso.
+   * Só permitido para ingressos do modelo Ticket (sem CPF).
+   * Valida ownership pelo user_id.
+   */
+  async updateBuyerName(ticketId: string, userId: string, newName: string): Promise<{ success: boolean }> {
+    // Buscar o ticket e validar ownership
+    const { data: ticket, error: fetchErr } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('id, user_id, event_id')
+      .eq('id', ticketId)
+      .eq('user_id', userId)
+      .single()
+
+    if (fetchErr || !ticket) {
+      throw new Error('Ingresso não encontrado ou sem permissão.')
+    }
+
+    // Buscar o evento para verificar se é formal_pdf (não permitido editar nome nesse caso)
+    if (ticket.event_id) {
+      const { data: event } = await this.supabase
+        .getClient()
+        .from('events')
+        .select('ticket_layout')
+        .eq('id', ticket.event_id)
+        .single()
+
+      if (event?.ticket_layout === 'formal_pdf') {
+        throw new Error('Não é possível editar o nome em ingressos do modelo PDF Formal.')
+      }
+    }
+
+    const { error: updateErr } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .update({ buyer_name: newName.trim() || null })
+      .eq('id', ticketId)
+      .eq('user_id', userId)
+
+    if (updateErr) throw new Error(updateErr.message)
+
+    return { success: true }
   }
 }

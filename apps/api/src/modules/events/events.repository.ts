@@ -112,6 +112,8 @@ export class EventsRepository {
         capacity: dto.capacity,
         price: dto.price ?? 0,
         status: dto.status ?? 'draft',
+        ticket_layout: dto.ticket_layout ?? 'ticket',
+        participant_id_type: dto.participant_id_type ?? 'name',
       })
       .select()
       .single()
@@ -147,6 +149,7 @@ export class EventsRepository {
   async update(id: string, userId: string, dto: UpdateEventDto) {
     // Remover campos que o usuário não deve poder alterar diretamente ou que não pertencem à tabela
     const { status: _s, ticket_types: _tt, ...safeDto } = dto
+    // ticket_layout e participant_id_type fazem parte de safeDto e serão incluídos no update
 
     // Log para diagnóstico
     console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'fields:', Object.keys(safeDto))

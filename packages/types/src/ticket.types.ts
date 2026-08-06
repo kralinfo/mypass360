@@ -10,6 +10,7 @@ export interface Ticket {
   userId: string
   buyerName?: string
   buyerEmail?: string
+  buyerCpf?: string
   qrCode: string
   status: TicketStatus
   issuedAt?: string
@@ -25,6 +26,8 @@ export interface Ticket {
     location: string
     slug: string
     imageUrl?: string
+    ticket_layout?: 'ticket' | 'formal_pdf'
+    participant_id_type?: 'none' | 'name' | 'name_cpf'
   }
   ticketType?: {
     id: string

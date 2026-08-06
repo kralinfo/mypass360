@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
 import { TicketsService } from './tickets.service'
 import { ValidateTicketDto } from './dto/validate-ticket.dto'
 import { AuthGuard } from '@/common/guards/auth.guard'
@@ -35,5 +35,19 @@ export class TicketsController {
   @Post('validate')
   validate(@Body() dto: ValidateTicketDto) {
     return this.ticketsService.validate(dto)
+  }
+
+  /**
+   * Edita o nome do portador de um ingresso (apenas modelo Ticket, sem CPF).
+   * O dono do ingresso pode editar o nome a qualquer momento.
+   */
+  @Patch(':id/buyer-name')
+  @UseGuards(AuthGuard)
+  updateBuyerName(
+    @Param('id') id: string,
+    @Body() body: { buyerName: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.ticketsService.updateBuyerName(id, user.id, body.buyerName)
   }
 }
