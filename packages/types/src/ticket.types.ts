@@ -1,12 +1,38 @@
-export type TicketStatus = 'active' | 'used' | 'cancelled'
+export type TicketStatus = 'PENDING' | 'VALID' | 'CHECKED_IN' | 'CANCELED'
 
 export interface Ticket {
   id: string
+  publicCode: string
   orderId: string
+  orderItemId?: string
   eventId: string
+  ticketTypeId?: string
   userId: string
+  buyerName?: string
+  buyerEmail?: string
+  buyerCpf?: string
   qrCode: string
   status: TicketStatus
-  usedAt?: string
+  issuedAt?: string
+  checkedInAt?: string
+  checkedInBy?: string
+  validationToken?: string
   createdAt: string
+  // Relações (quando expandido via JOIN)
+  event?: {
+    id: string
+    title: string
+    date: string
+    location: string
+    slug: string
+    imageUrl?: string
+    ticket_layout?: 'ticket' | 'formal_pdf'
+    participant_id_type?: 'none' | 'name' | 'name_cpf'
+  }
+  ticketType?: {
+    id: string
+    name: string
+    price: number
+    description?: string
+  }
 }

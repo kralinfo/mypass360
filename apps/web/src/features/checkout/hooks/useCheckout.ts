@@ -13,6 +13,8 @@ interface SelectedTicketType {
   ticketTypeId: string
   quantity: number
   unitPrice: number
+  nomineeNames?: string[]
+  nomineeCpfs?: string[]
 }
 
 interface UseCheckoutResult {
@@ -26,6 +28,8 @@ interface UseCheckoutResult {
   loadCheckout: (eventId: string) => Promise<void>
   setTicketQuantity: (ticketType: CheckoutTicketType, quantity: number) => void
   hydrateSelectedItems: (items: SelectedTicketType[]) => void
+  updateNomineeName: (ticketTypeId: string, index: number, name: string) => void
+  updateNomineeCpf: (ticketTypeId: string, index: number, cpf: string) => void
   handleSubmit: (eventId: string) => Promise<{ orderId: string; amount: number } | null>
 }
 
@@ -67,19 +71,54 @@ export function useCheckout(): UseCheckoutResult {
         return withoutCurrent
       }
 
+      const existingItem = previous.find((item) => item.ticketTypeId === ticketType.id)
+      const existingNames = existingItem?.nomineeNames ?? []
+      const existingCpfs = existingItem?.nomineeCpfs ?? []
+      const newNames = Array.from({ length: quantity }, (_, idx) => existingNames[idx] ?? '')
+      const newCpfs = Array.from({ length: quantity }, (_, idx) => existingCpfs[idx] ?? '')
+
       return [
         ...withoutCurrent,
         {
           ticketTypeId: ticketType.id,
           quantity,
           unitPrice: ticketType.price,
+          nomineeNames: newNames,
+          nomineeCpfs: newCpfs,
         },
       ]
     })
   }, [])
 
+  const updateNomineeName = useCallback((ticketTypeId: string, index: number, name: string): void => {
+    setSelectedItemsState((previous) =>
+      previous.map((item) => {
+        if (item.ticketTypeId !== ticketTypeId) return item
+        const newNames = [...(item.nomineeNames ?? [])]
+        newNames[index] = name
+        return { ...item, nomineeNames: newNames }
+      })
+    )
+  }, [])
+
+  const updateNomineeCpf = useCallback((ticketTypeId: string, index: number, cpf: string): void => {
+    setSelectedItemsState((previous) =>
+      previous.map((item) => {
+        if (item.ticketTypeId !== ticketTypeId) return item
+        const newCpfs = [...(item.nomineeCpfs ?? [])]
+        newCpfs[index] = cpf
+        return { ...item, nomineeCpfs: newCpfs }
+      })
+    )
+  }, [])
+
   const hydrateSelectedItems = useCallback((items: SelectedTicketType[]): void => {
-    setSelectedItemsState(items)
+    const itemsWithNames = items.map((item) => ({
+      ...item,
+      nomineeNames: item.nomineeNames ?? Array.from({ length: item.quantity }, () => ''),
+      nomineeCpfs: item.nomineeCpfs ?? Array.from({ length: item.quantity }, () => ''),
+    }))
+    setSelectedItemsState(itemsWithNames)
   }, [])
 
   const handleSubmit = useCallback(async (eventId: string): Promise<{ orderId: string; amount: number } | null> => {
@@ -128,6 +167,8 @@ export function useCheckout(): UseCheckoutResult {
     loadCheckout,
     setTicketQuantity,
     hydrateSelectedItems,
+    updateNomineeName,
+    updateNomineeCpf,
     handleSubmit,
   }
 }

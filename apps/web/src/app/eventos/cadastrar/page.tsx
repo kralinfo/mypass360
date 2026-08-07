@@ -25,6 +25,8 @@ function CadastrarEventoForm() {
     location: '',
     capacity: '',
     price: '',
+    ticketLayout: '' as '' | 'ticket' | 'formal_pdf',
+    participantIdType: '' as '' | 'none' | 'name',
     ticketTypes: [
       { name: 'Inteira', price: '', quantity: '0', description: '' },
       { name: 'Meia-entrada', price: '', quantity: '0', description: '' },
@@ -55,6 +57,24 @@ function CadastrarEventoForm() {
         const dateStr = eventDate.toISOString().split('T')[0]
         const timeStr = eventDate.toTimeString().slice(0, 5)
 
+        // Se o evento já tiver ticket_types, carrega do banco. Caso contrário, inicia vazios/padrão
+        const mappedTicketTypes = event.ticket_types && event.ticket_types.length > 0
+          ? event.ticket_types.map((tt: { name: string; price: number; quantity: number; description?: string }) => ({
+              name: tt.name,
+              price: String(tt.price),
+              quantity: String(tt.quantity),
+              description: tt.description ?? '',
+            }))
+          : [
+              { name: 'Inteira', price: String(event.price), quantity: '0', description: '' },
+              {
+                name: 'Meia-entrada',
+                price: String(event.price / 2),
+                quantity: '0',
+                description: '',
+              },
+            ]
+
         setFormData({
           title: event.title,
           slug: event.slug,
@@ -64,15 +84,9 @@ function CadastrarEventoForm() {
           location: event.location,
           capacity: String(event.capacity),
           price: String(event.price),
-          ticketTypes: [
-            { name: 'Inteira', price: String(event.price), quantity: '0', description: '' },
-            {
-              name: 'Meia-entrada',
-              price: String(event.price / 2),
-              quantity: '0',
-              description: '',
-            },
-          ],
+          ticketLayout: (event.ticket_layout ?? '') as '' | 'ticket' | 'formal_pdf',
+          participantIdType: (event.participant_id_type === 'name_cpf' ? '' : (event.participant_id_type ?? '')) as '' | 'none' | 'name',
+          ticketTypes: mappedTicketTypes,
         })
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar evento')
@@ -157,6 +171,19 @@ function CadastrarEventoForm() {
     setLoading(true)
     setError(null)
 
+    // Validação: modelo de ingresso obrigatório
+    if (!formData.ticketLayout) {
+      setError('Selecione o modelo de ingresso (Ticket ou PDF Formal).')
+      setLoading(false)
+      return
+    }
+
+    if (formData.ticketLayout === 'ticket' && !formData.participantIdType) {
+      setError('Selecione o tipo de identificação do participante (Sem nome ou Com nome).')
+      setLoading(false)
+      return
+    }
+
     try {
       const supabase = createClient()
       const {
@@ -180,6 +207,8 @@ function CadastrarEventoForm() {
         location: formData.location,
         capacity: parseInt(formData.capacity, 10),
         price: formData.price ? parseFloat(formData.price) : 0,
+        ticket_layout: formData.ticketLayout,
+        participant_id_type: formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType,
         ticket_types: formData.ticketTypes
           .filter((ticketType) => ticketType.name.trim().length > 0)
           .map((ticketType) => ({
@@ -206,8 +235,8 @@ function CadastrarEventoForm() {
 
   if (loadingEvent) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '5rem' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+      <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: 0 }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem 1rem 1.5rem' }}>
           <p style={{ color: '#64748b', textAlign: 'center' }}>Carregando evento...</p>
         </div>
       </div>
@@ -215,30 +244,31 @@ function CadastrarEventoForm() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: '5rem' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', paddingTop: 0 }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem 1rem 1.5rem' }}>
         <BackButton href={isEditMode ? '/meus-eventos' : '/eventos'} style={{ marginBottom: '1rem' }} />
-        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', color: '#0f172a' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '1.25rem', color: '#0f172a', letterSpacing: '-0.02em' }}>
           {isEditMode ? 'Editar Evento' : 'Cadastrar Novo Evento'}
         </h1>
 
         {error && (
           <div
             style={{
-              padding: '1rem',
+              padding: '0.75rem 1rem',
               background: '#fee2e2',
               color: '#991b1b',
               borderRadius: '8px',
-              marginBottom: '1.5rem',
+              marginBottom: '1rem',
+              fontSize: '0.9rem',
             }}
           >
             {error}
           </div>
         )}
 
-        <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
-            <label htmlFor="title" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+            <label htmlFor="title" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Título do Evento *
             </label>
             <input
@@ -250,10 +280,10 @@ function CadastrarEventoForm() {
               required
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.6rem 0.75rem',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 boxSizing: 'border-box',
               }}
               placeholder="Ex: Festival de Música 2026"
@@ -273,21 +303,21 @@ function CadastrarEventoForm() {
               required
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.6rem 0.75rem',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 boxSizing: 'border-box',
               }}
               placeholder="festival-de-musica-2026"
             />
-            <small style={{ color: '#64748b', fontSize: '0.875rem' }}>
+            <small style={{ color: '#64748b', fontSize: '0.85rem' }}>
               URL amigável gerada automaticamente a partir do título
             </small>
           </div>
 
           <div>
-            <label htmlFor="description" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+            <label htmlFor="description" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Descrição *
             </label>
             <textarea
@@ -299,10 +329,10 @@ function CadastrarEventoForm() {
               rows={4}
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.6rem 0.75rem',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 resize: 'vertical',
                 boxSizing: 'border-box',
               }}
@@ -310,9 +340,9 @@ function CadastrarEventoForm() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div>
-              <label htmlFor="date" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+              <label htmlFor="date" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
                 Data *
               </label>
               <input
@@ -324,17 +354,17 @@ function CadastrarEventoForm() {
                 required
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
+                  padding: '0.6rem 0.75rem',
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  fontSize: '1rem',
+                  fontSize: '0.95rem',
                   boxSizing: 'border-box',
                 }}
               />
             </div>
 
             <div>
-              <label htmlFor="time" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+              <label htmlFor="time" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
                 Horário *
               </label>
               <input
@@ -346,10 +376,10 @@ function CadastrarEventoForm() {
                 required
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
+                  padding: '0.6rem 0.75rem',
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  fontSize: '1rem',
+                  fontSize: '0.95rem',
                   boxSizing: 'border-box',
                 }}
               />
@@ -357,7 +387,7 @@ function CadastrarEventoForm() {
           </div>
 
           <div>
-            <label htmlFor="location" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+            <label htmlFor="location" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Local *
             </label>
             <input
@@ -369,19 +399,19 @@ function CadastrarEventoForm() {
               required
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.6rem 0.75rem',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 boxSizing: 'border-box',
               }}
               placeholder="Ex: São Paulo, SP — Allianz Parque"
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div>
-              <label htmlFor="capacity" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+              <label htmlFor="capacity" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
                 Capacidade *
               </label>
               <input
@@ -394,10 +424,10 @@ function CadastrarEventoForm() {
                 min="1"
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
+                  padding: '0.6rem 0.75rem',
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  fontSize: '1rem',
+                  fontSize: '0.95rem',
                   boxSizing: 'border-box',
                 }}
                 placeholder="1000"
@@ -405,7 +435,7 @@ function CadastrarEventoForm() {
             </div>
 
             <div>
-              <label htmlFor="price" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
+              <label htmlFor="price" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
                 Preço (R$)
               </label>
               <input
@@ -418,10 +448,10 @@ function CadastrarEventoForm() {
                 step="0.01"
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
+                  padding: '0.6rem 0.75rem',
                   border: '1px solid #cbd5e1',
                   borderRadius: '8px',
-                  fontSize: '1rem',
+                  fontSize: '0.95rem',
                   boxSizing: 'border-box',
                 }}
                 placeholder="150.00"
@@ -459,42 +489,44 @@ function CadastrarEventoForm() {
                 key={index}
                 style={{
                   display: 'grid',
-                  gap: '0.75rem',
-                  marginBottom: '1rem',
-                  padding: '1rem',
+                  gap: '0.6rem',
+                  marginBottom: '0.75rem',
+                  padding: '0.75rem',
                   borderRadius: '10px',
                   background: '#fff',
                   border: '1px solid #e2e8f0',
                 }}
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center' }}>
-                  <label style={{ margin: 0, fontWeight: 600, color: '#334155' }}>Tipo de ingresso</label>
+                  <label style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Tipo de ingresso</label>
                   <button
                     type="button"
                     onClick={() => removeTicketType(index)}
                     style={{
-                      padding: '0.5rem 0.85rem',
+                      padding: '0.4rem 0.75rem',
                       borderRadius: '8px',
                       border: '1px solid #e5e7eb',
                       background: '#fff',
                       color: '#ef4444',
+                      fontSize: '0.85rem',
                       cursor: 'pointer',
                     }}
                   >
                     Remover
                   </button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                   <input
                     type="text"
                     value={ticketType.name}
                     onChange={(event) => handleTicketTypeChange(index, 'name', event.target.value)}
-                    placeholder="Nome do tipo de ingresso"
+                    placeholder="Nome do tipo"
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.6rem 0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
+                      fontSize: '0.9rem',
                       boxSizing: 'border-box',
                     }}
                   />
@@ -507,9 +539,10 @@ function CadastrarEventoForm() {
                     placeholder="Preço"
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.6rem 0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
+                      fontSize: '0.9rem',
                       boxSizing: 'border-box',
                     }}
                   />
@@ -518,12 +551,13 @@ function CadastrarEventoForm() {
                     value={ticketType.quantity}
                     onChange={(event) => handleTicketTypeChange(index, 'quantity', event.target.value)}
                     min="0"
-                    placeholder="Quantidade"
+                    placeholder="Qtd"
                     style={{
                       width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.6rem 0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
+                      fontSize: '0.9rem',
                       boxSizing: 'border-box',
                     }}
                   />
@@ -531,19 +565,123 @@ function CadastrarEventoForm() {
                 <textarea
                   value={ticketType.description || ''}
                   onChange={(event) => handleTicketTypeChange(index, 'description', event.target.value)}
-                  placeholder="Descrição opcional do tipo de ingresso (ex: apresentar carteira de estudante)"
-                  rows={3}
+                  placeholder="Descrição opcional"
+                  rows={2}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
+                    padding: '0.6rem 0.75rem',
                     border: '1px solid #cbd5e1',
                     borderRadius: '8px',
+                    fontSize: '0.9rem',
                     resize: 'vertical',
                     boxSizing: 'border-box',
                   }}
                 />
               </div>
             ))}
+          </section>
+
+          {/* Seção: Modelo do Ingresso */}
+          <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
+            <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
+              Modelo do Ingresso <span style={{ color: '#ef4444' }}>*</span>
+            </h2>
+            <p style={{ margin: '0 0 1rem', color: '#64748b', fontSize: '0.95rem' }}>
+              Define a aparência e as informações exigidas do participante na compra.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Ticket */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: `2px solid ${formData.ticketLayout === 'ticket' ? '#0f172a' : '#e2e8f0'}`,
+                  background: formData.ticketLayout === 'ticket' ? '#f8fafc' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="ticketLayout"
+                  value="ticket"
+                  checked={formData.ticketLayout === 'ticket'}
+                  onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'ticket', participantIdType: '' }))}
+                  style={{ marginTop: '3px' }}
+                />
+                <div>
+                  <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 0.2rem' }}>🎫 Ticket</p>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Ingresso compacto no estilo ticket físico com QR Code. Modelo padrão.
+                  </p>
+                  {/* Sub-opção de identificação */}
+                  {formData.ticketLayout === 'ticket' && (
+                    <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '0.5rem', borderLeft: '3px solid #e2e8f0' }}>
+                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
+                        Identificação do Participante <span style={{ color: '#ef4444' }}>*</span>
+                      </p>
+                      {[
+                        { value: 'none', label: 'Sem nome', desc: 'Ingresso transferível, sem identificação' },
+                        { value: 'name', label: 'Com nome (opcional)', desc: 'Comprador pode informar o nome do portador' },
+                      ].map(opt => (
+                        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', background: formData.participantIdType === opt.value ? '#f0fdf4' : '#fff', border: `1px solid ${formData.participantIdType === opt.value ? '#bbf7d0' : '#e2e8f0'}` }}>
+                          <input
+                            type="radio"
+                            name="participantIdType"
+                            value={opt.value}
+                            checked={formData.participantIdType === opt.value}
+                            onChange={() => setFormData(prev => ({ ...prev, participantIdType: opt.value as 'none' | 'name' }))}
+                            style={{ marginTop: '2px' }}
+                          />
+                          <div>
+                            <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>{opt.label}</p>
+                            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>{opt.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* PDF Formal */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem',
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: `2px solid ${formData.ticketLayout === 'formal_pdf' ? '#0369a1' : '#e2e8f0'}`,
+                  background: formData.ticketLayout === 'formal_pdf' ? '#f0f9ff' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="ticketLayout"
+                  value="formal_pdf"
+                  checked={formData.ticketLayout === 'formal_pdf'}
+                  onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'formal_pdf', participantIdType: '' }))}
+                  style={{ marginTop: '3px' }}
+                />
+                <div>
+                  <p style={{ fontWeight: 700, color: '#0369a1', margin: '0 0 0.2rem' }}>📄 PDF Formal</p>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    PDF A4 profissional com nome e CPF obrigatórios por ingresso. Ideal para eventos corporativos e seminários.
+                  </p>
+                  {formData.ticketLayout === 'formal_pdf' && (
+                    <p style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 600, margin: '0.5rem 0 0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      Nome completo e CPF serão solicitados para cada ingresso no checkout
+                    </p>
+                  )}
+                </div>
+              </label>
+            </div>
           </section>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>

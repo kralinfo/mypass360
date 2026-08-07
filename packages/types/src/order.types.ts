@@ -6,6 +6,8 @@ export interface OrderItem {
   ticketTypeId: string
   quantity: number
   unitPrice: number
+  nomineeNames?: string[]
+  nomineeCpfs?: string[]
 }
 
 export interface Order {
@@ -21,5 +23,5 @@ export interface Order {
 
 export interface CreateOrderInput {
   eventId: string
-  items: Array<{ ticketTypeId: string; quantity: number }>
+  items: Array<{ ticketTypeId: string; quantity: number; nomineeNames?: string[]; nomineeCpfs?: string[] }>
 }

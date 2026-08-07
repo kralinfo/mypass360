@@ -63,3 +63,10 @@ export async function updateEvent(
 export async function fetchEventById(id: string, token: string): Promise<Event> {
   return apiWithAuth(token).get<Event>(`/events/by-id/${id}`)
 }
+
+/**
+ * Exclui um evento (autenticado, apenas o proprietário).
+ */
+export async function deleteEvent(id: string, token: string): Promise<void> {
+  return apiWithAuth(token).delete<void>(`/events/${id}`)
+}

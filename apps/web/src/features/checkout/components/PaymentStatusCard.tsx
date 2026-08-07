@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { Payment } from '@mypass360/types'
 import { createClient } from '@/lib/supabase/client'
-import { confirmPayment, createCheckoutPreference, fetchPaymentById } from '../services/payment.service'
+import { confirmPayment, createCheckoutPreference, fetchPaymentById, manualConfirmPayment } from '../services/payment.service'
+import { useCart } from '@/features/cart/cart-context'
 
 interface PaymentStatusCardProps {
   paymentId?: string
@@ -14,11 +16,17 @@ interface PaymentStatusCardProps {
 }
 
 export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: PaymentStatusCardProps) {
+  const router = useRouter()
+  const { clearCart } = useCart()
   const [payment, setPayment] = useState<Payment | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+  const [manualCode, setManualCode] = useState('')
+  const [isManualConfirming, setIsManualConfirming] = useState(false)
+  const [manualError, setManualError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!paymentId) {
@@ -59,6 +67,12 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       fetchPaymentById(payment.id)
         .then((data) => {
           setPayment(data)
+          // Quando webhook do MP aprovar → limpa carrinho e redireciona
+          if (data.status === 'approved') {
+            clearCart()
+            window.clearInterval(refreshPayment)
+            setTimeout(() => router.push('/meus-ingressos'), 1500)
+          }
         })
         .catch(() => undefined)
     }, 5000)
@@ -111,10 +125,33 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
     try {
       const updated = await confirmPayment(currentPaymentId)
       setPayment(updated)
+      if (updated.status === 'approved') {
+        clearCart()
+        setTimeout(() => router.push('/meus-ingressos'), 1000)
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao confirmar pagamento')
     } finally {
       setIsConfirming(false)
+    }
+  }
+
+  // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+  async function handleManualConfirm() {
+    setIsManualConfirming(true)
+    setManualError(null)
+
+    try {
+      const updated = await manualConfirmPayment(orderId, manualCode)
+      setPayment(updated)
+      setManualCode('')
+      // Limpa carrinho e redireciona para meus ingressos
+      clearCart()
+      setTimeout(() => router.push('/meus-ingressos'), 1200)
+    } catch (err: unknown) {
+      setManualError(err instanceof Error ? err.message : 'Erro na confirmação manual')
+    } finally {
+      setIsManualConfirming(false)
     }
   }
 
@@ -165,6 +202,69 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         >
           {isCreating ? 'Redirecionando...' : 'Continuar para pagamento'}
         </button>
+
+        {/* TODO: Remover quando a integração oficial do Mercado Pago estiver concluída. */}
+        <div
+          style={{
+            marginTop: '0.5rem',
+            background: '#fefce8',
+            border: '1px dashed #fbbf24',
+            borderRadius: '10px',
+            padding: '1rem',
+            display: 'grid',
+            gap: '0.75rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1rem' }}>🛠️</span>
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#92400e' }}>
+              Confirmação Manual — Somente Desenvolvimento
+            </p>
+          </div>
+          <p style={{ fontSize: '0.78rem', color: '#78350f', lineHeight: 1.5 }}>
+            Insira o código de confirmação para simular um pagamento aprovado e gerar os ingressos.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="Código de confirmação"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '0.6rem 0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #fbbf24',
+                background: '#fff',
+                fontSize: '0.875rem',
+                fontFamily: 'monospace',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleManualConfirm}
+              disabled={isManualConfirming || !manualCode.trim()}
+              style={{
+                padding: '0.6rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#d97706',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
+                opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isManualConfirming ? 'Confirmando...' : 'Confirmar'}
+            </button>
+          </div>
+          {manualError && (
+            <p style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>{manualError}</p>
+          )}
+        </div>
       </section>
     )
   }
@@ -228,22 +328,94 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       {error && <p style={{ color: '#dc2626' }}>{error}</p>}
 
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        {payment.status === 'pending' && (
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={isConfirming}
+        {payment.status === 'approved' && (
+          <div
             style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#15803d',
-              color: '#fff',
-              cursor: isConfirming ? 'not-allowed' : 'pointer',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '10px',
+              padding: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
             }}
           >
-            {isConfirming ? 'Confirmando...' : 'Simular pagamento aprovado'}
-          </button>
+            <span style={{ fontSize: '1.5rem' }}>✅</span>
+            <div>
+              <p style={{ fontWeight: 700, color: '#15803d', marginBottom: '0.25rem' }}>Pagamento aprovado!</p>
+              <p style={{ fontSize: '0.875rem', color: '#166534' }}>
+                Seus ingressos foram gerados e estão disponíveis em{' '}
+                <Link href="/meus-ingressos" style={{ color: '#15803d', fontWeight: 700 }}>
+                  Meus Ingressos
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        )}
+
+        {payment.status === 'pending' && (
+          // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+          <div
+            style={{
+              background: '#fefce8',
+              border: '1px dashed #fbbf24',
+              borderRadius: '10px',
+              padding: '1rem',
+              display: 'grid',
+              gap: '0.75rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1rem' }}>🛠️</span>
+              <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#92400e' }}>
+                Confirmação Manual — Somente Desenvolvimento
+              </p>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: '#78350f', lineHeight: 1.5 }}>
+              Insira o código para simular a aprovação do pagamento e gerar os ingressos automaticamente.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="Código de confirmação"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '0.6rem 0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #fbbf24',
+                  background: '#fff',
+                  fontSize: '0.875rem',
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleManualConfirm}
+                disabled={isManualConfirming || !manualCode.trim()}
+                style={{
+                  padding: '0.6rem 1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#d97706',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
+                  opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {isManualConfirming ? 'Confirmando...' : 'Confirmar'}
+              </button>
+            </div>
+            {manualError && (
+              <p style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>{manualError}</p>
+            )}
+          </div>
         )}
 
         <Link

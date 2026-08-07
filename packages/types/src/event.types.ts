@@ -3,6 +3,12 @@ export type EventStatus = 'draft' | 'published' | 'cancelled' | 'finished'
 /** Status visual calculado no frontend a partir dos campos do evento */
 export type EventDisplayStatus = 'published' | 'scheduled' | 'hidden'
 
+/** Modelo de ingresso usado pelo evento */
+export type TicketLayout = 'ticket' | 'formal_pdf'
+
+/** Tipo de identificação exigida no checkout */
+export type ParticipantIdType = 'none' | 'name' | 'name_cpf'
+
 export interface Event {
   id: string
   title: string
@@ -17,6 +23,17 @@ export interface Event {
   /** Data/hora de publicação agendada. null = publicação imediata ou não agendado. */
   published_at?: string | null
   image_url?: string
+  /** Modelo de ingresso do evento. Padrão: 'ticket' (retrocompatível) */
+  ticket_layout?: TicketLayout
+  /** Tipo de identificação do participante. Aplica-se quando ticket_layout = 'ticket'. Padrão: 'name' */
+  participant_id_type?: ParticipantIdType
+  ticket_types?: Array<{
+    id: string
+    name: string
+    price: number
+    quantity: number
+    description?: string
+  }>
   created_at: string
   updated_at: string
 }

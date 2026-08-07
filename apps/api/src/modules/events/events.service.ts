@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { EventsRepository } from './events.repository'
 import type { CreateEventDto } from './dto/create-event.dto'
 import type { UpdateEventDto } from './dto/update-event.dto'
@@ -46,7 +46,16 @@ export class EventsService {
   /** Remove evento — valida propriedade antes de deletar. */
   async remove(id: string, userId: string) {
     await this.assertOwnership(id, userId)
-    return this.eventsRepository.remove(id, userId)
+    try {
+      return await this.eventsRepository.remove(id, userId)
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === 'foreign_key_violation') {
+        throw new BadRequestException(
+          'Não é possível excluir um evento que já possui ingressos vendidos ou pedidos associados. Experimente ocultá-lo.'
+        )
+      }
+      throw error
+    }
   }
 
   /** Publica o evento imediatamente. */
