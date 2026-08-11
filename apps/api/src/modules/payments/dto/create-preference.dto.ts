@@ -14,4 +14,8 @@ export class CreatePreferenceDto {
   @IsString()
   @IsOptional()
   title?: string
+
+  @IsString()
+  @IsOptional()
+  payerDocument?: string
 }

@@ -48,9 +48,6 @@ export class CreateEventDto {
   @IsString()
   location!: string
 
-  @IsString()
-  organizer_id!: string
-
   @IsNumber()
   @Min(1)
   capacity!: number
@@ -60,9 +57,10 @@ export class CreateEventDto {
   @Min(0)
   price?: number
 
+  // status é gerenciado pelo backend — não aceitar do frontend para novos eventos
+  // (mantido aqui apenas para compatibilidade com UpdateEventDto via PartialType)
   @IsString()
   @IsOptional()
-  @IsIn(['draft', 'published', 'cancelled', 'finished'])
   status?: string
 
   @IsArray()
@@ -70,4 +68,12 @@ export class CreateEventDto {
   @Type(() => CreateEventTicketTypeDto)
   @IsOptional()
   ticket_types?: CreateEventTicketTypeDto[]
+
+  @IsOptional()
+  @IsIn(['ticket', 'formal_pdf'])
+  ticket_layout?: string
+
+  @IsOptional()
+  @IsIn(['none', 'name', 'name_cpf'])
+  participant_id_type?: string
 }

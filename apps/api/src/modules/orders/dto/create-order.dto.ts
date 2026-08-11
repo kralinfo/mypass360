@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsArray, IsNumber, IsString, IsUUID, Min, ValidateNested } from 'class-validator'
+import { IsArray, IsNumber, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator'
 
 export class CreateOrderItemDto {
   @IsUUID()
@@ -12,6 +12,16 @@ export class CreateOrderItemDto {
   @IsNumber()
   @Min(0)
   unitPrice!: number
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  nomineeNames?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  nomineeCpfs?: string[]
 }
 
 export class CreateOrderDto {

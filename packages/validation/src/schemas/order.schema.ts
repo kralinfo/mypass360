@@ -3,6 +3,7 @@ import { z } from 'zod'
 const orderItemSchema = z.object({
   ticketTypeId: z.string().uuid(),
   quantity: z.number().int().positive().max(10),
+  nomineeNames: z.array(z.string()).optional(),
 })
 
 export const createOrderSchema = z.object({

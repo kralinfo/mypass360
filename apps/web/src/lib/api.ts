@@ -8,10 +8,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     })
 
     if (!response.ok) {
-      throw new Error(`API error ${response.status}: ${response.statusText}`)
+      let message = `API error ${response.status}: ${response.statusText}`
+      try {
+        const body = (await response.json()) as { message?: string | string[] }
+        if (body.message) {
+          message = Array.isArray(body.message) ? body.message.join(', ') : body.message
+        }
+      } catch {
+        // ignora erro de parse do body
+      }
+      throw new Error(message)
     }
 
-    return response.json() as Promise<T>
+    const text = await response.text()
+    return text ? (JSON.parse(text) as T) : (undefined as unknown as T)
   } catch (error) {
     console.error(`API request failed for ${path}:`, error)
     if (error instanceof TypeError) {
@@ -34,4 +44,48 @@ export const api = {
     request<T>(path, { ...init, method: 'PATCH', body: JSON.stringify(body) }),
 
   delete: <T>(path: string, init?: RequestInit) => request<T>(path, { ...init, method: 'DELETE' }),
+}
+
+/**
+ * Versão autenticada do cliente de API.
+ * Inclui o Bearer token em todas as requisições.
+ *
+ * @example
+ * const { data: session } = await supabase.auth.getSession()
+ * const authApi = apiWithAuth(session.session?.access_token ?? '')
+ * const myEvents = await authApi.get<Event[]>('/events/my')
+ */
+export function apiWithAuth(token: string) {
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  }
+
+  return {
+    get: <T>(path: string, init?: RequestInit) =>
+      request<T>(path, { ...init, method: 'GET', headers: { ...authHeaders, ...init?.headers } }),
+
+    post: <T>(path: string, body: unknown, init?: RequestInit) =>
+      request<T>(path, {
+        ...init,
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { ...authHeaders, ...init?.headers },
+      }),
+
+    patch: <T>(path: string, body: unknown, init?: RequestInit) =>
+      request<T>(path, {
+        ...init,
+        method: 'PATCH',
+        body: JSON.stringify(body),
+        headers: { ...authHeaders, ...init?.headers },
+      }),
+
+    delete: <T>(path: string, init?: RequestInit) =>
+      request<T>(path, {
+        ...init,
+        method: 'DELETE',
+        headers: { ...authHeaders, ...init?.headers },
+      }),
+  }
 }

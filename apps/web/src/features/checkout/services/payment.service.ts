@@ -6,6 +6,7 @@ export interface CreateCheckoutPreferenceInput {
   amount: number
   payerEmail: string
   title?: string
+  payerDocument?: string
 }
 
 export interface CheckoutPreferenceResult {
@@ -30,3 +31,14 @@ export async function fetchPaymentById(paymentId: string): Promise<Payment> {
 export async function confirmPayment(paymentId: string): Promise<Payment> {
   return api.post<Payment>(`/payments/${paymentId}/confirm`, {})
 }
+
+/**
+ * Confirmação manual de pagamento para ambiente de desenvolvimento.
+ * Envia o código "mypass360pg" para simular pagamento aprovado e gerar ingressos.
+ *
+ * TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+ */
+export async function manualConfirmPayment(orderId: string, code: string): Promise<Payment> {
+  // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+  return api.post<Payment>('/payments/manual-confirmation', { orderId, code })
+}
