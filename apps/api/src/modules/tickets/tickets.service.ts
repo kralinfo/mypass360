@@ -38,6 +38,10 @@ export class TicketsService {
     return ticket
   }
 
+  async findByOrder(orderId: string) {
+    return this.ticketsRepository.findByOrder(orderId)
+  }
+
   /**
    * Gera tickets para todos os itens de um pedido pago.
    * Um ticket é criado para cada unidade de cada order_item.

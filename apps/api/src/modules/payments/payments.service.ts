@@ -4,6 +4,7 @@ import type { CreatePaymentDto } from './dto/create-payment.dto'
 import type { CreatePreferenceDto } from './dto/create-preference.dto'
 import { MercadoPagoGatewayService } from './payment-gateway.service'
 import { TicketsService } from '../tickets/tickets.service'
+import { PaymentMailService } from './payment-mail.service'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import { randomUUID } from 'crypto'
 
@@ -24,6 +25,7 @@ export class PaymentsService {
     private readonly paymentsRepository: PaymentsRepository,
     private readonly paymentGateway: MercadoPagoGatewayService,
     private readonly ticketsService: TicketsService,
+    private readonly paymentMailService: PaymentMailService,
     private readonly supabase: SupabaseService
   ) {}
 
@@ -59,6 +61,7 @@ export class PaymentsService {
 
     // Gerar tickets após confirmação
     await this.generateTicketsForOrder(confirmed.order_id)
+    await this.paymentMailService.sendOrderTicketsEmail(confirmed.order_id)
 
     return confirmed
   }
@@ -96,6 +99,7 @@ export class PaymentsService {
       // Gerar tickets após webhook do Mercado Pago
       if (updated) {
         await this.generateTicketsForOrder(updated.order_id)
+        await this.paymentMailService.sendOrderTicketsEmail(updated.order_id)
       }
 
       return { received: true, processed: true, payment: updated }
@@ -141,6 +145,7 @@ export class PaymentsService {
     if (payment?.status === 'approved') {
       this.logger.log(`[DEV] Pedido ${orderId} já aprovado — garantindo geração de tickets`)
       await this.generateTicketsForOrder(orderId)
+      await this.paymentMailService.sendOrderTicketsEmail(orderId)
       return payment
     }
 
@@ -148,6 +153,7 @@ export class PaymentsService {
     if (payment?.status === 'pending') {
       const confirmed = await this.paymentsRepository.confirm(payment.id)
       await this.generateTicketsForOrder(orderId)
+      await this.paymentMailService.sendOrderTicketsEmail(orderId)
       this.logger.log(`[DEV] Pagamento ${payment.id} confirmado manualmente para pedido ${orderId}`)
       return confirmed
     }
@@ -185,6 +191,7 @@ export class PaymentsService {
 
     const confirmed = await this.paymentsRepository.confirm(newPayment.id)
     await this.generateTicketsForOrder(orderId)
+    await this.paymentMailService.sendOrderTicketsEmail(orderId)
     this.logger.log(`[DEV] Pagamento manual criado e confirmado para pedido ${orderId}`)
 
     return confirmed

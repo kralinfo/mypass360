@@ -129,6 +129,44 @@ export class TicketsRepository {
     }
   }
 
+  async findByOrder(orderId: string) {
+    const { data: tickets, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      throw new Error(`Erro ao buscar ingressos pelo pedido: ${error.message}`)
+    }
+
+    if (!tickets || tickets.length === 0) {
+      return []
+    }
+
+    const eventIds = [...new Set(tickets.map((t: any) => t.event_id).filter(Boolean))]
+    const ticketTypeIds = [...new Set(tickets.map((t: any) => t.ticket_type_id).filter(Boolean))]
+
+    const [eventsResult, ticketTypesResult] = await Promise.all([
+      eventIds.length > 0
+        ? this.supabase.getClient().from('events').select('id, title, ticket_layout, participant_id_type').in('id', eventIds)
+        : Promise.resolve({ data: [], error: null as any }),
+      ticketTypeIds.length > 0
+        ? this.supabase.getClient().from('ticket_types').select('id, name, price, description').in('id', ticketTypeIds)
+        : Promise.resolve({ data: [], error: null as any }),
+    ])
+
+    const eventsMap = new Map((eventsResult.data ?? []).map((e: any) => [e.id, e]))
+    const ticketTypesMap = new Map((ticketTypesResult.data ?? []).map((tt: any) => [tt.id, tt]))
+
+    return tickets.map((ticket: any) => ({
+      ...ticket,
+      event: eventsMap.get(ticket.event_id) ?? null,
+      ticketType: ticketTypesMap.get(ticket.ticket_type_id) ?? null,
+    }))
+  }
+
   /**
    * Gera um ticket para cada unidade adquirida em um pedido.
    * Requer que a migration 20260723000000_tickets_definitive_architecture.sql
