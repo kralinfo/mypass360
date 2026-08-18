@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { AdminDashboardData, AdminEventItem, AdminUserItem } from '@mypass360/types'
+import { MailService } from '@/common/mail/mail.service'
 
 type EventRow = {
   id: string
@@ -40,7 +41,10 @@ type AuthUserRow = {
 
 @Injectable()
 export class AdminRepository {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly mailService: MailService
+  ) {}
 
   async getDashboard(): Promise<AdminDashboardData> {
     const client = this.supabase.getClient()
@@ -180,4 +184,95 @@ export class AdminRepository {
     if (error) throw new Error(error.message)
     return { success: true }
   }
-}
+
+  async remindPendingOrders(eventId: string): Promise<{ success: boolean; sentCount: number }> {
+    const client = this.supabase.getClient()
+
+    // 1. Obter informações do evento
+    const { data: event, error: eventError } = await client
+      .from('events')
+      .select('title')
+      .eq('id', eventId)
+      .single()
+
+    if (eventError || !event) {
+      throw new Error(`Evento com ID '${eventId}' não encontrado.`)
+    }
+
+    // 2. Buscar pedidos pendentes do evento
+    const { data: pendingOrders, error: ordersError } = await client
+      .from('orders')
+      .select('id, user_id, total, event_id')
+      .eq('event_id', eventId)
+      .eq('status', 'pending')
+
+    if (ordersError) {
+      throw new Error(ordersError.message)
+    }
+
+    if (!pendingOrders || pendingOrders.length === 0) {
+      return { success: true, sentCount: 0 }
+    }
+
+    let sentCount = 0
+
+    // 3. Iterar e enviar e-mails
+    for (const order of pendingOrders) {
+      if (!order.user_id) continue
+
+      try {
+        const { data: userData } = await client.auth.admin.getUserById(order.user_id)
+        const userEmail = userData?.user?.email
+        const userMeta = userData?.user?.user_metadata
+        const buyerName = userMeta?.full_name ?? userMeta?.name ?? 'Cliente'
+
+        if (!userEmail) continue
+
+        const formattedTotal = Number(order.total).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        })
+
+        const paymentUrl = `http://localhost:3000/checkout/pagamento?orderId=${order.id}&eventId=${order.event_id}&amount=${order.total}`
+
+        const html = `
+          <div style="font-family: Inter, system-ui, sans-serif; background: #f8fafc; padding: 32px;">
+            <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05); border: 1px solid #e2e8f0;">
+              <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 32px; color: #ffffff; text-align: center;">
+                <p style="margin: 0; opacity: 0.9; letter-spacing: 0.12em; font-size: 0.85rem; text-transform: uppercase; font-weight: 700;">MyPass360</p>
+                <h1 style="margin: 10px 0 0; font-size: 1.8rem; font-weight: 800;">Conclua sua compra!</h1>
+              </div>
+              <div style="padding: 32px; color: #0f172a; line-height: 1.6;">
+                <p style="margin: 0 0 16px; font-size: 1.05rem; font-weight: 700; color: #1e293b;">Olá, ${buyerName},</p>
+                <p style="margin: 0 0 16px; color: #475569;">Notamos que você iniciou o processo de compra para o evento <strong>${event.title}</strong>, mas a transação ainda está pendente.</p>
+                <p style="margin: 0 0 24px; color: #475569;">Garanta já o seu lugar antes que os ingressos se esgotem! O valor total do seu pedido é de <strong>${formattedTotal}</strong>.</p>
+                
+                <div style="text-align: center; margin: 32px 0;">
+                  <a href="${paymentUrl}" style="display: inline-flex; align-items: center; justify-content: center; padding: 14px 28px; border-radius: 12px; background: #f59e0b; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                    Finalizar Pagamento
+                  </a>
+                </div>
+
+                <p style="margin: 24px 0 0; color: #64748b; font-size: 0.88rem; border-top: 1px solid #f1f5f9; padding-top: 16px;">Se você já realizou o pagamento, por favor desconsidere este e-mail. A confirmação pode levar alguns minutos.</p>
+                <p style="margin: 8px 0 0; color: #94a3b8; font-size: 0.8rem;">MyPass360 — o seu passaporte para os melhores eventos.</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        await this.mailService.sendTicketEmail({
+          to: userEmail,
+          subject: `Finalize seu pedido para o evento ${event.title} - MyPass360`,
+          html,
+        })
+
+        sentCount++
+      } catch (err) {
+        // Logar erro individual mas continuar enviando para outros pendentes
+        console.error(`Erro ao enviar lembrete para pedido ${order.id}:`, err)
+      }
+    }
+
+    return { success: true, sentCount }
+  }
+}

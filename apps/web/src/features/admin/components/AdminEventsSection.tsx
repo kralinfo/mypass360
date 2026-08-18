@@ -8,9 +8,10 @@ type AdminEventsSectionProps = {
   runningAction: string | null
   onChangeStatus: (event: AdminEventItem, status: EventStatus) => Promise<void>
   onDelete: (event: AdminEventItem) => Promise<void>
+  onSendReminders: (event: AdminEventItem) => void
 }
 
-export function AdminEventsSection({ dashboard, isLoading, runningAction, onChangeStatus, onDelete }: AdminEventsSectionProps) {
+export function AdminEventsSection({ dashboard, isLoading, runningAction, onChangeStatus, onDelete, onSendReminders }: AdminEventsSectionProps) {
   return (
     <AdminPanelCard title="Operação de eventos" subtitle="Visualização densa para acompanhamento e tomada de decisão rápida.">
       {isLoading && !dashboard ? <p style={{ color: '#64748b' }}>Carregando eventos...</p> : null}
@@ -22,7 +23,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '2.1fr 1.1fr 0.9fr 0.7fr 0.7fr 1fr 1.2fr',
+                gridTemplateColumns: '2fr 1fr 0.8fr 0.6fr 0.6fr 0.8fr 1.6fr',
                 gap: '0.75rem',
                 padding: '0 0 0.75rem',
                 borderBottom: '1px solid #e2e8f0',
@@ -44,13 +45,14 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
 
             {dashboard.events.map((event) => {
               const isActionLoading = runningAction?.includes(event.id)
+              const pendingCount = event.totalOrders - event.paidOrders
 
               return (
                 <div
                   key={event.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '2.1fr 1.1fr 0.9fr 0.7fr 0.7fr 1fr 1.2fr',
+                    gridTemplateColumns: '2fr 1fr 0.8fr 0.6fr 0.6fr 0.8fr 1.6fr',
                     gap: '0.75rem',
                     padding: '0.95rem 0',
                     borderBottom: '1px solid #f1f5f9',
@@ -86,7 +88,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                   <div style={{ color: '#0f172a', fontWeight: 700 }}>{event.totalOrders}</div>
                   <div style={{ color: '#0f172a', fontWeight: 700 }}>{event.paidOrders}</div>
                   <div style={{ color: '#0f172a', fontWeight: 700 }}>{formatCurrency(event.revenue)}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <select
                       value={event.status}
                       disabled={isActionLoading}
@@ -98,6 +100,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                         background: '#fff',
                         color: '#0f172a',
                         fontSize: '0.88rem',
+                        flex: '1',
                       }}
                     >
                       {eventStatusOptions.map((status) => (
@@ -106,6 +109,28 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                         </option>
                       ))}
                     </select>
+
+                    {pendingCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => void onSendReminders(event)}
+                        disabled={isActionLoading}
+                        style={{
+                          border: '1px solid #fde68a',
+                          borderRadius: '10px',
+                          padding: '0.58rem 0.7rem',
+                          background: '#fffbeb',
+                          color: '#b45309',
+                          fontWeight: 700,
+                          fontSize: '0.84rem',
+                          cursor: isActionLoading ? 'not-allowed' : 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Lembrar ({pendingCount})
+                      </button>
+                    ) : null}
+
                     <button
                       type="button"
                       onClick={() => void onDelete(event)}
@@ -133,3 +158,4 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
     </AdminPanelCard>
   )
 }
+

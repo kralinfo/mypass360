@@ -25,3 +25,7 @@ export async function updateAdminUserStatus(userId: string, disabled: boolean): 
 export async function deleteAdminUser(userId: string): Promise<{ success: boolean }> {
   return api.delete<{ success: boolean }>(`/admin/users/${userId}`)
 }
+
+export async function sendPendingReminders(eventId: string): Promise<{ success: boolean; sentCount: number }> {
+  return api.post<{ success: boolean; sentCount: number }>(`/admin/events/${eventId}/remind-pending`, {})
+}

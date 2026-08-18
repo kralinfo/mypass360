@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common'
 import { AdminService } from './admin.service'
 import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto'
 import { UpdateAdminEventStatusDto } from './dto/update-admin-event-status.dto'
@@ -31,4 +31,9 @@ export class AdminController {
   deleteEvent(@Param('id') id: string) {
     return this.adminService.deleteEvent(id)
   }
-}
+
+  @Post('events/:id/remind-pending')
+  remindPendingOrders(@Param('id') id: string) {
+    return this.adminService.remindPendingOrders(id)
+  }
+}
