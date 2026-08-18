@@ -6,6 +6,17 @@ import type {
   EventStatus,
 } from '@mypass360/types'
 
+export interface AdminAttendee {
+  ticketId: string
+  publicCode: string
+  name: string | null
+  cpf: string | null
+  email: string | null
+  ticketTypeName: string
+  status: string
+  issuedAt: string | null
+}
+
 export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
   return api.get<AdminDashboardData>('/admin/dashboard')
 }
@@ -28,4 +39,9 @@ export async function deleteAdminUser(userId: string): Promise<{ success: boolea
 
 export async function sendPendingReminders(eventId: string): Promise<{ success: boolean; sentCount: number }> {
   return api.post<{ success: boolean; sentCount: number }>(`/admin/events/${eventId}/remind-pending`, {})
-}
+}
+
+export async function fetchEventAttendees(eventId: string): Promise<AdminAttendee[]> {
+  return api.get<AdminAttendee[]>(`/admin/events/${eventId}/attendees`)
+}
+

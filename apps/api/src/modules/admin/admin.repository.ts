@@ -3,6 +3,17 @@ import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { AdminDashboardData, AdminEventItem, AdminUserItem } from '@mypass360/types'
 import { MailService } from '@/common/mail/mail.service'
 
+export interface AdminAttendee {
+  ticketId: string
+  publicCode: string
+  name: string | null
+  cpf: string | null
+  email: string | null
+  ticketTypeName: string
+  status: string
+  issuedAt: string | null
+}
+
 type EventRow = {
   id: string
   title: string
@@ -274,5 +285,29 @@ export class AdminRepository {
     }
 
     return { success: true, sentCount }
+  }
+
+  async getEventAttendees(eventId: string): Promise<AdminAttendee[]> {
+    const client = this.supabase.getClient()
+
+    // Buscar todos os tickets do evento com tipo de ingresso
+    const { data: tickets, error } = await client
+      .from('tickets')
+      .select('id, public_code, buyer_name, buyer_cpf, buyer_email, status, issued_at, ticket_type_id, ticket_types(name)')
+      .eq('event_id', eventId)
+      .order('issued_at', { ascending: true })
+
+    if (error) throw new Error(error.message)
+
+    return (tickets ?? []).map((t: any) => ({
+      ticketId: t.id,
+      publicCode: t.public_code ?? '',
+      name: t.buyer_name ?? null,
+      cpf: t.buyer_cpf ?? null,
+      email: t.buyer_email ?? null,
+      ticketTypeName: t.ticket_types?.name ?? 'Ingresso',
+      status: t.status ?? 'VALID',
+      issuedAt: t.issued_at ?? null,
+    }))
   }
 }

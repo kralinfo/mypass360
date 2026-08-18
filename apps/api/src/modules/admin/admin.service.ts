@@ -28,4 +28,8 @@ export class AdminService {
   remindPendingOrders(eventId: string) {
     return this.adminRepository.remindPendingOrders(eventId)
   }
+
+  getEventAttendees(eventId: string) {
+    return this.adminRepository.getEventAttendees(eventId)
+  }
 }

@@ -36,4 +36,10 @@ export class AdminController {
   remindPendingOrders(@Param('id') id: string) {
     return this.adminService.remindPendingOrders(id)
   }
-}
+
+  @Get('events/:id/attendees')
+  getEventAttendees(@Param('id') id: string) {
+    return this.adminService.getEventAttendees(id)
+  }
+}
+
