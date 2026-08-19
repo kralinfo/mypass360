@@ -26,7 +26,7 @@ export class PaymentsService {
     private readonly paymentGateway: MercadoPagoGatewayService,
     private readonly ticketsService: TicketsService,
     private readonly paymentMailService: PaymentMailService,
-    private readonly supabase: SupabaseService
+    private readonly supabase: SupabaseService,
   ) {}
 
   async findById(id: string) {
@@ -93,16 +93,9 @@ export class PaymentsService {
    * Pode ser chamado via endpoint admin para recuperar pagamentos perdidos.
    */
   async reconcilePendingPayments() {
-    const { data: pending } = await this.supabase
-      .getClient()
-      .from('payments')
-      .select('*')
-      .eq('status', 'pending')
-      .not('external_id', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const pending = await this.paymentsRepository.findAllPending(100)
 
-    if (!pending?.length) return { reconciled: 0, total: 0 }
+    if (!pending.length) return { reconciled: 0, total: 0 }
 
     let reconciled = 0
     for (const p of pending) {
