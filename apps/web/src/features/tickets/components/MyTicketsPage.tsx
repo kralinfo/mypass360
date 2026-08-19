@@ -5,6 +5,7 @@ import { useMyTickets } from '../hooks/useMyTickets'
 import { TicketCard } from './TicketCard'
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { PendingPaymentBanner } from './PendingPaymentBanner'
 
 export function MyTicketsPage() {
   const { tickets, isLoading, error, refetch } = useMyTickets()
@@ -70,6 +71,7 @@ export function MyTicketsPage() {
       >
         {/* Cabeçalho da página */}
         <div style={{ marginBottom: '1.75rem' }}>
+
           <h1
             style={{
               fontSize: '1.75rem',
@@ -86,8 +88,12 @@ export function MyTicketsPage() {
           </p>
         </div>
 
+        {/* Banner de pagamento PIX pendente — detectado via sessionStorage */}
+        <PendingPaymentBanner refetch={refetch} />
+
         {/* Estado de carregamento */}
         {isLoading && (
+
           <div
             style={{
               display: 'flex',

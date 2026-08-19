@@ -215,6 +215,13 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         payerEmail: user.email,
       })
 
+      // Salvar orderId antes de redirecionar — permite detectar o pagamento
+      // quando o usuário voltar para o app depois de pagar o PIX no MP
+      window.sessionStorage.setItem('mypass360-pending-payment', JSON.stringify({
+        orderId,
+        initiatedAt: new Date().toISOString(),
+      }))
+
       window.location.href = preference.initPoint
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao iniciar pagamento')

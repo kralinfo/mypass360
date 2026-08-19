@@ -116,6 +116,19 @@ export class PaymentsRepository {
     return data
   }
 
+  async findAllPending(limit = 100) {
+    const { data } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('*')
+      .eq('status', 'pending')
+      .not('external_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    return data ?? []
+  }
+
   async confirm(id: string) {
     const payment = await this.updateStatusById(id, 'approved')
 
