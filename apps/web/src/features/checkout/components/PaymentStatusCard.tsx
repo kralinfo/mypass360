@@ -155,6 +155,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
 
   // Ref for polling interval cleanup
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Ref para a aba do Mercado Pago aberta via popup (Checkout Pro) — fechada automaticamente ao aprovar
+  const mpPopupRef = useRef<Window | null>(null)
 
   // ── Success handler (shared) ──────────────────────────────────────────────
   const handleApproved = useCallback((approved: Payment) => {
@@ -164,13 +166,19 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       clearInterval(pollRef.current)
       pollRef.current = null
     }
-    setTimeout(() => router.push('/meus-ingressos'), 2000)
+    // Fecha automaticamente a aba nativa do Mercado Pago, se ainda estiver aberta
+    if (mpPopupRef.current && !mpPopupRef.current.closed) {
+      mpPopupRef.current.close()
+      mpPopupRef.current = null
+    }
+    setTimeout(() => router.push('/meus-ingressos'), 1200)
   }, [clearCart, router])
 
   // ── Start polling — usa syncPaymentStatus que consulta MP ativamente ────
   const startPolling = useCallback((pid: string) => {
     if (pollRef.current) clearInterval(pollRef.current)
-    pollRef.current = setInterval(async () => {
+
+    const check = async () => {
       try {
         // POST /payments/:id/sync → backend consulta API do MP em tempo real
         // Se o MP diz "approved", o backend confirma, gera ingressos e retorna
@@ -182,8 +190,33 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       } catch {
         // silently ignore transient errors
       }
-    }, 5000)
+    }
+
+    // Verifica imediatamente (não espera o primeiro intervalo) para reduzir a percepção de espera
+    check()
+    pollRef.current = setInterval(check, 3000)
   }, [handleApproved])
+
+  // ── Verifica assim que a aba volta a ficar em foco (ex: usuário voltou do app do banco/MP) ──
+  useEffect(() => {
+    function handleFocusOrVisible() {
+      if (document.visibilityState === 'hidden') return
+      if (payment?.id && payment.status === 'pending') {
+        syncPaymentStatus(payment.id)
+          .then((data) => {
+            setPayment(data)
+            if (data.status === 'approved') handleApproved(data)
+          })
+          .catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleFocusOrVisible)
+    window.addEventListener('focus', handleFocusOrVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', handleFocusOrVisible)
+      window.removeEventListener('focus', handleFocusOrVisible)
+    }
+  }, [payment?.id, payment?.status, handleApproved])
 
   // ── Initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -272,9 +305,17 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   }
 
   // ── Create new Checkout Pro preference ───────────────────────────────────
+  // Abre o Mercado Pago em uma NOVA aba (em vez de redirecionar a atual) e mantém
+  // esta aba com o polling ativo. Assim que o pagamento é aprovado, fechamos a aba
+  // do Mercado Pago automaticamente e mostramos o ingresso aqui, sem depender do
+  // usuário clicar em "voltar" manualmente na tela nativa do MP.
   async function handleCreateCheckoutPreference() {
     setIsCreating(true)
     setError(null)
+
+    // Precisa ser aberto de forma síncrona (antes de qualquer await) para não ser
+    // bloqueado pelo navegador como pop-up indesejado.
+    const popup = window.open('about:blank', '_blank')
 
     try {
       const supabase = createClient()
@@ -282,6 +323,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
 
       if (!user?.email) {
         setError('Você precisa estar logado com um e-mail válido para gerar o pagamento.')
+        popup?.close()
         return
       }
 
@@ -291,16 +333,29 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         payerEmail: user.email,
       })
 
-      // Salvar orderId antes de redirecionar — permite detectar o pagamento
-      // quando o usuário voltar para o app depois de pagar o PIX no MP
+      // Salvar orderId — permite detectar o pagamento caso o usuário feche a aba
+      // e volte manualmente, ou em caso de fallback para redirecionamento.
       window.sessionStorage.setItem('mypass360-pending-payment', JSON.stringify({
         orderId,
         initiatedAt: new Date().toISOString(),
       }))
 
-      // Redirecionar na mesma aba para que o retorno do Mercado Pago funcione corretamente
-      window.location.href = preference.initPoint
+      if (popup && !popup.closed) {
+        // Fluxo principal: MP abre em nova aba, nossa aba continua monitorando o status
+        mpPopupRef.current = popup
+        popup.location.href = preference.initPoint
+
+        const pending = await fetchPaymentByOrderId(orderId)
+        setPayment(pending)
+        if (pending?.id) {
+          startPolling(pending.id)
+        }
+      } else {
+        // Fallback: pop-up bloqueado pelo navegador — redireciona na mesma aba
+        window.location.href = preference.initPoint
+      }
     } catch (err) {
+      popup?.close()
       setError(err instanceof Error ? err.message : 'Erro ao iniciar pagamento')
     } finally {
       setIsCreating(false)
@@ -452,7 +507,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         {paymentMethod === 'other' && (
           <div style={{ display: 'grid', gap: '1rem' }}>
             <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: 1.5, margin: 0 }}>
-              Você será redirecionado para o Mercado Pago onde poderá pagar por Cartão de Crédito ou Boleto Bancário.
+              O Mercado Pago abrirá em uma nova aba, onde você poderá pagar por PIX, Cartão de Crédito ou Boleto.
+              Assim que o pagamento for aprovado, a aba do Mercado Pago fecha sozinha e seu ingresso aparece aqui.
             </p>
 
             {error && <p style={{ color: '#dc2626', fontWeight: 600, margin: 0 }}>{error}</p>}
@@ -473,7 +529,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
                 transition: 'background 0.15s',
               }}
             >
-              {isCreating ? 'Redirecionando...' : 'Ir para o Mercado Pago'}
+              {isCreating ? 'Abrindo Mercado Pago...' : 'Ir para o Mercado Pago'}
             </button>
           </div>
         )}

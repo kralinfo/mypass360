@@ -129,8 +129,29 @@ export class PaymentsRepository {
     return data ?? []
   }
 
+  /**
+   * Confirma o pagamento de forma idempotente: só transiciona se o status
+   * ainda for 'pending'. Retorna `null` quando outra chamada concorrente
+   * (webhook vs. polling) já confirmou — evita gerar ingressos em duplicidade.
+   */
   async confirm(id: string) {
-    const payment = await this.updateStatusById(id, 'approved')
+    const { data: payment, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .update({ status: 'approved', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('status', 'pending')
+      .select('*')
+      .maybeSingle()
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    if (!payment) {
+      // Nenhuma linha afetada — já estava aprovado (corrida com webhook/polling)
+      return null
+    }
 
     const { error: orderError } = await this.supabase
       .getClient()

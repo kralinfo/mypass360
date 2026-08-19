@@ -126,12 +126,12 @@ Gerenciado pelo Supabase. Tabelas principais:
 ### Fluxo atual de compra
 
 - O checkout cria primeiro o pedido em `orders`.
-- A tela `/checkout/pagamento` mostra o método de pagamento.
-- No MVP, apenas `PIX` está habilitado.
-- Ao continuar, o backend cria uma **Preferência (Checkout Pro)** no Mercado Pago e o comprador é redirecionado para o ambiente seguro do Mercado Pago para concluir o pagamento (PIX, cartão, boleto, etc).
-- Após o pagamento, o Mercado Pago redireciona de volta para `/checkout/pagamento` e o **webhook** confirma e atualiza o pedido para `paid`.
+- A tela `/checkout/pagamento` oferece duas formas de pagamento:
+  - **PIX direto**: gera o QR Code embutido na própria página (`POST /payments`), sem sair do site. O frontend faz *polling* ativo (`POST /payments/:id/sync`) a cada poucos segundos consultando o Mercado Pago.
+  - **Outros (Cartão/Boleto/PIX no MP)**: o backend cria uma **Preferência (Checkout Pro)** e o Mercado Pago é aberto em **uma nova aba** (não substitui a aba do comprador). A aba original continua na tela `/checkout/pagamento` fazendo o mesmo *polling* ativo.
+- Assim que o pagamento é aprovado (via *polling* e/ou webhook), o backend confirma o pedido, gera os ingressos e o frontend **fecha automaticamente** a aba do Mercado Pago e redireciona o comprador para `/meus-ingressos`, já com o ingresso gerado — sem exigir que ele clique em "voltar" manualmente na tela nativa do Mercado Pago.
 
-> Usamos o Checkout Pro (`Preference`) em vez da API de Pagamentos direta porque contas novas/não totalmente verificadas do Mercado Pago costumam receber o erro `Unauthorized use of live credentials` ao tentar criar pagamentos PIX diretamente. O Checkout Pro não tem essa restrição.
+> Usamos o Checkout Pro (`Preference`) como alternativa à API de Pagamentos direta porque contas novas/não totalmente verificadas do Mercado Pago costumam receber o erro `Unauthorized use of live credentials` ao tentar criar pagamentos PIX diretamente. O Checkout Pro não tem essa restrição, mas por rodar em domínio do Mercado Pago não pode ser fechado por nós via redirect — por isso ele é aberto em nova aba e fechado programaticamente pelo frontend quando o pagamento é confirmado.
 
 ### Configuração de pagamentos
 
@@ -163,7 +163,7 @@ http://localhost:3001/api/v1/payments/webhook/mercadopago
 ### Endpoint de Checkout Pro
 
 - `POST /api/v1/payments/preference` recebe `{ orderId, amount, payerEmail }` e retorna `{ preferenceId, initPoint }`.
-- O frontend redireciona o navegador para `initPoint`, que é a página hospedada pelo Mercado Pago para concluir o pagamento.
+- O frontend abre `initPoint` (a página hospedada pelo Mercado Pago) em uma **nova aba**, mantendo a aba original com o *polling* de status ativo. Ao detectar aprovação, o frontend fecha a aba do Mercado Pago automaticamente.
 
 ## Deploy
 
