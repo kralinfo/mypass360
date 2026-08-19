@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AppShell } from '@/components/AppShell'
 import { CartProvider } from '@/features/cart/cart-context'
+import { DevServiceWorkerCleanup } from '@/components/DevServiceWorkerCleanup'
 
 export const metadata: Metadata = {
   title: {
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <body style={{ margin: 0, minHeight: '100vh' }}>
+        <DevServiceWorkerCleanup />
         <CartProvider>
           <AppShell>{children}</AppShell>
         </CartProvider>

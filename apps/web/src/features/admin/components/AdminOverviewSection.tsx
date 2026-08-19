@@ -10,11 +10,14 @@ type FilterType = 'revenue' | 'published' | 'pending' | 'users' | null
 
 type AdminOverviewSectionProps = {
   dashboard: AdminDashboardData | null
+  runningAction: string | null
+  onSendReminders: (event: AdminEventItem) => void
 }
 
 // ─── Tabela: Receita / Pedidos Pagos ────────────────────────────────────────
 type AdminEventItem = AdminDashboardData['events'][number]
 type AdminUserItem = AdminDashboardData['users'][number]
+
 
 function RevenueTable({ events }: { events: AdminEventItem[] }) {
   const COLS = '2fr 1.2fr 0.8fr 0.8fr'
@@ -78,14 +81,23 @@ function PublishedEventsTable({ events }: { events: AdminEventItem[] }) {
 }
 
 // ─── Tabela: Pedidos Pendentes ───────────────────────────────────────────────
-function PendingOrdersTable({ events }: { events: AdminEventItem[] }) {
-  const COLS = '2.5fr 0.9fr 0.8fr 0.8fr 0.8fr'
+function PendingOrdersTable({
+  events,
+  runningAction,
+  onSendReminders,
+}: {
+  events: AdminEventItem[]
+  runningAction: string | null
+  onSendReminders: (event: AdminEventItem) => void
+}) {
+  const COLS = '2fr 0.8fr 0.6fr 0.6fr 0.6fr 1fr'
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ minWidth: '580px' }}>
-        <TableHeader columns={['Evento', 'Status', 'Pendentes', 'Pagos', 'Total']} cols={COLS} />
+        <TableHeader columns={['Evento', 'Status', 'Pend.', 'Pagos', 'Total', 'Ação']} cols={COLS} />
         {events.map((event) => {
           const pending = event.totalOrders - event.paidOrders
+          const isActionLoading = runningAction?.includes(event.id)
           return (
             <div key={event.id} style={makeRowStyle(COLS)}>
               <div>
@@ -108,6 +120,30 @@ function PendingOrdersTable({ events }: { events: AdminEventItem[] }) {
               <div style={{ fontWeight: 700, color: '#f59e0b' }}>{pending}</div>
               <div style={{ fontWeight: 700, color: '#16a34a' }}>{event.paidOrders}</div>
               <div style={{ fontWeight: 700, color: '#0f172a' }}>{event.totalOrders}</div>
+              <div>
+                {pending > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void onSendReminders(event)}
+                    disabled={isActionLoading}
+                    style={{
+                      border: '1px solid #fde68a',
+                      borderRadius: '10px',
+                      padding: '0.4rem 0.6rem',
+                      background: '#fffbeb',
+                      color: '#b45309',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      cursor: isActionLoading ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Lembrar ({pending})
+                  </button>
+                ) : (
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Nenhum</span>
+                )}
+              </div>
             </div>
           )
         })}
@@ -115,6 +151,7 @@ function PendingOrdersTable({ events }: { events: AdminEventItem[] }) {
     </div>
   )
 }
+
 
 // ─── Tabela: Usuários ────────────────────────────────────────────────────────
 function UsersTable({ users }: { users: AdminUserItem[] }) {
@@ -199,10 +236,14 @@ function FilteredTable({
   filter,
   dashboard,
   onClose,
+  runningAction,
+  onSendReminders,
 }: {
   filter: Exclude<FilterType, null>
   dashboard: AdminDashboardData
   onClose: () => void
+  runningAction: string | null
+  onSendReminders: (event: AdminEventItem) => void
 }) {
   const config = filterConfig[filter]
   const [currentPage, setCurrentPage] = useState(1)
@@ -251,11 +292,18 @@ function FilteredTable({
       case 'published':
         return <PublishedEventsTable events={slicedItems as AdminEventItem[]} />
       case 'pending':
-        return <PendingOrdersTable events={slicedItems as AdminEventItem[]} />
+        return (
+          <PendingOrdersTable
+            events={slicedItems as AdminEventItem[]}
+            runningAction={runningAction}
+            onSendReminders={onSendReminders}
+          />
+        )
       case 'users':
         return <UsersTable users={slicedItems as AdminUserItem[]} />
     }
   })()
+
 
   return (
     <div
@@ -584,7 +632,7 @@ function OverviewTabs({ metrics, topEvents, activeUsers }: OverviewTabsProps) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function AdminOverviewSection({ dashboard }: AdminOverviewSectionProps) {
+export function AdminOverviewSection({ dashboard, runningAction, onSendReminders }: AdminOverviewSectionProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>(null)
 
   const toggleFilter = useCallback((filter: Exclude<FilterType, null>) => {
@@ -650,6 +698,8 @@ export function AdminOverviewSection({ dashboard }: AdminOverviewSectionProps) {
           filter={activeFilter}
           dashboard={dashboard}
           onClose={() => setActiveFilter(null)}
+          runningAction={runningAction}
+          onSendReminders={onSendReminders}
         />
       ) : null}
 
@@ -657,3 +707,4 @@ export function AdminOverviewSection({ dashboard }: AdminOverviewSectionProps) {
     </div>
   )
 }
+

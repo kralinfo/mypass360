@@ -4,6 +4,7 @@ import { AdminEventsSection } from '@/features/admin/components/AdminEventsSecti
 import { AdminMetricsSection } from '@/features/admin/components/AdminMetricsSection'
 import { AdminOverviewSection } from '@/features/admin/components/AdminOverviewSection'
 import { AdminUsersSection } from '@/features/admin/components/AdminUsersSection'
+import { ReminderModal } from '@/features/admin/components/ReminderModal'
 import type { AdminSection } from '@/features/admin/admin.types'
 import { getAdminSection } from '@/features/admin/admin.utils'
 import { useAdminDashboard } from '@/features/admin/useAdminDashboard'
@@ -37,8 +38,21 @@ export function AdminPageContent() {
   const searchParams = useSearchParams()
   const activeSection = useMemo(() => getAdminSection(searchParams.get('sec')), [searchParams])
   const sectionHeader = sectionContent[activeSection]
-  const { dashboard, isLoading, error, runningAction, loadDashboard, handleEventStatusChange, handleEventDelete, handleUserToggle, handleUserDelete } =
-    useAdminDashboard()
+  const {
+    dashboard,
+    isLoading,
+    error,
+    runningAction,
+    reminderModal,
+    loadDashboard,
+    handleEventStatusChange,
+    handleEventDelete,
+    handleUserToggle,
+    handleUserDelete,
+    handleSendPendingReminders,
+    handleReminderConfirm,
+    handleReminderClose,
+  } = useAdminDashboard()
 
   const currentSection = useMemo(() => {
     switch (activeSection) {
@@ -52,6 +66,7 @@ export function AdminPageContent() {
             runningAction={runningAction}
             onChangeStatus={handleEventStatusChange}
             onDelete={handleEventDelete}
+            onSendReminders={handleSendPendingReminders}
           />
         )
       case 'usuarios':
@@ -65,9 +80,26 @@ export function AdminPageContent() {
           />
         )
       default:
-        return <AdminOverviewSection dashboard={dashboard} />
+        return (
+          <AdminOverviewSection
+            dashboard={dashboard}
+            runningAction={runningAction}
+            onSendReminders={handleSendPendingReminders}
+          />
+        )
     }
-  }, [activeSection, dashboard, handleEventDelete, handleEventStatusChange, handleUserDelete, handleUserToggle, isLoading, runningAction])
+  }, [
+    activeSection,
+    dashboard,
+    handleEventDelete,
+    handleEventStatusChange,
+    handleUserDelete,
+    handleUserToggle,
+    handleSendPendingReminders,
+    isLoading,
+    runningAction,
+  ])
+
 
   return (
     <main
@@ -130,6 +162,18 @@ export function AdminPageContent() {
       ) : null}
 
       {currentSection}
+
+      {/* Modal de lembretes — renderizado no topo para overlay correto */}
+      {reminderModal && (
+        <ReminderModal
+          event={reminderModal.event}
+          state={reminderModal.state}
+          sentCount={reminderModal.sentCount}
+          errorMessage={reminderModal.errorMessage}
+          onConfirm={() => void handleReminderConfirm()}
+          onClose={handleReminderClose}
+        />
+      )}
     </main>
   )
-}
+}
