@@ -582,12 +582,17 @@ function CadastrarEventoForm() {
           </section>
 
           {/* Seção: Modelo do Ingresso */}
-          <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
+          <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0', opacity: isEditMode ? 0.8 : 1 }}>
             <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
               Modelo do Ingresso <span style={{ color: '#ef4444' }}>*</span>
             </h2>
             <p style={{ margin: '0 0 1rem', color: '#64748b', fontSize: '0.95rem' }}>
               Define a aparência e as informações exigidas do participante na compra.
+              {isEditMode && (
+                <span style={{ display: 'block', color: '#b45309', fontWeight: 600, marginTop: '0.25rem' }}>
+                  ⚠️ O modelo do ingresso não pode ser alterado após a criação do evento.
+                </span>
+              )}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -601,7 +606,7 @@ function CadastrarEventoForm() {
                   borderRadius: '10px',
                   border: `2px solid ${formData.ticketLayout === 'ticket' ? '#0f172a' : '#e2e8f0'}`,
                   background: formData.ticketLayout === 'ticket' ? '#f8fafc' : '#fff',
-                  cursor: 'pointer',
+                  cursor: isEditMode ? 'not-allowed' : 'pointer',
                 }}
               >
                 <input
@@ -609,6 +614,7 @@ function CadastrarEventoForm() {
                   name="ticketLayout"
                   value="ticket"
                   checked={formData.ticketLayout === 'ticket'}
+                  disabled={isEditMode}
                   onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'ticket', participantIdType: '' }))}
                   style={{ marginTop: '3px' }}
                 />
@@ -627,12 +633,13 @@ function CadastrarEventoForm() {
                         { value: 'none', label: 'Sem nome', desc: 'Ingresso transferível, sem identificação' },
                         { value: 'name', label: 'Com nome (opcional)', desc: 'Comprador pode informar o nome do portador' },
                       ].map(opt => (
-                        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', background: formData.participantIdType === opt.value ? '#f0fdf4' : '#fff', border: `1px solid ${formData.participantIdType === opt.value ? '#bbf7d0' : '#e2e8f0'}` }}>
+                        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: isEditMode ? 'not-allowed' : 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', background: formData.participantIdType === opt.value ? '#f0fdf4' : '#fff', border: `1px solid ${formData.participantIdType === opt.value ? '#bbf7d0' : '#e2e8f0'}` }}>
                           <input
                             type="radio"
                             name="participantIdType"
                             value={opt.value}
                             checked={formData.participantIdType === opt.value}
+                            disabled={isEditMode}
                             onChange={() => setFormData(prev => ({ ...prev, participantIdType: opt.value as 'none' | 'name' }))}
                             style={{ marginTop: '2px' }}
                           />
@@ -657,7 +664,7 @@ function CadastrarEventoForm() {
                   borderRadius: '10px',
                   border: `2px solid ${formData.ticketLayout === 'formal_pdf' ? '#0369a1' : '#e2e8f0'}`,
                   background: formData.ticketLayout === 'formal_pdf' ? '#f0f9ff' : '#fff',
-                  cursor: 'pointer',
+                  cursor: isEditMode ? 'not-allowed' : 'pointer',
                 }}
               >
                 <input
@@ -665,6 +672,7 @@ function CadastrarEventoForm() {
                   name="ticketLayout"
                   value="formal_pdf"
                   checked={formData.ticketLayout === 'formal_pdf'}
+                  disabled={isEditMode}
                   onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'formal_pdf', participantIdType: '' }))}
                   style={{ marginTop: '3px' }}
                 />
