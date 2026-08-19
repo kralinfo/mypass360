@@ -8,10 +8,17 @@ import { ManualConfirmationDto } from './dto/manual-confirmation.dto'
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  // IMPORTANTE: rotas estáticas devem vir ANTES de rotas parametrizadas (:id)
+  @Get('by-order/:orderId')
+  findByOrderId(@Param('orderId') orderId: string) {
+    return this.paymentsService.findByOrderId(orderId)
+  }
+
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.paymentsService.findById(id)
   }
+
 
   @Post()
   create(@Body() dto: CreatePaymentDto) {

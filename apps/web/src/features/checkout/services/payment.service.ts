@@ -28,6 +28,14 @@ export async function fetchPaymentById(paymentId: string): Promise<Payment> {
   return api.get<Payment>(`/payments/${paymentId}`)
 }
 
+export async function fetchPaymentByOrderId(orderId: string): Promise<Payment | null> {
+  try {
+    return await api.get<Payment>(`/payments/by-order/${orderId}`)
+  } catch {
+    return null
+  }
+}
+
 export async function confirmPayment(paymentId: string): Promise<Payment> {
   return api.post<Payment>(`/payments/${paymentId}/confirm`, {})
 }
@@ -41,4 +49,5 @@ export async function confirmPayment(paymentId: string): Promise<Payment> {
 export async function manualConfirmPayment(orderId: string, code: string): Promise<Payment> {
   // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
   return api.post<Payment>('/payments/manual-confirmation', { orderId, code })
-}
+}
+
