@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client'
 import {
   confirmPayment,
   createCheckoutPreference,
-  createPixPayment,
   fetchPaymentById,
   fetchPaymentByOrderId,
   manualConfirmPayment,
@@ -21,35 +20,6 @@ interface PaymentStatusCardProps {
   orderId: string
   eventId: string
   amount: number
-}
-
-// ─── Validation Helpers ──────────────────────────────────────────────────────
-function cleanCpfDigits(value: string) {
-  return value.replace(/\D/g, '')
-}
-
-function formatCpfValue(value: string) {
-  const clean = cleanCpfDigits(value).slice(0, 11)
-  if (clean.length <= 3) return clean
-  if (clean.length <= 6) return `${clean.slice(0, 3)}.${clean.slice(3)}`
-  if (clean.length <= 9) return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6)}`
-  return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9)}`
-}
-
-function isCpfValid(cpf: string) {
-  const clean = cleanCpfDigits(cpf)
-  if (clean.length !== 11) return false
-  if (/^(\d)\1+$/.test(clean)) return false
-  let sum = 0
-  for (let i = 0; i < 9; i++) sum += parseInt(clean[i]) * (10 - i)
-  let rev = (sum * 10) % 11
-  if (rev === 10 || rev === 11) rev = 0
-  if (rev !== parseInt(clean[9])) return false
-  sum = 0
-  for (let i = 0; i < 10; i++) sum += parseInt(clean[i]) * (11 - i)
-  rev = (sum * 10) % 11
-  if (rev === 10 || rev === 11) rev = 0
-  return rev === parseInt(clean[10])
 }
 
 // ─── Loading skeleton ──────────────────────────────────────────────────────────
@@ -143,11 +113,6 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Payment Method Selection States
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'other'>('pix')
-  const [payerCpf, setPayerCpf] = useState('')
-  const [cpfError, setCpfError] = useState<string | null>(null)
-
   // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
   const [manualCode, setManualCode] = useState('')
   const [isManualConfirming, setIsManualConfirming] = useState(false)
@@ -230,49 +195,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
     }
   }, [paymentId, orderId, handleApproved, startPolling])
 
-  // ── Create Direct PIX Payment ───────────────────────────────────────────
-  async function handleCreatePixPayment(e: React.FormEvent) {
-    e.preventDefault()
-    setCpfError(null)
-    setError(null)
-
-    const cleanCpf = cleanCpfDigits(payerCpf)
-    if (!isCpfValid(cleanCpf)) {
-      setCpfError('CPF inválido. Verifique o número digitado.')
-      return
-    }
-
-    setIsCreating(true)
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user?.email) {
-        setError('Você precisa estar logado com um e-mail válido para gerar o pagamento.')
-        return
-      }
-
-      const newPayment = await createPixPayment({
-        orderId,
-        provider: 'pix',
-        amount,
-        payerEmail: user.email,
-        payerDocument: cleanCpf,
-      })
-
-      setPayment(newPayment)
-      if (newPayment.id) {
-        startPolling(newPayment.id)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao gerar PIX')
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
   // ── Create new Checkout Pro preference ───────────────────────────────────
-  async function handleCreateCheckoutPreference() {
+  async function handleCreatePayment() {
     setIsCreating(true)
     setError(null)
 
@@ -335,150 +259,47 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         borderRadius: '14px',
         padding: '1.5rem',
         display: 'grid',
-        gap: '1.25rem',
+        gap: '1rem',
       }}>
-        {/* Order Details */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6', paddingBottom: '1rem' }}>
-          <div>
-            <p style={{ color: '#6b7280', fontSize: '0.85rem', margin: '0 0 2px' }}>Pedido</p>
-            <strong style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{orderId}</strong>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ color: '#6b7280', fontSize: '0.85rem', margin: '0 0 2px' }}>Total a pagar</p>
-            <strong style={{ fontSize: '1.2rem', color: '#0f172a' }}>
-              {amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </strong>
-          </div>
+        <div>
+          <p style={{ color: '#6b7280', fontSize: '0.85rem', margin: '0 0 2px' }}>Pedido</p>
+          <strong style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{orderId}</strong>
         </div>
 
-        {/* Tab Selection */}
-        <div style={{ display: 'flex', gap: '0.5rem', background: '#f1f5f9', padding: '0.35rem', borderRadius: '10px' }}>
-          <button
-            type="button"
-            onClick={() => setPaymentMethod('pix')}
-            style={{
-              flex: 1,
-              padding: '0.6rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: paymentMethod === 'pix' ? '#fff' : 'transparent',
-              color: paymentMethod === 'pix' ? '#0f172a' : '#64748b',
-              fontWeight: 700,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              boxShadow: paymentMethod === 'pix' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s',
-            }}
-          >
-            ⚡ Pagar com PIX
-          </button>
-          <button
-            type="button"
-            onClick={() => setPaymentMethod('other')}
-            style={{
-              flex: 1,
-              padding: '0.6rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: paymentMethod === 'other' ? '#fff' : 'transparent',
-              color: paymentMethod === 'other' ? '#0f172a' : '#64748b',
-              fontWeight: 700,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              boxShadow: paymentMethod === 'other' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              transition: 'all 0.15s',
-            }}
-          >
-            💳 Outros (Cartão, Boleto)
-          </button>
+        <div>
+          <p style={{ color: '#6b7280', fontSize: '0.85rem', margin: '0 0 2px' }}>Total a pagar</p>
+          <strong style={{ fontSize: '1.1rem' }}>
+            {amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </strong>
         </div>
 
-        {/* PIX Form */}
-        {paymentMethod === 'pix' && (
-          <form onSubmit={handleCreatePixPayment} style={{ display: 'grid', gap: '1rem' }}>
-            <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: 1.5, margin: 0 }}>
-              Gere o QR Code PIX direto aqui no site. O ingresso é liberado em segundos assim que você pagar.
-            </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <label htmlFor="payerCpf" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-                CPF do Pagador *
-              </label>
-              <input
-                id="payerCpf"
-                type="text"
-                maxLength={14}
-                placeholder="000.000.000-00"
-                value={payerCpf}
-                onChange={(e) => setPayerCpf(formatCpfValue(e.target.value))}
-                required
-                style={{
-                  padding: '0.65rem 0.75rem',
-                  borderRadius: '8px',
-                  border: `1px solid ${cpfError ? '#ef4444' : '#cbd5e1'}`,
-                  fontSize: '0.95rem',
-                  outline: 'none',
-                  background: '#fff',
-                }}
-              />
-              {cpfError && (
-                <span style={{ color: '#ef4444', fontSize: '0.78rem', fontWeight: 600 }}>{cpfError}</span>
-              )}
-            </div>
+        <p style={{ color: '#6b7280', fontSize: '0.875rem', lineHeight: 1.6 }}>
+          Ao continuar, você será redirecionado para o ambiente seguro do Mercado Pago, onde poderá
+          escolher entre PIX, cartão de crédito, boleto e outros meios disponíveis.
+        </p>
 
-            {error && <p style={{ color: '#dc2626', fontWeight: 600, margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: '#dc2626', fontWeight: 600 }}>{error}</p>}
 
-            <button
-              type="submit"
-              disabled={isCreating}
-              style={{
-                padding: '0.875rem 1rem',
-                borderRadius: '10px',
-                border: 'none',
-                background: isCreating ? '#94a3b8' : '#22c55e',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                cursor: isCreating ? 'not-allowed' : 'pointer',
-                transition: 'background 0.15s',
-              }}
-            >
-              {isCreating ? 'Gerando PIX...' : 'Gerar QR Code PIX'}
-            </button>
-          </form>
-        )}
+        <button
+          type="button"
+          onClick={handleCreatePayment}
+          disabled={isCreating}
+          style={{
+            padding: '0.875rem 1rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: isCreating ? '#94a3b8' : '#0f172a',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: '0.95rem',
+            cursor: isCreating ? 'not-allowed' : 'pointer',
+            transition: 'background 0.15s',
+          }}
+        >
+          {isCreating ? 'Redirecionando...' : 'Continuar para pagamento'}
+        </button>
 
-        {/* Other Payments (Checkout Pro) */}
-        {paymentMethod === 'other' && (
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            <p style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: 1.5, margin: 0 }}>
-              Você será redirecionado para o Mercado Pago onde poderá pagar por Cartão de Crédito ou Boleto Bancário.
-            </p>
-
-            {error && <p style={{ color: '#dc2626', fontWeight: 600, margin: 0 }}>{error}</p>}
-
-            <button
-              type="button"
-              onClick={handleCreateCheckoutPreference}
-              disabled={isCreating}
-              style={{
-                padding: '0.875rem 1rem',
-                borderRadius: '10px',
-                border: 'none',
-                background: isCreating ? '#94a3b8' : '#0f172a',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                cursor: isCreating ? 'not-allowed' : 'pointer',
-                transition: 'background 0.15s',
-              }}
-            >
-              {isCreating ? 'Redirecionando...' : 'Ir para o Mercado Pago'}
-            </button>
-          </div>
-        )}
-
-        {/* Dev Manual Confirmation */}
+        {/* TODO: Remover quando a integração oficial do Mercado Pago estiver concluída. */}
         <ManualConfirmationBox
           orderId={orderId}
           manualCode={manualCode}
@@ -522,81 +343,32 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         </div>
       </div>
 
-      {/* Direct PIX display (no redirect!) */}
+      {/* PIX code (if present) */}
       {payment.pixCode && isPending && (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '1.25rem',
-          background: '#f8fafc',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-        }}>
-          <p style={{ fontWeight: 700, margin: 0, color: '#334155', fontSize: '0.95rem' }}>
-            Escaneie o QR Code abaixo para pagar
+        <div>
+          <p style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+            Código PIX copia e cola
           </p>
-
-          <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(payment.pixCode)}&size=200x200`}
-            alt="PIX QR Code"
+          <textarea
+            readOnly
+            value={payment.pixCode}
             style={{
-              width: 200,
-              height: 200,
+              width: '100%',
+              minHeight: '100px',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              padding: '4px',
-              background: '#fff',
+              border: '1px solid #d1d5db',
+              padding: '0.75rem',
+              fontFamily: 'monospace',
+              fontSize: '0.78rem',
+              resize: 'none',
+              background: '#f8fafc',
             }}
           />
-
-          <div style={{ width: '100%' }}>
-            <label style={{ display: 'block', color: '#6b7280', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-              Código PIX Copia e Cola
-            </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="text"
-                readOnly
-                value={payment.pixCode}
-                style={{
-                  flex: 1,
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontFamily: 'monospace',
-                  fontSize: '0.8rem',
-                  background: '#fff',
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(payment.pixCode || '')
-                  alert('Código copiado!')
-                }}
-                style={{
-                  padding: '0.6rem 1rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: '#0f172a',
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Copiar
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
       {payment.pixExpiresAt && isPending && (
-        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>
+        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>
           ⏱ Expira em: {new Date(payment.pixExpiresAt).toLocaleString('pt-BR')}
         </p>
       )}
@@ -680,7 +452,6 @@ function ManualConfirmationBox({
       padding: '1rem',
       display: 'grid',
       gap: '0.75rem',
-      marginTop: '1rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <span>🛠️</span>
