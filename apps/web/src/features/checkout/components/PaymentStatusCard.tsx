@@ -222,17 +222,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         initiatedAt: new Date().toISOString(),
       }))
 
-      // Abrir o Mercado Pago em uma nova aba
-      window.open(preference.initPoint, '_blank')
-
-      // Buscar o pagamento criado no BD e iniciar polling na aba principal imediatamente
-      const newPayment = await fetchPaymentByOrderId(orderId)
-      if (newPayment) {
-        setPayment(newPayment)
-        if (newPayment.id) {
-          startPolling(newPayment.id)
-        }
-      }
+      // Redirecionar na mesma aba para que o retorno do Mercado Pago funcione corretamente
+      window.location.href = preference.initPoint
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao iniciar pagamento')
     } finally {
