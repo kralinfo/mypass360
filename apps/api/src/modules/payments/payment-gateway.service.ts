@@ -29,7 +29,7 @@ export class MercadoPagoGatewayService {
 
     const webAppUrl = this.config.get<string>('WEB_APP_URL') ?? 'http://localhost:3000'
     const apiUrl = this.config.get<string>('API_PUBLIC_URL')
-    const isLocalWebUrl = webAppUrl.includes('localhost') || webAppUrl.includes('127.0.0.1')
+
 
     const response = await preferenceClient.create({
       body: {
@@ -46,21 +46,30 @@ export class MercadoPagoGatewayService {
           email: dto.payerEmail,
         },
         external_reference: dto.orderId,
-        ...(isLocalWebUrl
-          ? {}
-          : {
-              back_urls: {
-                success: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
-                pending: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
-                failure: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
-              },
-              auto_return: 'approved',
-            }),
+        // Garantir que PIX (bank_transfer) esteja disponível — não excluir
+        // O MP SDK v2 usa excluded_payment_types para remover métodos
+        payment_methods: {
+          excluded_payment_types: [
+            { id: 'ticket' }, // boleto — não relevante para ingressos
+          ],
+          installments: 12,
+        },
+        // SEMPRE enviar back_urls e auto_return — o MP exige isso para exibir PIX no Checkout Pro.
+        // Em localhost o redirect não funciona (MP não alcança localhost), mas o polling
+        // do frontend detecta o pagamento automaticamente. Em produção o redirect funciona normalmente.
+        back_urls: {
+          success: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
+          pending: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
+          failure: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
+        },
+        auto_return: 'approved',
         ...(apiUrl
           ? { notification_url: `${apiUrl}/api/v1/payments/webhook/mercadopago` }
           : {}),
       },
     })
+
+
 
     if (!response.id || !response.init_point) {
       throw new Error('Mercado Pago não retornou os dados esperados da preferência.')

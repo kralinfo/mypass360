@@ -39,6 +39,19 @@ export class PaymentsRepository {
     return data
   }
 
+  async findLatestByOrderId(orderId: string) {
+    const { data } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    return data ?? null
+  }
+
   async updateStatusById(id: string, status: 'pending' | 'approved' | 'rejected' | 'refunded') {
     const { data, error } = await this.supabase
       .getClient()

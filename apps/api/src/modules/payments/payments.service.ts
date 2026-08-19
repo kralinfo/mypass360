@@ -37,6 +37,10 @@ export class PaymentsService {
     return payment
   }
 
+  async findByOrderId(orderId: string) {
+    return this.paymentsRepository.findLatestByOrderId(orderId)
+  }
+
   async create(dto: CreatePaymentDto) {
     const initializationData =
       dto.provider === 'pix'

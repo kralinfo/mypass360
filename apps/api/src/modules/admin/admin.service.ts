@@ -24,4 +24,12 @@ export class AdminService {
   deleteEvent(eventId: string) {
     return this.adminRepository.deleteEvent(eventId)
   }
-}
+
+  remindPendingOrders(eventId: string) {
+    return this.adminRepository.remindPendingOrders(eventId)
+  }
+
+  getEventAttendees(eventId: string) {
+    return this.adminRepository.getEventAttendees(eventId)
+  }
+}
