@@ -41,6 +41,14 @@ export async function confirmPayment(paymentId: string): Promise<Payment> {
 }
 
 /**
+ * Sincroniza o status do pagamento com o Mercado Pago em tempo real.
+ * O backend consulta a API do MP e, se aprovado, confirma e gera ingressos.
+ */
+export async function syncPaymentStatus(paymentId: string): Promise<Payment> {
+  return api.post<Payment>(`/payments/${paymentId}/sync`, {})
+}
+
+/**
  * Confirmação manual de pagamento para ambiente de desenvolvimento.
  * Envia o código "mypass360pg" para simular pagamento aprovado e gerar ingressos.
  *
