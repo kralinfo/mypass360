@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -11,6 +11,7 @@ import {
   fetchPaymentById,
   fetchPaymentByOrderId,
   manualConfirmPayment,
+  syncPaymentStatus,
 } from '../services/payment.service'
 import { useCart } from '@/features/cart/cart-context'
 
@@ -131,12 +132,14 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
     setTimeout(() => router.push('/meus-ingressos'), 2000)
   }, [clearCart, router])
 
-  // ── Start polling for a known payment ID ─────────────────────────────────
+  // ── Start polling — usa syncPaymentStatus que consulta MP ativamente ────
   const startPolling = useCallback((pid: string) => {
     if (pollRef.current) clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
       try {
-        const data = await fetchPaymentById(pid)
+        // POST /payments/:id/sync → backend consulta API do MP em tempo real
+        // Se o MP diz "approved", o backend confirma, gera ingressos e retorna
+        const data = await syncPaymentStatus(pid)
         setPayment(data)
         if (data.status === 'approved') {
           handleApproved(data)

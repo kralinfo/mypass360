@@ -41,6 +41,83 @@ export class PaymentsService {
     return this.paymentsRepository.findLatestByOrderId(orderId)
   }
 
+  /**
+   * Busca o status real do pagamento no Mercado Pago e, se aprovado,
+   * confirma no banco e gera os ingressos sem depender de webhook.
+   * Chamado pelo polling do frontend a cada 5s enquanto status === 'pending'.
+   */
+  async syncPaymentStatus(paymentId: string) {
+    const payment = await this.paymentsRepository.findById(paymentId)
+    if (!payment) throw new NotFoundException(`Pagamento '${paymentId}' não encontrado`)
+
+    // Já confirmado — retornar direto sem consultar MP
+    if (payment.status !== 'pending') return payment
+
+    // Sem externalId real do MP não há o que consultar
+    if (!payment.external_id || payment.external_id.startsWith('manual_') || payment.external_id.startsWith('pix_')) {
+      return payment
+    }
+
+    try {
+      // Estratégia 1: buscar por payment ID (funciona para PIX direto)
+      let mpStatus = await this.paymentGateway.fetchPaymentStatus(payment.external_id)
+
+      // Estratégia 2: buscar por external_reference/orderId (funciona para Checkout Pro)
+      // No Checkout Pro, external_id é o preferenceId, não o paymentId
+      if (!mpStatus) {
+        mpStatus = await this.paymentGateway.fetchPaymentStatusByOrderId(payment.order_id)
+      }
+
+      this.logger.debug(`MP status para payment=${payment.id}, order=${payment.order_id}: ${mpStatus}`)
+
+      if (mpStatus === 'approved') {
+        const confirmed = await this.paymentsRepository.confirm(payment.id)
+        await this.generateTicketsForOrder(confirmed.order_id)
+        await this.paymentMailService.sendOrderTicketsEmail(confirmed.order_id)
+        this.logger.log(`Pagamento ${payment.id} sincronizado e confirmado via polling (sem webhook)`)
+        return confirmed
+      }
+
+      if (mpStatus === 'rejected' || mpStatus === 'cancelled') {
+        return this.paymentsRepository.updateStatusById(payment.id, 'rejected')
+      }
+    } catch (err) {
+      this.logger.warn(`Falha ao sincronizar status com MP para ${payment.id}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+
+    return payment
+  }
+
+  /**
+   * Reconcilia todos os pagamentos pendentes consultando o MP.
+   * Pode ser chamado via endpoint admin para recuperar pagamentos perdidos.
+   */
+  async reconcilePendingPayments() {
+    const { data: pending } = await this.supabase
+      .getClient()
+      .from('payments')
+      .select('*')
+      .eq('status', 'pending')
+      .not('external_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (!pending?.length) return { reconciled: 0, total: 0 }
+
+    let reconciled = 0
+    for (const p of pending) {
+      try {
+        const updated = await this.syncPaymentStatus(p.id)
+        if (updated?.status === 'approved') reconciled++
+      } catch {
+        // continua para o próximo
+      }
+    }
+
+    this.logger.log(`Reconciliação: ${reconciled}/${pending.length} pagamentos pendentes confirmados`)
+    return { reconciled, total: pending.length }
+  }
+
   async create(dto: CreatePaymentDto) {
     const initializationData =
       dto.provider === 'pix'

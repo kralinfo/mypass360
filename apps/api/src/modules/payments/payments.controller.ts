@@ -9,16 +9,26 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   // IMPORTANTE: rotas estáticas devem vir ANTES de rotas parametrizadas (:id)
+
   @Get('by-order/:orderId')
   findByOrderId(@Param('orderId') orderId: string) {
     return this.paymentsService.findByOrderId(orderId)
+  }
+
+  /**
+   * Reconcilia TODOS os pagamentos pendentes consultando o MP.
+   * Use quando o webhook falhou (API_PUBLIC_URL não configurado).
+   */
+  @Post('reconcile')
+  @HttpCode(200)
+  reconcilePendingPayments() {
+    return this.paymentsService.reconcilePendingPayments()
   }
 
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.paymentsService.findById(id)
   }
-
 
   @Post()
   create(@Body() dto: CreatePaymentDto) {
@@ -28,6 +38,16 @@ export class PaymentsController {
   @Post(':id/confirm')
   confirm(@Param('id') id: string) {
     return this.paymentsService.confirm(id)
+  }
+
+  /**
+   * Sincroniza o status do pagamento com o Mercado Pago em tempo real.
+   * Chamado pelo polling do frontend — não depende de webhook.
+   */
+  @Post(':id/sync')
+  @HttpCode(200)
+  syncPaymentStatus(@Param('id') id: string) {
+    return this.paymentsService.syncPaymentStatus(id)
   }
 
   @Post('preference')
@@ -43,15 +63,11 @@ export class PaymentsController {
 
   /**
    * Endpoint temporário para confirmação manual de pagamento em desenvolvimento.
-   * Aceita o código "mypass360pg" e executa o mesmo fluxo da confirmação oficial.
-   *
    * TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
-   * Também remover: ManualConfirmationDto, método manualConfirmation() em PaymentsService
    */
   @Post('manual-confirmation')
   @HttpCode(200)
   manualConfirmation(@Body() dto: ManualConfirmationDto) {
-    // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
     return this.paymentsService.manualConfirmation(dto.orderId, dto.code)
   }
 }

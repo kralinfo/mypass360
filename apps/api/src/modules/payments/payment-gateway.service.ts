@@ -159,6 +159,48 @@ export class MercadoPagoGatewayService {
     return payload.status ?? null
   }
 
+  /**
+   * Busca o status do pagamento no MP pela external_reference (nosso orderId).
+   * Necessário para Checkout Pro onde o external_id armazenado é o preferenceId,
+   * não o paymentId do MP.
+   */
+  async fetchPaymentStatusByOrderId(orderId: string): Promise<string | null> {
+    const accessToken = this.config.get<string>('MERCADO_PAGO_ACCESS_TOKEN')
+
+    if (!accessToken) {
+      return null
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mercadopago.com/v1/payments/search?external_reference=${orderId}&sort=date_created&criteria=desc`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      )
+
+      if (!response.ok) {
+        this.logger.warn(`MP search falhou para orderId=${orderId}: ${response.status}`)
+        return null
+      }
+
+      const payload = (await response.json()) as {
+        results?: Array<{ status?: string; id?: number }>
+      }
+
+      const latest = payload.results?.[0]
+      if (!latest) return null
+
+      this.logger.debug(`MP search para orderId=${orderId}: payment_id=${latest.id}, status=${latest.status}`)
+      return latest.status ?? null
+    } catch (err) {
+      this.logger.warn(`Erro ao buscar MP por external_reference: ${err instanceof Error ? err.message : String(err)}`)
+      return null
+    }
+  }
+
   private createMockPixPayment(dto: CreatePaymentDto): PaymentInitializationData {
     const externalId = dto.externalId ?? `pix_${randomUUID()}`
     const pixCode = `00020126580014BR.GOV.BCB.PIX0136${externalId}520400005303986540${dto.amount.toFixed(2)}5802BR5925MYPASS3606009SAO PAULO62070503***6304ABCD`
