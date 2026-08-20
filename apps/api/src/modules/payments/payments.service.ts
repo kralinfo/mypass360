@@ -72,6 +72,12 @@ export class PaymentsService {
 
       if (mpStatus === 'approved') {
         const confirmed = await this.paymentsRepository.confirm(payment.id)
+
+        // null = outra chamada concorrente (webhook) já confirmou — não duplicar ingressos
+        if (!confirmed) {
+          return this.paymentsRepository.findById(payment.id)
+        }
+
         await this.generateTicketsForOrder(confirmed.order_id)
         await this.paymentMailService.sendOrderTicketsEmail(confirmed.order_id)
         this.logger.log(`Pagamento ${payment.id} sincronizado e confirmado via polling (sem webhook)`)
@@ -132,6 +138,11 @@ export class PaymentsService {
     }
 
     const confirmed = await this.paymentsRepository.confirm(id)
+
+    // null = já confirmado por outra chamada concorrente — não duplicar ingressos
+    if (!confirmed) {
+      return this.paymentsRepository.findById(id)
+    }
 
     // Gerar tickets após confirmação
     await this.generateTicketsForOrder(confirmed.order_id)
@@ -226,6 +237,12 @@ export class PaymentsService {
     // Caso 2: Pagamento pendente → confirmar normalmente
     if (payment?.status === 'pending') {
       const confirmed = await this.paymentsRepository.confirm(payment.id)
+
+      if (!confirmed) {
+        this.logger.log(`[DEV] Pagamento ${payment.id} já havia sido confirmado por outra chamada`)
+        return this.paymentsRepository.findById(payment.id)
+      }
+
       await this.generateTicketsForOrder(orderId)
       await this.paymentMailService.sendOrderTicketsEmail(orderId)
       this.logger.log(`[DEV] Pagamento ${payment.id} confirmado manualmente para pedido ${orderId}`)
