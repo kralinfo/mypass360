@@ -5,9 +5,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 export interface CartItem {
   eventId: string
@@ -48,8 +50,6 @@ interface CartContextValue {
   clearCart: () => void
   getItemsForEvent: (eventId: string) => CartItem[]
 }
-
-const CART_STORAGE_KEY = 'mypass360-cart'
 
 const CartContext = createContext<CartContextValue | undefined>(undefined)
 
@@ -96,31 +96,68 @@ function groupCartItems(items: CartItem[]): CartEventGroup[] {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const loadedUserIdRef = useRef<string | undefined>(undefined)
 
+  // 1. Escutar alterações de autenticação para rastrear o usuário atual
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(CART_STORAGE_KEY)
+    const supabase = createClient()
 
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUserId(session?.user?.id ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // 2. Carregar o carrinho específico do usuário quando o userId mudar
+  useEffect(() => {
+    const currentKey = userId || 'guest'
+    const key = `mypass360-cart:${currentKey}`
+
+    try {
+      const stored = window.localStorage.getItem(key)
       if (stored) {
         const parsed = JSON.parse(stored) as CartItem[]
         if (Array.isArray(parsed)) {
           setItems(parsed)
+          loadedUserIdRef.current = currentKey
+          setIsHydrated(true)
+          return
         }
       }
+      setItems([])
+      loadedUserIdRef.current = currentKey
+      setIsHydrated(true)
     } catch {
-      window.localStorage.removeItem(CART_STORAGE_KEY)
-    } finally {
+      setItems([])
+      loadedUserIdRef.current = currentKey
       setIsHydrated(true)
     }
-  }, [])
+  }, [userId])
 
+  // 3. Salvar o carrinho específico do usuário quando os itens mudarem
   useEffect(() => {
     if (!isHydrated) {
       return
     }
 
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
-  }, [items, isHydrated])
+    const currentKey = userId || 'guest'
+    // Prevenir a sobrescrita caso o carrinho atual do estado não pertença ao usuário ativo
+    if (loadedUserIdRef.current !== currentKey) {
+      return
+    }
+
+    const key = `mypass360-cart:${currentKey}`
+    window.localStorage.setItem(key, JSON.stringify(items))
+  }, [items, userId, isHydrated])
+
 
   const addToCart = (input: AddToCartInput) => {
     if (input.quantity <= 0) {
