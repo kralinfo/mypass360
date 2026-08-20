@@ -29,7 +29,11 @@ export class MercadoPagoGatewayService {
 
     const webAppUrl = this.config.get<string>('WEB_APP_URL') ?? 'http://localhost:3000'
     const apiUrl = this.config.get<string>('API_PUBLIC_URL')
-
+    // O Mercado Pago rejeita a preferência com "auto_return invalid. back_url.success
+    // must be defined" quando back_urls aponta para localhost/rede privada (não alcançável
+    // por eles). Nesses casos omitimos back_urls/auto_return; o polling do frontend
+    // continua detectando o pagamento normalmente.
+    const isLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?/i.test(webAppUrl)
 
     const response = await preferenceClient.create({
       body: {
@@ -54,15 +58,16 @@ export class MercadoPagoGatewayService {
           ],
           installments: 12,
         },
-        // SEMPRE enviar back_urls e auto_return — o MP exige isso para exibir PIX no Checkout Pro.
-        // Em localhost o redirect não funciona (MP não alcança localhost), mas o polling
-        // do frontend detecta o pagamento automaticamente. Em produção o redirect funciona normalmente.
-        back_urls: {
-          success: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
-          pending: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
-          failure: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
-        },
-        auto_return: 'approved',
+        ...(isLocalUrl
+          ? {}
+          : {
+              back_urls: {
+                success: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
+                pending: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
+                failure: `${webAppUrl}/checkout/pagamento?orderId=${dto.orderId}`,
+              },
+              auto_return: 'approved' as const,
+            }),
         ...(apiUrl
           ? { notification_url: `${apiUrl}/api/v1/payments/webhook/mercadopago` }
           : {}),
