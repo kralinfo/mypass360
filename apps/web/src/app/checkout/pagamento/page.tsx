@@ -8,7 +8,11 @@ interface CheckoutPaymentPageProps {
 export default async function CheckoutPaymentPage({ searchParams }: CheckoutPaymentPageProps) {
   const { paymentId, orderId, eventId, amount, from, slug } = await searchParams
 
-  if (!orderId || !eventId || !amount) {
+  // Só orderId é obrigatório: eventId/amount são usados apenas na tela de criação
+  // de um pagamento novo. Ao voltar para conferir um pagamento já existente
+  // (ex: botão "Ver pagamento" do banner de pendência), o PaymentStatusCard busca
+  // os dados reais do pagamento pelo orderId.
+  if (!orderId) {
     return (
       <main style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
         <h1>Pagamento</h1>
@@ -26,8 +30,8 @@ export default async function CheckoutPaymentPage({ searchParams }: CheckoutPaym
       <PaymentStatusCard
         paymentId={paymentId}
         orderId={orderId}
-        eventId={eventId}
-        amount={Number(amount)}
+        eventId={eventId ?? ''}
+        amount={Number(amount ?? 0)}
       />
     </main>
   )
