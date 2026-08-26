@@ -57,26 +57,52 @@ export class AdminRepository {
     private readonly mailService: MailService
   ) {}
 
+  private async safeListUsers(client: any): Promise<AuthUserRow[]> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const { data, error } = await client.auth.admin.listUsers({ page: 1, perPage: 200 })
+        if (!error && data?.users) {
+          return data.users as AuthUserRow[]
+        }
+        if (error) {
+          const isClockSkew = error.message?.includes('JWT') || error.message?.includes('future')
+          if (isClockSkew && attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, attempt * 350))
+            continue
+          }
+          console.warn(`[AdminRepository] listUsers aviso (tentativa ${attempt}):`, error.message)
+        }
+      } catch (err) {
+        const isClockSkew = err instanceof Error && (err.message.includes('JWT') || err.message.includes('future'))
+        if (isClockSkew && attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 350))
+          continue
+        }
+        console.warn(`[AdminRepository] listUsers erro inesperado (tentativa ${attempt}):`, err)
+      }
+    }
+    return []
+  }
+
   async getDashboard(): Promise<AdminDashboardData> {
     const client = this.supabase.getClient()
 
-    const [{ data: events, error: eventsError }, { data: orders, error: ordersError }, { data: usersData, error: usersError }] =
+    const [{ data: events, error: eventsError }, { data: orders, error: ordersError }, authUsers] =
       await Promise.all([
         client
           .from('events')
           .select('id, title, slug, date, location, status, organizer_id, capacity, price, created_at')
           .order('date', { ascending: false }),
         client.from('orders').select('id, event_id, user_id, status, total'),
-        client.auth.admin.listUsers({ page: 1, perPage: 200 }),
+        this.safeListUsers(client),
       ])
 
     if (eventsError) throw new Error(eventsError.message)
     if (ordersError) throw new Error(ordersError.message)
-    if (usersError) throw new Error(usersError.message)
 
     const safeEvents = (events ?? []) as EventRow[]
     const safeOrders = (orders ?? []) as OrderRow[]
-    const authUsers = (usersData?.users ?? []) as AuthUserRow[]
+
 
     const ordersByEvent = new Map<string, { totalOrders: number; paidOrders: number; revenue: number }>()
     const eventCountByOrganizer = new Map<string, number>()
