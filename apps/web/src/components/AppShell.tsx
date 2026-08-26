@@ -11,7 +11,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin-login'
   const isAdminLoginRoute = pathname === '/admin-login'
-  const showPublicChrome = !isAdminRoute && !isAdminLoginRoute
+  const isCheckinRoute = pathname.startsWith('/checkin')
+  const showPublicChrome = !isAdminRoute && !isAdminLoginRoute && !isCheckinRoute
+
 
   return (
     <>

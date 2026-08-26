@@ -27,7 +27,10 @@ export interface Event {
   ticket_layout?: TicketLayout
   /** Tipo de identificação do participante. Aplica-se quando ticket_layout = 'ticket'. Padrão: 'name' */
   participant_id_type?: ParticipantIdType
+  /** Indica se a portaria / check-in está aberta/ativa para este evento. Padrão: true */
+  checkin_enabled?: boolean
   ticket_types?: Array<{
+
     id: string
     name: string
     price: number

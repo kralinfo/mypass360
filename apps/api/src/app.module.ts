@@ -7,6 +7,7 @@ import { EventsModule } from './modules/events/events.module'
 import { OrdersModule } from './modules/orders/orders.module'
 import { PaymentsModule } from './modules/payments/payments.module'
 import { TicketsModule } from './modules/tickets/tickets.module'
+import { CheckinModule } from './modules/checkin/checkin.module'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TicketsModule } from './modules/tickets/tickets.module'
     OrdersModule,
     PaymentsModule,
     TicketsModule,
+    CheckinModule,
   ],
 })
 export class AppModule {}

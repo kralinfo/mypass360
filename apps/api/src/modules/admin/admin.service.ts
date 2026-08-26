@@ -32,4 +32,43 @@ export class AdminService {
   getEventAttendees(eventId: string) {
     return this.adminRepository.getEventAttendees(eventId)
   }
-}
+
+  getEventDetails(eventId: string) {
+    return this.adminRepository.getEventDetails(eventId)
+  }
+
+  getCheckinAccesses(eventId: string) {
+    return this.adminRepository.getCheckinAccesses(eventId)
+  }
+
+  createCheckinAccess(eventId: string, name: string) {
+    return this.adminRepository.createCheckinAccess(eventId, name)
+  }
+
+  updateCheckinAccess(accessId: string, data: { name?: string; isActive?: boolean }) {
+    return this.adminRepository.updateCheckinAccess(accessId, data)
+  }
+
+  deleteCheckinAccess(accessId: string) {
+    return this.adminRepository.deleteCheckinAccess(accessId)
+  }
+
+  getEventCheckins(eventId: string) {
+    return this.adminRepository.getEventCheckins(eventId)
+  }
+
+  resetEventCheckins(eventId: string) {
+    return this.adminRepository.resetEventCheckins(eventId)
+  }
+
+  updateEventCheckinStatus(eventId: string, enabled: boolean) {
+    return this.adminRepository.updateEventCheckinStatus(eventId, enabled)
+  }
+
+  deleteEventCheckin(eventId: string, checkinId: string) {
+    return this.adminRepository.deleteEventCheckin(eventId, checkinId)
+  }
+}
+
+
+

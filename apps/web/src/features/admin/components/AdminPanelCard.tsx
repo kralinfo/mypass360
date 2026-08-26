@@ -14,8 +14,9 @@ export function AdminPanelCard({ title, subtitle, children }: AdminPanelCardProp
         border: '1px solid #e2e8f0',
         borderRadius: '16px',
         boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
+
     >
       <header
         style={{

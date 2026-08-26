@@ -306,15 +306,27 @@ export class TicketsRepository {
     }
 
     const newStatus = ticket.status === 'VALID' ? 'CHECKED_IN' : 'used'
+    const checkinTime = new Date().toISOString()
     const { error } = await this.supabase
       .getClient()
       .from(this.table)
-      .update({ status: newStatus, checked_in_at: new Date().toISOString() })
+      .update({ status: newStatus, checked_in_at: checkinTime })
       .eq('id', ticket.id)
 
     if (error) throw new Error(error.message)
 
+    try {
+      await this.supabase.getClient().from('checkins').insert({
+        event_id: ticket.event_id,
+        ticket_id: ticket.id,
+        checked_in_at: checkinTime,
+      })
+    } catch {
+      // Ignora erro se já inserido ou tabela não disponível
+    }
+
     return { valid: true, ticketId: ticket.id }
+
   }
 
   /**

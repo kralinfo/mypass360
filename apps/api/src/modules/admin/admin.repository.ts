@@ -310,4 +310,309 @@ export class AdminRepository {
       issuedAt: t.issued_at ?? null,
     }))
   }
-}
+
+  /**
+   * Retorna os detalhes consolidados do evento para o modal administrativo.
+   */
+  async getEventDetails(eventId: string) {
+    const client = this.supabase.getClient()
+
+    const { data: event, error: eventErr } = await client
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .single()
+
+    if (eventErr || !event) {
+      throw new Error(`Evento '${eventId}' não encontrado`)
+    }
+
+    const { count: totalTickets } = await client
+      .from('tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+
+    const { count: checkedInTickets } = await client
+      .from('tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .in('status', ['CHECKED_IN', 'used'])
+
+    return {
+      ...event,
+      checkin_enabled: event.checkin_enabled !== false,
+      totalTickets: totalTickets ?? 0,
+      checkedInTickets: checkedInTickets ?? 0,
+    }
+  }
+
+  /**
+   * Ativa ou desativa a portaria / check-in para o evento como um todo.
+   */
+  async updateEventCheckinStatus(eventId: string, enabled: boolean) {
+    const client = this.supabase.getClient()
+
+    const { data, error } = await client
+      .from('events')
+      .update({ checkin_enabled: enabled })
+      .eq('id', eventId)
+      .select('id, checkin_enabled')
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    return {
+      success: true,
+      checkin_enabled: data.checkin_enabled,
+    }
+  }
+
+
+  /**
+   * Lista todos os acessos de portaria cadastrados para o evento.
+   */
+  async getCheckinAccesses(eventId: string) {
+    const client = this.supabase.getClient()
+
+    const { data, error } = await client
+      .from('checkin_accesses')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw new Error(error.message)
+
+    return (data ?? []).map((a: any) => ({
+      id: a.id,
+      eventId: a.event_id,
+      name: a.name,
+      code: a.code,
+      isActive: a.is_active,
+      createdAt: a.created_at,
+      lastUsedAt: a.last_used_at,
+    }))
+  }
+
+  /**
+   * Cria uma nova credencial de check-in vinculada exclusivamente ao evento.
+   */
+  async createCheckinAccess(eventId: string, name: string) {
+    const client = this.supabase.getClient()
+    const code = this.generateAccessCode()
+
+    const { data, error } = await client
+      .from('checkin_accesses')
+      .insert({
+        event_id: eventId,
+        name: name.trim(),
+        code,
+        is_active: true,
+      })
+      .select('*')
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    return {
+      id: data.id,
+      eventId: data.event_id,
+      name: data.name,
+      code: data.code,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      lastUsedAt: data.last_used_at,
+    }
+  }
+
+  /**
+   * Ativa/desativa ou renomeia uma credencial de check-in.
+   */
+  async updateCheckinAccess(accessId: string, updateData: { name?: string; isActive?: boolean }) {
+    const client = this.supabase.getClient()
+    const payload: Record<string, unknown> = {}
+
+    if (updateData.name !== undefined) payload.name = updateData.name.trim()
+    if (updateData.isActive !== undefined) payload.is_active = updateData.isActive
+
+    const { data, error } = await client
+      .from('checkin_accesses')
+      .update(payload)
+      .eq('id', accessId)
+      .select('*')
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    return {
+      id: data.id,
+      eventId: data.event_id,
+      name: data.name,
+      code: data.code,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      lastUsedAt: data.last_used_at,
+    }
+  }
+
+  /**
+   * Remove uma credencial de check-in.
+   */
+  async deleteCheckinAccess(accessId: string) {
+    const client = this.supabase.getClient()
+    const { error } = await client.from('checkin_accesses').delete().eq('id', accessId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  }
+
+  /**
+   * Lista todos os check-ins realizados no evento, aplicando as regras de privacidade configuradas.
+   */
+  async getEventCheckins(eventId: string) {
+    const client = this.supabase.getClient()
+
+    // 1. Obter o modelo de layout e identificação do evento
+    const { data: event } = await client
+      .from('events')
+      .select('ticket_layout, participant_id_type')
+      .eq('id', eventId)
+      .single()
+
+    const isAnonymous = event?.ticket_layout !== 'formal_pdf' && event?.participant_id_type === 'none'
+
+    // 2. Buscar registros na tabela de auditoria
+    const { data: records, error } = await client
+      .from('checkins')
+      .select(`
+        id,
+        event_id,
+        ticket_id,
+        checked_in_at,
+        checkin_accesses (
+          name
+        ),
+        tickets (
+          public_code,
+          buyer_name,
+          buyer_cpf,
+          buyer_email,
+          ticket_types (
+            name
+          )
+        )
+      `)
+      .eq('event_id', eventId)
+      .order('checked_in_at', { ascending: false })
+
+    if (error) throw new Error(error.message)
+
+    return (records ?? []).map((r: any) => ({
+      id: r.id,
+      eventId: r.event_id,
+      ticketId: r.ticket_id,
+      publicCode: r.tickets?.public_code ?? '',
+      ticketTypeName: r.tickets?.ticket_types?.name ?? 'Ingresso',
+      participantName: isAnonymous ? null : r.tickets?.buyer_name ?? r.tickets?.buyer_email ?? null,
+      participantCpf: isAnonymous ? null : r.tickets?.buyer_cpf ?? null,
+      checkedInAt: r.checked_in_at,
+      operatorName: r.checkin_accesses?.name ?? null,
+      status: 'CHECKED_IN' as const,
+    }))
+  }
+
+  /**
+   * Limpa todos os check-ins realizados no evento e restaura os tickets para o status anterior válido.
+   *
+   * // TODO: Avaliar remoção ou restrição desta ação em produção.
+   * // Funcionalidade utilizada atualmente para resetar check-ins durante testes.
+   */
+  async resetEventCheckins(eventId: string) {
+    const client = this.supabase.getClient()
+
+    // 1. Remover todos os registros de check-in da tabela de auditoria
+    const { error: deleteErr } = await client
+      .from('checkins')
+      .delete()
+      .eq('event_id', eventId)
+
+    if (deleteErr) {
+      console.warn('[AdminRepository] Aviso ao deletar auditoria de checkins:', deleteErr.message)
+    }
+
+    // 2. Restaurar o status de todos os tickets utilizados para VALID
+    const { error: updateErr, count } = await client
+      .from('tickets')
+      .update({
+        status: 'VALID',
+        checked_in_at: null,
+        checked_in_by: null,
+      })
+      .eq('event_id', eventId)
+      .in('status', ['CHECKED_IN', 'used'])
+
+    if (updateErr) throw new Error(updateErr.message)
+
+    return {
+      success: true,
+      message: 'Todos os check-ins do evento foram restaurados com sucesso para estado válido.',
+      restoredCount: count ?? 0,
+    }
+  }
+
+  /**
+   * Exclui um registro específico de check-in e restaura o ticket individual para VALID.
+   */
+  async deleteEventCheckin(eventId: string, checkinId: string) {
+    const client = this.supabase.getClient()
+
+    // 1. Buscar o check-in para obter o ticket_id correspondente
+    const { data: checkin, error: findErr } = await client
+      .from('checkins')
+      .select('id, ticket_id, event_id')
+      .eq('id', checkinId)
+      .eq('event_id', eventId)
+      .single()
+
+    if (findErr || !checkin) {
+      throw new Error('Registro de check-in não encontrado.')
+    }
+
+    // 2. Deletar da tabela de auditoria de checkins
+    const { error: delErr } = await client
+      .from('checkins')
+      .delete()
+      .eq('id', checkinId)
+
+    if (delErr) throw new Error(delErr.message)
+
+    // 3. Restaurar o ticket para o status VALID
+    const { error: updateErr } = await client
+      .from('tickets')
+      .update({
+        status: 'VALID',
+        checked_in_at: null,
+        checked_in_by: null,
+      })
+      .eq('id', checkin.ticket_id)
+
+    if (updateErr) throw new Error(updateErr.message)
+
+    return {
+      success: true,
+      message: 'Check-in cancelado com sucesso. O ingresso voltou a ser válido.',
+    }
+  }
+
+  /**
+   * Gera um código de acesso seguro e amigável: CKIN-XXXXXXXX
+   */
+
+  private generateAccessCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let code = 'CKIN-'
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return code
+  }
+}
+
