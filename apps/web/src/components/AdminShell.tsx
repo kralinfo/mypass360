@@ -45,10 +45,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [usuario, setUsuario] = useState<User | null>(null)
-  const [menuAberto, setMenuAberto] = useState(true)
+  const [desktopMenuAberto, setDesktopMenuAberto] = useState(true)
+  const [mobileMenuAberto, setMobileMenuAberto] = useState(false)
+
   const secaoAtiva = useMemo(() => getAdminSection(searchParams.get('sec')), [searchParams])
   const tituloDaPagina = useMemo(() => getTituloDaPagina(secaoAtiva), [secaoAtiva])
   const descricaoDaPagina = useMemo(() => getDescricaoDaPagina(secaoAtiva), [secaoAtiva])
+
+  // Fechar o menu mobile ao navegar
+  useEffect(() => {
+    setMobileMenuAberto(false)
+  }, [pathname, searchParams])
 
   useEffect(() => {
     const supabase = createClient()
@@ -76,22 +83,84 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', background: '#f8fafc', overflow: 'hidden' }}>
+    <div style={{ height: '100vh', display: 'flex', background: '#f8fafc', overflow: 'hidden', position: 'relative' }}>
+      <style>{`
+        /* Desktop */
+        @media (min-width: 769px) {
+          .admin-sidebar {
+            position: sticky !important;
+            top: 0 !important;
+            height: 100vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justifyContent: space-between !important;
+            flex-shrink: 0 !important;
+            z-index: 30 !important;
+          }
+          .admin-backdrop {
+            display: none !important;
+          }
+          .admin-mobile-toggle {
+            display: none !important;
+          }
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+          .admin-sidebar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            height: 100vh !important;
+            width: 260px !important;
+            z-index: 1000 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justifyContent: space-between !important;
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35) !important;
+            transform: translateX(-100%);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          }
+          .admin-sidebar.mobile-open {
+            transform: translateX(0) !important;
+          }
+          .admin-header-desc {
+            display: none !important;
+          }
+          .admin-mobile-toggle {
+            display: inline-flex !important;
+          }
+          .admin-header-container {
+            padding: 0.5rem 0.85rem !important;
+          }
+        }
+      `}</style>
+
+      {/* Backdrop para fechar o menu mobile ao tocar fora */}
+      {mobileMenuAberto && (
+        <div
+          className="admin-backdrop"
+          onClick={() => setMobileMenuAberto(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 999,
+          }}
+        />
+      )}
+
+      {/* Sidebar */}
       <aside
+        className={`admin-sidebar ${mobileMenuAberto ? 'mobile-open' : ''}`}
         style={{
-          width: menuAberto ? '220px' : '62px',
+          width: desktopMenuAberto ? '220px' : '62px',
           transition: 'width 0.22s ease',
           borderRight: '1px solid #e2e8f0',
           background: '#020617',
           color: '#fff',
-          position: 'sticky',
-          top: 0,
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
           overflow: 'hidden',
-          flexShrink: 0,
         }}
       >
         <div>
@@ -101,11 +170,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               borderBottom: '1px solid rgba(148, 163, 184, 0.16)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: menuAberto ? 'space-between' : 'center',
+              justifyContent: desktopMenuAberto ? 'space-between' : 'center',
               gap: '0.5rem',
             }}
           >
-            {menuAberto ? (
+            {desktopMenuAberto || mobileMenuAberto ? (
               <div>
                 <p style={{ margin: 0, fontSize: '0.72rem', letterSpacing: '0.08em', color: '#a78bfa', fontWeight: 700 }}>
                   MYPASS360
@@ -114,9 +183,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
 
+            {/* Botão de fechar/recolher sidebar */}
             <button
               type="button"
-              onClick={() => setMenuAberto((valorAtual) => !valorAtual)}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                  setMobileMenuAberto(false)
+                } else {
+                  setDesktopMenuAberto((curr) => !curr)
+                }
+              }}
               style={{
                 border: '1px solid rgba(148, 163, 184, 0.24)',
                 background: 'rgba(148, 163, 184, 0.08)',
@@ -127,10 +203,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 cursor: 'pointer',
                 fontSize: '0.95rem',
                 flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-              aria-label={menuAberto ? 'Recolher menu' : 'Expandir menu'}
+              aria-label="Recolher menu"
             >
-              ☰
+              {mobileMenuAberto ? '✕' : '☰'}
             </button>
           </div>
 
@@ -142,6 +221,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileMenuAberto(false)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -154,11 +234,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     borderRadius: '12px',
                     fontWeight: 600,
                     fontSize: '0.88rem',
-                    justifyContent: menuAberto ? 'flex-start' : 'center',
+                    justifyContent: desktopMenuAberto || mobileMenuAberto ? 'flex-start' : 'center',
                   }}
                 >
                   <span style={{ fontSize: '0.9rem', minWidth: '16px', textAlign: 'center' }}>{item.icon}</span>
-                  {menuAberto ? <span>{item.label}</span> : null}
+                  {desktopMenuAberto || mobileMenuAberto ? <span>{item.label}</span> : null}
                 </Link>
               )
             })}
@@ -166,7 +246,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div style={{ padding: '0.65rem', borderTop: '1px solid rgba(148, 163, 184, 0.16)' }}>
-          {menuAberto ? (
+          {desktopMenuAberto || mobileMenuAberto ? (
             <div
               style={{
                 marginBottom: '0.65rem',
@@ -197,11 +277,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               fontSize: '0.83rem',
             }}
           >
-            {menuAberto ? 'Sair da administração' : 'Sair'}
+            {desktopMenuAberto || mobileMenuAberto ? 'Sair da administração' : 'Sair'}
           </button>
         </div>
       </aside>
 
+      {/* Conteúdo Principal */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <header
           style={{
@@ -214,24 +295,52 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           }}
         >
           <div
+            className="admin-header-container"
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '1rem',
+              gap: '0.75rem',
               padding: '0.65rem 1.25rem',
             }}
           >
-            <div>
-              <span style={{ display: 'block', color: '#6366f1', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.08em' }}>
-                MÓDULO INTERNO
-              </span>
-              <strong style={{ display: 'block', marginTop: '0.15rem', color: '#0f172a', fontSize: '0.97rem' }}>
-                {tituloDaPagina}
-              </strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              {/* Botão Hambúrguer Mobile */}
+              <button
+                type="button"
+                className="admin-mobile-toggle"
+                onClick={() => setMobileMenuAberto(true)}
+                title="Abrir menu de navegação"
+                style={{
+                  border: '1px solid #cbd5e1',
+                  background: '#fff',
+                  color: '#0f172a',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                ☰
+              </button>
+
+              <div>
+                <span style={{ display: 'block', color: '#6366f1', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.08em' }}>
+                  MÓDULO INTERNO
+                </span>
+                <strong style={{ display: 'block', marginTop: '0.15rem', color: '#0f172a', fontSize: '0.97rem' }}>
+                  {tituloDaPagina}
+                </strong>
+              </div>
             </div>
 
-            <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{descricaoDaPagina}</span>
+            <span className="admin-header-desc" style={{ color: '#64748b', fontSize: '0.85rem' }}>
+              {descricaoDaPagina}
+            </span>
           </div>
         </header>
 
