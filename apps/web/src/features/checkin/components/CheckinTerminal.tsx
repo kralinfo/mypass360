@@ -259,31 +259,88 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
     }
   }, [])
 
-
   const isAnonymousEvent = event.ticketLayout !== 'formal_pdf' && event.participantIdType === 'none'
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1rem', display: 'grid', gap: '1.25rem' }}>
+    <div className="checkin-terminal-wrapper">
+
       <style>{`
+        .checkin-terminal-wrapper {
+          max-width: 960px;
+          margin: 0 auto;
+          padding: 1rem 0.5rem;
+          display: grid;
+          gap: 1rem;
+          width: 100%;
+          box-sizing: border-box;
+          overflow-x: hidden;
+        }
+        .checkin-terminal-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+          gap: 1rem;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .checkin-input-group {
+          display: flex;
+          gap: 0.5rem;
+          width: 100%;
+          box-sizing: border-box;
+        }
         #qr-reader-container {
           border: none !important;
           background: transparent !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+          overflow: hidden !important;
         }
         #qr-reader-container video {
           width: 100% !important;
+          max-width: 100% !important;
+          height: auto !important;
           border-radius: 12px;
           object-fit: cover;
         }
         #qr-reader-container img {
           display: none !important;
         }
+        #qr-reader-container canvas {
+          max-width: 100% !important;
+        }
         #qr-reader-container__scan_region {
           border-radius: 12px;
+          max-width: 100% !important;
+          overflow: hidden !important;
+        }
+        @media (max-width: 768px) {
+          .checkin-terminal-wrapper {
+            padding: 0.5rem 0.25rem;
+            gap: 0.75rem;
+          }
+          .checkin-terminal-grid {
+            grid-template-columns: 1fr !important;
+            gap: 0.75rem !important;
+          }
+          .checkin-input-group {
+            flex-direction: column !important;
+          }
+          .checkin-input-group button {
+            width: 100% !important;
+          }
+          .checkin-header-card {
+            padding: 1rem !important;
+          }
+          .checkin-main-card {
+            padding: 1rem !important;
+          }
         }
       `}</style>
+
       {/* ── BARRA SUPERIOR ── */}
       <header
-
+        className="checkin-header-card"
         style={{
           background: '#ffffff',
           borderRadius: '16px',
@@ -295,11 +352,13 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '1rem',
+          boxSizing: 'border-box',
+          width: '100%',
         }}
       >
-        <div>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0, wordBreak: 'break-word' }}>
               {event.title}
             </h1>
             <span
@@ -310,6 +369,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                 borderRadius: '999px',
                 fontSize: '0.75rem',
                 fontWeight: 700,
+                whiteSpace: 'nowrap',
               }}
             >
               📍 {access.name}
@@ -322,26 +382,27 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                 borderRadius: '999px',
                 fontSize: '0.75rem',
                 fontWeight: 700,
+                whiteSpace: 'nowrap',
               }}
             >
               {event.checkinEnabled !== false ? '🟢 Portaria Aberta' : '🔴 Portaria Fechada'}
             </span>
           </div>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.85rem' }}>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.82rem', wordBreak: 'break-word' }}>
             Credencial: <code style={{ fontWeight: 700, color: '#4f46e5' }}>{access.code}</code> • {event.location}
           </p>
         </div>
 
         {/* Contador e Botão Sair */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+            <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
               Presença
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', justifyContent: 'flex-end' }}>
-              <strong style={{ fontSize: '1.25rem', color: '#15803d' }}>{checkedInCount}</strong>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>/ {totalTickets}</span>
-              <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 700, marginLeft: '4px' }}>
+              <strong style={{ fontSize: '1.2rem', color: '#15803d' }}>{checkedInCount}</strong>
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/ {totalTickets}</span>
+              <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700, marginLeft: '2px' }}>
                 ({attendanceRate}%)
               </span>
             </div>
@@ -353,7 +414,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               onLogout()
             }}
             style={{
-              padding: '0.5rem 0.85rem',
+              padding: '0.45rem 0.8rem',
               borderRadius: '8px',
               border: '1px solid #cbd5e1',
               background: '#f8fafc',
@@ -381,14 +442,16 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
             alignItems: 'center',
             gap: '0.75rem',
             boxShadow: '0 4px 6px -1px rgba(185, 28, 28, 0.1)',
+            boxSizing: 'border-box',
+            width: '100%',
           }}
         >
-          <span style={{ fontSize: '1.5rem' }}>🚫</span>
+          <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🚫</span>
           <div>
             <strong style={{ display: 'block', fontSize: '0.95rem' }}>
               Portaria Fechada pelo Administrador
             </strong>
-            <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#b91c1c' }}>
+            <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#b91c1c', lineHeight: 1.4 }}>
               O check-in para este evento está pausado. Nenhuma validação de ingresso será autorizada até que a administração reabra a portaria.
             </p>
           </div>
@@ -396,29 +459,32 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
       )}
 
       {/* ── CARD PRINCIPAL: SCANNER & FEEDBACK ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+      <div className="checkin-terminal-grid">
         {/* Lado Esquerdo: Câmera e Entrada */}
         <div
+          className="checkin-main-card"
           style={{
             background: '#ffffff',
             borderRadius: '16px',
-            padding: '1.5rem',
+            padding: '1.25rem',
             border: '1px solid #e2e8f0',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
             display: 'grid',
-            gap: '1.25rem',
+            gap: '1rem',
+            boxSizing: 'border-box',
+            width: '100%',
+            minWidth: 0,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
               Validação de Entrada
             </h2>
-            <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+            <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
               Leitor USB / Teclado Pronto
             </span>
           </div>
-
 
           {/* Área da Câmera */}
           <div
@@ -427,11 +493,14 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               borderRadius: '12px',
               overflow: 'hidden',
               background: '#0f172a',
-              minHeight: '260px',
+              minHeight: '220px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
             }}
           >
             {/* O container onde o Html5Qrcode renderiza o stream da câmera */}
@@ -439,11 +508,14 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               id="qr-reader-container"
               style={{
                 width: '100%',
+                maxWidth: '100%',
                 display: cameraActive ? 'block' : 'none',
+                boxSizing: 'border-box',
               }}
             />
 
             {/* Overlay de Câmera Pausada durante o feedback de 5s */}
+
             {cameraActive && result && (
               <div
                 style={{
@@ -539,15 +611,17 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
               ⌨️ Ou Digite o Código (Código MP360-... ou UUID do QR Code):
             </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="checkin-input-group">
               <input
                 type="text"
                 disabled={event.checkinEnabled === false}
-                placeholder="Ex: MP360-8A2F9C1E ou UUID do ingresso"
+                placeholder="Ex: MP360-8A2F9C1E ou UUID"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 style={{
                   flex: 1,
+                  minWidth: 0,
+                  width: '100%',
                   padding: '0.65rem 0.85rem',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
@@ -556,6 +630,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                   fontFamily: 'monospace',
                   background: event.checkinEnabled === false ? '#f1f5f9' : '#fff',
                   cursor: event.checkinEnabled === false ? 'not-allowed' : 'text',
+                  boxSizing: 'border-box',
                 }}
               />
               <button
@@ -571,6 +646,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                   fontSize: '0.875rem',
                   cursor: isValidating || !manualCode.trim() || event.checkinEnabled === false ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap',
+                  boxSizing: 'border-box',
                 }}
               >
                 {isValidating ? 'Validando...' : 'Validar Entrada'}
