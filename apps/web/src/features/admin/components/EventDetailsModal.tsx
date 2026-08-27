@@ -1,7 +1,5 @@
-'use client'
-
 import { useCallback, useEffect, useState } from 'react'
-import type { AdminEventItem, CheckinAccess, CheckinRecord } from '@mypass360/types'
+import type { AdminEventItem, CheckinAccess, CheckinRecord, Event } from '@mypass360/types'
 import {
   createEventCheckinAccess,
   deleteEventCheckin,
@@ -15,11 +13,10 @@ import {
   type AdminEventDetails,
 } from '../admin.service'
 
-
 import { eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
 
 interface EventDetailsModalProps {
-  event: AdminEventItem
+  event: AdminEventItem | Event
   onClose: () => void
   onUpdated?: () => void
 }
@@ -306,7 +303,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   })
 
   const checkedInCount = checkins.length
-  const totalTickets = details?.totalTickets ?? event.paidOrders
+  const totalTickets = details?.totalTickets ?? ('paidOrders' in event ? event.paidOrders : 0)
   const attendanceRate = totalTickets > 0 ? Math.round((checkedInCount / totalTickets) * 100) : 0
   const isAnonymousEvent = details?.ticket_layout !== 'formal_pdf' && details?.participant_id_type === 'none'
 
@@ -623,7 +620,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                         Receita Aprovada
                       </p>
                       <strong style={{ display: 'block', fontSize: '1.5rem', color: '#1e40af', marginTop: '4px' }}>
-                        {formatCurrency(event.revenue)}
+                        {formatCurrency('revenue' in event ? event.revenue : (details?.price ? details.price * (details.totalTickets ?? 0) : 0))}
                       </strong>
                     </div>
                   </div>

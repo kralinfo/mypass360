@@ -1,12 +1,16 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { EventsRepository } from './events.repository'
+import { AdminRepository } from '@/modules/admin/admin.repository'
 import type { CreateEventDto } from './dto/create-event.dto'
 import type { UpdateEventDto } from './dto/update-event.dto'
 import type { ScheduleEventDto } from './dto/schedule-event.dto'
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly eventsRepository: EventsRepository) {}
+  constructor(
+    private readonly eventsRepository: EventsRepository,
+    private readonly adminRepository: AdminRepository
+  ) {}
 
   /** Lista eventos públicos (publicados + published_at já atingido). */
   findAll() {
@@ -74,6 +78,65 @@ export class EventsService {
   async schedulePublication(id: string, userId: string, dto: ScheduleEventDto) {
     await this.assertOwnership(id, userId)
     return this.eventsRepository.schedule(id, userId, dto.published_at)
+  }
+
+  /** Detalhes e métricas consolidadas do evento (valida propriedade). */
+  async getEventDetails(id: string, userId: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.getEventDetails(id)
+  }
+
+  /** Credenciais de portaria do evento (valida propriedade). */
+  async getCheckinAccesses(id: string, userId: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.getCheckinAccesses(id)
+  }
+
+  /** Cria credencial de portaria para o evento (valida propriedade). */
+  async createCheckinAccess(id: string, userId: string, name: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.createCheckinAccess(id, name)
+  }
+
+  /** Atualiza credencial de portaria do evento (valida propriedade). */
+  async updateCheckinAccess(
+    id: string,
+    userId: string,
+    accessId: string,
+    dto: { name?: string; isActive?: boolean }
+  ) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.updateCheckinAccess(accessId, dto)
+  }
+
+  /** Exclui credencial de portaria do evento (valida propriedade). */
+  async deleteCheckinAccess(id: string, userId: string, accessId: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.deleteCheckinAccess(accessId)
+  }
+
+  /** Lista registros de check-in do evento (valida propriedade). */
+  async getEventCheckins(id: string, userId: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.getEventCheckins(id)
+  }
+
+  /** Ativa ou desativa portaria do evento (valida propriedade). */
+  async updateEventCheckinStatus(id: string, userId: string, enabled: boolean) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.updateEventCheckinStatus(id, enabled)
+  }
+
+  /** Exclui check-in individual (valida propriedade e restaura ingresso). */
+  async deleteEventCheckin(id: string, userId: string, checkinId: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.deleteEventCheckin(id, checkinId)
+  }
+
+  /** Reseta todos os check-ins do evento para testes (valida propriedade). */
+  async resetEventCheckins(id: string, userId: string) {
+    await this.assertOwnership(id, userId)
+    return this.adminRepository.resetEventCheckins(id)
   }
 
   /**

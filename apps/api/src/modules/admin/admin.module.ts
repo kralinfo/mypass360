@@ -8,5 +8,6 @@ import { MailModule } from '@/common/mail/mail.module'
   imports: [MailModule],
   controllers: [AdminController],
   providers: [AdminService, AdminRepository],
+  exports: [AdminRepository],
 })
 export class AdminModule {}

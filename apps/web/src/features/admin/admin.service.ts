@@ -1,4 +1,5 @@
-import { api } from '@/lib/api'
+import { api, apiWithAuth } from '@/lib/api'
+import { createClient } from '@/lib/supabase/client'
 import type {
   AdminDashboardData,
   AdminEventItem,
@@ -53,16 +54,27 @@ export async function fetchEventAttendees(eventId: string): Promise<AdminAttende
   return api.get<AdminAttendee[]>(`/admin/events/${eventId}/attendees`)
 }
 
+async function getAuthApi() {
+  const supabase = createClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  return apiWithAuth(session?.access_token ?? '')
+}
+
 export async function fetchEventDetails(eventId: string): Promise<AdminEventDetails> {
-  return api.get<AdminEventDetails>(`/admin/events/${eventId}/details`)
+  const authApi = await getAuthApi()
+  return authApi.get<AdminEventDetails>(`/events/${eventId}/details`)
 }
 
 export async function fetchEventCheckinAccesses(eventId: string): Promise<CheckinAccess[]> {
-  return api.get<CheckinAccess[]>(`/admin/events/${eventId}/checkin-accesses`)
+  const authApi = await getAuthApi()
+  return authApi.get<CheckinAccess[]>(`/events/${eventId}/checkin-accesses`)
 }
 
 export async function createEventCheckinAccess(eventId: string, name: string): Promise<CheckinAccess> {
-  return api.post<CheckinAccess>(`/admin/events/${eventId}/checkin-accesses`, { name })
+  const authApi = await getAuthApi()
+  return authApi.post<CheckinAccess>(`/events/${eventId}/checkin-accesses`, { name })
 }
 
 export async function updateEventCheckinAccess(
@@ -70,22 +82,26 @@ export async function updateEventCheckinAccess(
   accessId: string,
   data: { name?: string; isActive?: boolean }
 ): Promise<CheckinAccess> {
-  return api.patch<CheckinAccess>(`/admin/events/${eventId}/checkin-accesses/${accessId}`, data)
+  const authApi = await getAuthApi()
+  return authApi.patch<CheckinAccess>(`/events/${eventId}/checkin-accesses/${accessId}`, data)
 }
 
 export async function deleteEventCheckinAccess(eventId: string, accessId: string): Promise<{ success: boolean }> {
-  return api.delete<{ success: boolean }>(`/admin/events/${eventId}/checkin-accesses/${accessId}`)
+  const authApi = await getAuthApi()
+  return authApi.delete<{ success: boolean }>(`/events/${eventId}/checkin-accesses/${accessId}`)
 }
 
 export async function fetchEventCheckins(eventId: string): Promise<CheckinRecord[]> {
-  return api.get<CheckinRecord[]>(`/admin/events/${eventId}/checkins`)
+  const authApi = await getAuthApi()
+  return authApi.get<CheckinRecord[]>(`/events/${eventId}/checkins`)
 }
 
 export async function updateEventCheckinStatus(
   eventId: string,
   enabled: boolean
 ): Promise<{ success: boolean; checkin_enabled: boolean }> {
-  return api.patch<{ success: boolean; checkin_enabled: boolean }>(`/admin/events/${eventId}/checkin-status`, {
+  const authApi = await getAuthApi()
+  return authApi.patch<{ success: boolean; checkin_enabled: boolean }>(`/events/${eventId}/checkin-status`, {
     enabled,
   })
 }
@@ -94,17 +110,16 @@ export async function deleteEventCheckin(
   eventId: string,
   checkinId: string
 ): Promise<{ success: boolean; message: string }> {
-  return api.delete<{ success: boolean; message: string }>(`/admin/events/${eventId}/checkins/${checkinId}`)
+  const authApi = await getAuthApi()
+  return authApi.delete<{ success: boolean; message: string }>(`/events/${eventId}/checkins/${checkinId}`)
 }
-
 
 /**
  * Limpa todos os check-ins do evento para testes.
- * // TODO: Avaliar remoção ou restrição desta ação em produção.
- * // Funcionalidade utilizada atualmente para resetar check-ins durante testes.
  */
 export async function resetEventCheckins(eventId: string): Promise<{ success: boolean; message: string; restoredCount: number }> {
-  return api.delete<{ success: boolean; message: string; restoredCount: number }>(`/admin/events/${eventId}/checkins`)
+  const authApi = await getAuthApi()
+  return authApi.delete<{ success: boolean; message: string; restoredCount: number }>(`/events/${eventId}/checkins`)
 }
 
 
