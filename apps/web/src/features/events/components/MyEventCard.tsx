@@ -81,6 +81,15 @@ const TrashIcon = () => (
   </svg>
 )
 
+const RocketIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+    <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+    <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+  </svg>
+)
+
 const ChevronDownIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9" />
@@ -265,12 +274,22 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           background: #f1f5f9;
           color: #0f172a;
         }
+        .my-event-dropdown-item:disabled {
+          opacity: 0.5;
+          cursor: not-allowed !important;
+          background: transparent !important;
+          color: #94a3b8 !important;
+        }
         .my-event-dropdown-item.danger {
           color: #dc2626;
         }
         .my-event-dropdown-item.danger:hover {
           background: #fef2f2;
           color: #b91c1c;
+        }
+        .my-event-dropdown-item.danger:disabled {
+          color: #94a3b8 !important;
+          background: transparent !important;
         }
       `}</style>
 
@@ -468,45 +487,22 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     zIndex: 100,
                   }}
                 >
-                  {/* Publicar / Ocultar */}
-                  {displayStatus === 'hidden' ? (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      onClick={() => void handlePublish()}
-                      disabled={loading === 'publish'}
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                      <span>{loading === 'publish' ? 'Publicando...' : 'Publicar'}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      onClick={() => void handleUnpublish()}
-                      disabled={loading === 'unpublish'}
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-                      <span>{loading === 'unpublish' ? 'Ocultando...' : 'Ocultar'}</span>
-                    </button>
-                  )}
+                  {/* 1. Solicitar Publicação (Nova opção) */}
+                  <button
+                    type="button"
+                    className="my-event-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      // TODO: Implementar fluxo de solicitação de publicação
+                    }}
+                    style={{ color: '#4f46e5', fontWeight: 700 }}
+                    title="Solicitar publicação do evento para a plataforma"
+                  >
+                    <span style={{ display: 'flex', color: '#4f46e5' }}><RocketIcon /></span>
+                    <span>Solicitar publicação</span>
+                  </button>
 
-                  {/* Agendar Publicação */}
-                  {displayStatus === 'hidden' && (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowScheduleModal(true)
-                      }}
-                    >
-                      <span style={{ display: 'flex', color: '#f59e0b' }}><CalendarIcon /></span>
-                      <span>Agendar publicação</span>
-                    </button>
-                  )}
-
-                  {/* Gerenciar (Abre EventDetailsModal) */}
+                  {/* 2. Gerenciar (Abre EventDetailsModal) */}
                   <button
                     type="button"
                     className="my-event-dropdown-item"
@@ -515,23 +511,57 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                       setShowManageModal(true)
                     }}
                   >
-                    <span style={{ display: 'flex', color: '#4f46e5' }}><GearIcon /></span>
+                    <span style={{ display: 'flex', color: '#6366f1' }}><GearIcon /></span>
                     <span>Gerenciar</span>
                   </button>
+
+                  {/* 3. Publicar / Ocultar (Temporariamente inclicável) */}
+                  {displayStatus === 'hidden' ? (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      disabled={true}
+                      title="Opção temporariamente desabilitada"
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
+                      <span>Publicar</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      disabled={true}
+                      title="Opção temporariamente desabilitada"
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
+                      <span>Ocultar</span>
+                    </button>
+                  )}
+
+                  {/* 4. Agendar Publicação (Temporariamente inclicável) */}
+                  {displayStatus === 'hidden' && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      disabled={true}
+                      title="Opção temporariamente desabilitada"
+                    >
+                      <span style={{ display: 'flex', color: '#94a3b8' }}><CalendarIcon /></span>
+                      <span>Agendar publicação</span>
+                    </button>
+                  )}
 
                   {/* Divisória */}
                   <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
 
-                  {/* Excluir (Destrutivo) */}
+                  {/* 5. Excluir (Temporariamente inclicável) */}
                   <button
                     type="button"
                     className="my-event-dropdown-item danger"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowDeleteModal(true)
-                    }}
+                    disabled={true}
+                    title="Opção temporariamente desabilitada"
                   >
-                    <span style={{ display: 'flex', color: '#dc2626' }}><TrashIcon /></span>
+                    <span style={{ display: 'flex', color: '#94a3b8' }}><TrashIcon /></span>
                     <span>Excluir</span>
                   </button>
                 </div>
