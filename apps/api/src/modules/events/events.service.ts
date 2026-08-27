@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { EventsRepository } from './events.repository'
 import { AdminRepository } from '@/modules/admin/admin.repository'
+import type { AuthenticatedUser } from '@/common/guards/auth.guard'
 import type { CreateEventDto } from './dto/create-event.dto'
 import type { UpdateEventDto } from './dto/update-event.dto'
 import type { ScheduleEventDto } from './dto/schedule-event.dto'
@@ -140,15 +141,22 @@ export class EventsService {
   }
 
   /**
-   * Valida que o evento existe e pertence ao userId.
-   * Lança ForbiddenException (403) se não for o proprietário.
-   * Lança NotFoundException (404) se o evento não existir.
+   * Valida que o evento existe e pertence ao usuário (ou concede acesso irrestrito se for Admin).
+   * Lança ForbiddenException (403) se não for o proprietário nem administrador.
    */
-  private async assertOwnership(id: string, userId: string): Promise<void> {
+  private async assertOwnership(id: string, user: AuthenticatedUser | string): Promise<void> {
+    const userId = typeof user === 'string' ? user : user.id
+    const userRole = typeof user !== 'string' ? (user.user_metadata?.role as string) : undefined
+    const userEmail = typeof user !== 'string' ? user.email : ''
+
+    // Administradores têm acesso a todos os eventos do sistema
+    if (userRole === 'admin' || userRole === 'superadmin' || userEmail === 'admin@mypass360.com') {
+      return
+    }
+
     const event = await this.eventsRepository.findByIdAndOwner(id, userId)
 
     if (!event) {
-      // Verificar se o evento existe (para distinguir 403 de 404)
       throw new ForbiddenException(
         'Você não tem permissão para gerenciar este evento'
       )

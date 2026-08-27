@@ -21,7 +21,7 @@ interface EventDetailsModalProps {
   onUpdated?: () => void
 }
 
-type TabType = 'overview' | 'accesses' | 'checkins'
+type TabType = 'overview' | 'financial' | 'accesses' | 'checkins'
 
 function formatCpf(cpf: string | null): string {
   if (!cpf) return '—'
@@ -522,6 +522,24 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
             Visão Geral
           </button>
           <button
+            onClick={() => setActiveTab('financial')}
+            style={{
+              padding: '0.75rem 1rem',
+              border: 'none',
+              background: 'transparent',
+              fontSize: '0.85rem',
+              fontWeight: activeTab === 'financial' ? 700 : 500,
+              color: activeTab === 'financial' ? '#4f46e5' : '#64748b',
+              borderBottom: activeTab === 'financial' ? '2px solid #4f46e5' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            Vendas & Financeiro
+          </button>
+          <button
             onClick={() => setActiveTab('accesses')}
             style={{
               padding: '0.75rem 1rem',
@@ -620,7 +638,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                         Receita Aprovada
                       </p>
                       <strong style={{ display: 'block', fontSize: '1.5rem', color: '#1e40af', marginTop: '4px' }}>
-                        {formatCurrency('revenue' in event ? event.revenue : (details?.price ? details.price * (details.totalTickets ?? 0) : 0))}
+                        {formatCurrency(details?.financialSummary?.totalRevenue ?? ('revenue' in event ? event.revenue : (details?.price ? details.price * (details.totalTickets ?? 0) : 0)))}
                       </strong>
                     </div>
                   </div>
@@ -685,6 +703,186 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB NOVA: VENDAS & FINANCEIRO ── */}
+              {activeTab === 'financial' && (
+                <div style={{ display: 'grid', gap: '1.25rem' }}>
+                  {/* Grid de Métricas Financeiras Consolidadas */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                    {/* Receita Aprovada */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase' }}>
+                        Receita Aprovada
+                      </p>
+                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#1e40af', marginTop: '4px' }}>
+                        {formatCurrency(details?.financialSummary?.totalRevenue ?? ('revenue' in event ? event.revenue : (details?.price ? details.price * (details.totalTickets ?? 0) : 0)))}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 600 }}>
+                        {details?.financialSummary?.paidOrdersCount ?? 0} pedidos pagos
+                      </span>
+                    </div>
+
+                    {/* Ingressos Vendidos */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        Ingressos Emitidos
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginTop: '4px' }}>
+                        <strong style={{ fontSize: '1.45rem', color: '#0f172a' }}>
+                          {totalTickets}
+                        </strong>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          de {details?.capacity || event.capacity || '∞'}
+                        </span>
+                      </div>
+                      {/* Barra de Ocupação */}
+                      <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${details?.financialSummary?.occupancyRate ?? attendanceRate}%`,
+                          height: '100%',
+                          background: '#4f46e5',
+                          borderRadius: '3px',
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#4f46e5', fontWeight: 600, display: 'block', marginTop: '4px' }}>
+                        {details?.financialSummary?.occupancyRate ?? 0}% da capacidade
+                      </span>
+                    </div>
+
+                    {/* Ticket Médio */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#faf5ff', border: '1px solid #e9d5ff' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#7e22ce', textTransform: 'uppercase' }}>
+                        Ticket Médio
+                      </p>
+                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#6b21a8', marginTop: '4px' }}>
+                        {formatCurrency(details?.financialSummary?.averageTicketPrice ?? (details?.price || 0))}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: '#9333ea', fontWeight: 600 }}>
+                        Média por ingresso
+                      </span>
+                    </div>
+
+                    {/* Presença / Portaria */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>
+                        Presença na Portaria
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginTop: '4px' }}>
+                        <strong style={{ fontSize: '1.45rem', color: '#15803d' }}>
+                          {checkedInCount}
+                        </strong>
+                        <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>
+                          ({attendanceRate}%)
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 600 }}>
+                        {totalTickets - checkedInCount} pendentes
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Detalhamento por Lotes / Tipos de Ingresso */}
+                  <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
+                          Vendas por Lote / Tipo de Ingresso
+                        </h3>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                          Acompanhamento detalhado de quantidade emitida e receita gerada por cada categoria
+                        </p>
+                      </div>
+                    </div>
+
+                    {details?.ticketTypes && details.ticketTypes.length > 0 ? (
+                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        {details.ticketTypes.map((tt) => (
+                          <div
+                            key={tt.id}
+                            style={{
+                              padding: '1rem',
+                              borderRadius: '10px',
+                              border: '1px solid #e2e8f0',
+                              background: '#f8fafc',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <div>
+                                <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>
+                                  {tt.name}
+                                </strong>
+                                {tt.description && (
+                                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                                    {tt.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>
+                                  Preço Unitário: <strong>{formatCurrency(tt.price)}</strong>
+                                </span>
+                                <strong style={{ fontSize: '1rem', color: '#1e40af' }}>
+                                  Receita: {formatCurrency(tt.revenue)}
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* Barra de Progresso de Vendas */}
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', marginBottom: '4px' }}>
+                                <span>
+                                  Vendidos: <strong>{tt.sold}</strong> {tt.quantity > 0 ? `de ${tt.quantity}` : '(Lote Aberto)'}
+                                </span>
+                                {tt.quantity > 0 && (
+                                  <span style={{ fontWeight: 700, color: tt.percentageSold >= 90 ? '#dc2626' : '#4f46e5' }}>
+                                    {tt.percentageSold}% vendido {tt.percentageSold >= 100 ? '🔥 ESGOTADO' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {tt.quantity > 0 && (
+                                <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div
+                                    style={{
+                                      width: `${tt.percentageSold}%`,
+                                      height: '100%',
+                                      background: tt.percentageSold >= 90 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : 'linear-gradient(90deg, #6366f1, #4f46e5)',
+                                      borderRadius: '4px',
+                                      transition: 'width 0.3s ease',
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: '1.25rem',
+                          borderRadius: '10px',
+                          border: '1px dashed #cbd5e1',
+                          background: '#f8fafc',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <p style={{ margin: 0, color: '#475569', fontSize: '0.88rem' }}>
+                          Ingresso Geral • Valor: <strong>{formatCurrency(Number(details?.price || event.price || 0))}</strong>
+                        </p>
+                        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
+                          Total emitido: <strong>{totalTickets}</strong> ingressos • Receita acumulada:{' '}
+                          <strong style={{ color: '#166534' }}>
+                            {formatCurrency(Number(details?.price || event.price || 0) * totalTickets)}
+                          </strong>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

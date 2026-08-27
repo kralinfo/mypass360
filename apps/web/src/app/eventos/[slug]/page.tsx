@@ -237,8 +237,8 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     <>
       <style>{`
         .detail-banner {
-          height: 180px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          height: 260px;
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
           border-radius: 14px;
           display: flex;
           align-items: center;
@@ -381,8 +381,16 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
           </div>
         ) : null}
 
-        <div className="detail-banner">
-          🎵
+        <div className="detail-banner" style={{ overflow: 'hidden', padding: 0 }}>
+          {event.image_url ? (
+            <img
+              src={event.image_url}
+              alt={event.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          ) : (
+            '🎵'
+          )}
         </div>
 
         <h1 className="detail-title">{event.title}</h1>

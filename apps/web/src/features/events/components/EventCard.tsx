@@ -31,16 +31,25 @@ export function EventCard({ event }: EventCardProps) {
     >
       <div
         style={{
-          height: '120px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          height: '140px',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: '#fff',
           fontSize: '2rem',
+          overflow: 'hidden',
         }}
       >
-        🎵
+        {event.image_url ? (
+          <img
+            src={event.image_url}
+            alt={event.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          '🎵'
+        )}
       </div>
 
       <div style={{ padding: '1.25rem' }}>

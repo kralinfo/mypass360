@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BackButton } from '@/components/BackButton'
 import { createEvent, updateEvent, fetchEventById } from '@/features/events/services/my-events.service'
+import { EventCoverUploader } from '@/features/events/components/EventCoverUploader'
 
 function CadastrarEventoForm() {
   const router = useRouter()
@@ -20,6 +21,7 @@ function CadastrarEventoForm() {
     title: '',
     slug: '',
     description: '',
+    imageUrl: '',
     date: '',
     time: '',
     location: '',
@@ -79,6 +81,7 @@ function CadastrarEventoForm() {
           title: event.title,
           slug: event.slug,
           description: event.description ?? '',
+          imageUrl: event.image_url ?? '',
           date: dateStr,
           time: timeStr,
           location: event.location,
@@ -203,6 +206,7 @@ function CadastrarEventoForm() {
         title: formData.title,
         slug: formData.slug,
         description: formData.description,
+        image_url: formData.imageUrl || null,
         date: dateTime,
         location: formData.location,
         capacity: parseInt(formData.capacity, 10),
@@ -267,6 +271,13 @@ function CadastrarEventoForm() {
         )}
 
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Uploader de Foto de Capa do Evento com Ajuste Interativo */}
+          <EventCoverUploader
+            value={formData.imageUrl}
+            onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url ?? '' }))}
+            eventId={editId ?? undefined}
+          />
+
           <div>
             <label htmlFor="title" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Título do Evento *

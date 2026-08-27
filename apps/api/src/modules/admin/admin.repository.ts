@@ -338,7 +338,7 @@ export class AdminRepository {
   }
 
   /**
-   * Retorna os detalhes consolidados do evento para o modal administrativo.
+   * Retorna os detalhes consolidados do evento para o modal administrativo e de gestão.
    */
   async getEventDetails(eventId: string) {
     const client = this.supabase.getClient()
@@ -364,11 +364,73 @@ export class AdminRepository {
       .eq('event_id', eventId)
       .in('status', ['CHECKED_IN', 'used'])
 
+    // Buscar tipos de ingresso com quantidades e vendas
+    const { data: ticketTypes } = await client
+      .from('ticket_types')
+      .select('id, name, price, quantity, sold, description')
+      .eq('event_id', eventId)
+      .order('price', { ascending: false })
+
+    // Buscar pedidos para métricas financeiras
+    const { data: orders } = await client
+      .from('orders')
+      .select('id, status, total, created_at')
+      .eq('event_id', eventId)
+
+    const paidOrders = (orders ?? []).filter((o: any) => o.status === 'paid')
+    const pendingOrders = (orders ?? []).filter((o: any) => o.status === 'pending')
+    const cancelledOrders = (orders ?? []).filter((o: any) => o.status === 'cancelled' || o.status === 'refunded')
+
+    let totalRevenue = paidOrders.reduce((sum: number, o: any) => sum + (Number(o.total) || 0), 0)
+
+    // Fallback: se pedidos não possuem total consolidado mas há tickets vendidos por lote
+    if (totalRevenue === 0 && (ticketTypes ?? []).length > 0) {
+      totalRevenue = (ticketTypes ?? []).reduce(
+        (sum: number, tt: any) => sum + ((Number(tt.sold) || 0) * (Number(tt.price) || 0)),
+        0
+      )
+    }
+
+    // Se ainda for 0, usa event.price * totalTickets
+    if (totalRevenue === 0 && Number(event.price) > 0) {
+      totalRevenue = Number(event.price) * (totalTickets ?? 0)
+    }
+
+    const totalTicketsSold = totalTickets ?? 0
+    const averageTicketPrice = totalTicketsSold > 0 ? totalRevenue / totalTicketsSold : (Number(event.price) || 0)
+    const occupancyRate = event.capacity > 0 ? Math.min(100, Math.round((totalTicketsSold / event.capacity) * 100)) : 0
+
+    const formattedTicketTypes = (ticketTypes ?? []).map((tt: any) => {
+      const sold = Number(tt.sold) || 0
+      const price = Number(tt.price) || 0
+      const quantity = Number(tt.quantity) || 0
+      return {
+        id: tt.id,
+        name: tt.name,
+        price,
+        quantity,
+        sold,
+        description: tt.description ?? '',
+        revenue: sold * price,
+        percentageSold: quantity > 0 ? Math.min(100, Math.round((sold / quantity) * 100)) : 0,
+      }
+    })
+
     return {
       ...event,
       checkin_enabled: event.checkin_enabled !== false,
-      totalTickets: totalTickets ?? 0,
+      totalTickets: totalTicketsSold,
       checkedInTickets: checkedInTickets ?? 0,
+      ticketTypes: formattedTicketTypes,
+      financialSummary: {
+        totalRevenue,
+        paidOrdersCount: paidOrders.length,
+        pendingOrdersCount: pendingOrders.length,
+        cancelledOrdersCount: cancelledOrders.length,
+        totalTicketsSold,
+        averageTicketPrice,
+        occupancyRate,
+      },
     }
   }
 

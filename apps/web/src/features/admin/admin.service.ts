@@ -21,9 +21,32 @@ export interface AdminAttendee {
   issuedAt: string | null
 }
 
+export interface EventTicketTypeSummary {
+  id: string
+  name: string
+  price: number
+  quantity: number
+  sold: number
+  description?: string
+  revenue: number
+  percentageSold: number
+}
+
+export interface EventFinancialSummary {
+  totalRevenue: number
+  paidOrdersCount: number
+  pendingOrdersCount: number
+  cancelledOrdersCount: number
+  totalTicketsSold: number
+  averageTicketPrice: number
+  occupancyRate: number
+}
+
 export interface AdminEventDetails extends Event {
   totalTickets: number
   checkedInTickets: number
+  ticketTypes?: EventTicketTypeSummary[]
+  financialSummary?: EventFinancialSummary
 }
 
 export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
@@ -54,6 +77,13 @@ export async function fetchEventAttendees(eventId: string): Promise<AdminAttende
   return api.get<AdminAttendee[]>(`/admin/events/${eventId}/attendees`)
 }
 
+function isAdminContext(): boolean {
+  if (typeof window !== 'undefined') {
+    return window.location.pathname.startsWith('/admin')
+  }
+  return false
+}
+
 async function getAuthApi() {
   const supabase = createClient()
   const {
@@ -63,18 +93,39 @@ async function getAuthApi() {
 }
 
 export async function fetchEventDetails(eventId: string): Promise<AdminEventDetails> {
-  const authApi = await getAuthApi()
-  return authApi.get<AdminEventDetails>(`/events/${eventId}/details`)
+  if (isAdminContext()) {
+    return api.get<AdminEventDetails>(`/admin/events/${eventId}/details`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.get<AdminEventDetails>(`/events/${eventId}/details`)
+  } catch {
+    return api.get<AdminEventDetails>(`/admin/events/${eventId}/details`)
+  }
 }
 
 export async function fetchEventCheckinAccesses(eventId: string): Promise<CheckinAccess[]> {
-  const authApi = await getAuthApi()
-  return authApi.get<CheckinAccess[]>(`/events/${eventId}/checkin-accesses`)
+  if (isAdminContext()) {
+    return api.get<CheckinAccess[]>(`/admin/events/${eventId}/checkin-accesses`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.get<CheckinAccess[]>(`/events/${eventId}/checkin-accesses`)
+  } catch {
+    return api.get<CheckinAccess[]>(`/admin/events/${eventId}/checkin-accesses`)
+  }
 }
 
 export async function createEventCheckinAccess(eventId: string, name: string): Promise<CheckinAccess> {
-  const authApi = await getAuthApi()
-  return authApi.post<CheckinAccess>(`/events/${eventId}/checkin-accesses`, { name })
+  if (isAdminContext()) {
+    return api.post<CheckinAccess>(`/admin/events/${eventId}/checkin-accesses`, { name })
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.post<CheckinAccess>(`/events/${eventId}/checkin-accesses`, { name })
+  } catch {
+    return api.post<CheckinAccess>(`/admin/events/${eventId}/checkin-accesses`, { name })
+  }
 }
 
 export async function updateEventCheckinAccess(
@@ -82,44 +133,90 @@ export async function updateEventCheckinAccess(
   accessId: string,
   data: { name?: string; isActive?: boolean }
 ): Promise<CheckinAccess> {
-  const authApi = await getAuthApi()
-  return authApi.patch<CheckinAccess>(`/events/${eventId}/checkin-accesses/${accessId}`, data)
+  if (isAdminContext()) {
+    return api.patch<CheckinAccess>(`/admin/events/${eventId}/checkin-accesses/${accessId}`, data)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.patch<CheckinAccess>(`/events/${eventId}/checkin-accesses/${accessId}`, data)
+  } catch {
+    return api.patch<CheckinAccess>(`/admin/events/${eventId}/checkin-accesses/${accessId}`, data)
+  }
 }
 
 export async function deleteEventCheckinAccess(eventId: string, accessId: string): Promise<{ success: boolean }> {
-  const authApi = await getAuthApi()
-  return authApi.delete<{ success: boolean }>(`/events/${eventId}/checkin-accesses/${accessId}`)
+  if (isAdminContext()) {
+    return api.delete<{ success: boolean }>(`/admin/events/${eventId}/checkin-accesses/${accessId}`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.delete<{ success: boolean }>(`/events/${eventId}/checkin-accesses/${accessId}`)
+  } catch {
+    return api.delete<{ success: boolean }>(`/admin/events/${eventId}/checkin-accesses/${accessId}`)
+  }
 }
 
 export async function fetchEventCheckins(eventId: string): Promise<CheckinRecord[]> {
-  const authApi = await getAuthApi()
-  return authApi.get<CheckinRecord[]>(`/events/${eventId}/checkins`)
+  if (isAdminContext()) {
+    return api.get<CheckinRecord[]>(`/admin/events/${eventId}/checkins`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.get<CheckinRecord[]>(`/events/${eventId}/checkins`)
+  } catch {
+    return api.get<CheckinRecord[]>(`/admin/events/${eventId}/checkins`)
+  }
 }
 
 export async function updateEventCheckinStatus(
   eventId: string,
   enabled: boolean
 ): Promise<{ success: boolean; checkin_enabled: boolean }> {
-  const authApi = await getAuthApi()
-  return authApi.patch<{ success: boolean; checkin_enabled: boolean }>(`/events/${eventId}/checkin-status`, {
-    enabled,
-  })
+  if (isAdminContext()) {
+    return api.patch<{ success: boolean; checkin_enabled: boolean }>(`/admin/events/${eventId}/checkin-status`, {
+      enabled,
+    })
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.patch<{ success: boolean; checkin_enabled: boolean }>(`/events/${eventId}/checkin-status`, {
+      enabled,
+    })
+  } catch {
+    return api.patch<{ success: boolean; checkin_enabled: boolean }>(`/admin/events/${eventId}/checkin-status`, {
+      enabled,
+    })
+  }
 }
 
 export async function deleteEventCheckin(
   eventId: string,
   checkinId: string
 ): Promise<{ success: boolean; message: string }> {
-  const authApi = await getAuthApi()
-  return authApi.delete<{ success: boolean; message: string }>(`/events/${eventId}/checkins/${checkinId}`)
+  if (isAdminContext()) {
+    return api.delete<{ success: boolean; message: string }>(`/admin/events/${eventId}/checkins/${checkinId}`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.delete<{ success: boolean; message: string }>(`/events/${eventId}/checkins/${checkinId}`)
+  } catch {
+    return api.delete<{ success: boolean; message: string }>(`/admin/events/${eventId}/checkins/${checkinId}`)
+  }
 }
 
 /**
  * Limpa todos os check-ins do evento para testes.
  */
 export async function resetEventCheckins(eventId: string): Promise<{ success: boolean; message: string; restoredCount: number }> {
-  const authApi = await getAuthApi()
-  return authApi.delete<{ success: boolean; message: string; restoredCount: number }>(`/events/${eventId}/checkins`)
+  if (isAdminContext()) {
+    return api.delete<{ success: boolean; message: string; restoredCount: number }>(`/admin/events/${eventId}/checkins`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.delete<{ success: boolean; message: string; restoredCount: number }>(`/events/${eventId}/checkins`)
+  } catch {
+    return api.delete<{ success: boolean; message: string; restoredCount: number }>(`/admin/events/${eventId}/checkins`)
+  }
 }
 
 
