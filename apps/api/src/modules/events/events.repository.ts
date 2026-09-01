@@ -115,6 +115,7 @@ export class EventsRepository {
         ticket_layout: dto.ticket_layout ?? 'ticket',
         participant_id_type: dto.participant_id_type ?? 'name',
         image_url: dto.image_url ?? null,
+        genre: dto.genre ?? null,
       })
       .select()
       .single()

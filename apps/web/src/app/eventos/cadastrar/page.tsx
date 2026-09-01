@@ -22,6 +22,7 @@ function CadastrarEventoForm() {
     slug: '',
     description: '',
     imageUrl: '',
+    genre: '',
     date: '',
     time: '',
     location: '',
@@ -82,6 +83,7 @@ function CadastrarEventoForm() {
           slug: event.slug,
           description: event.description ?? '',
           imageUrl: event.image_url ?? '',
+          genre: event.genre ?? '',
           date: dateStr,
           time: timeStr,
           location: event.location,
@@ -101,7 +103,7 @@ function CadastrarEventoForm() {
     void loadEvent()
   }, [editId, router])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
 
     if (name === 'title') {
@@ -207,6 +209,7 @@ function CadastrarEventoForm() {
         slug: formData.slug,
         description: formData.description,
         image_url: formData.imageUrl || null,
+        genre: formData.genre || null,
         date: dateTime,
         location: formData.location,
         capacity: parseInt(formData.capacity, 10),
@@ -349,6 +352,39 @@ function CadastrarEventoForm() {
               }}
               placeholder="Descreva o evento..."
             />
+          </div>
+
+          <div>
+            <label htmlFor="genre" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
+              Gênero / Categoria *
+            </label>
+            <select
+              id="genre"
+              name="genre"
+              value={formData.genre}
+              onChange={handleChange}
+              required
+              style={{
+                width: '100%',
+                padding: '0.6rem 0.75rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '0.95rem',
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="">Selecione um gênero...</option>
+              <option value="Música">Música</option>
+              <option value="Festival">Festival</option>
+              <option value="Esportes">Esportes</option>
+              <option value="Teatro">Teatro</option>
+              <option value="Gastronomia">Gastronomia</option>
+              <option value="Cultura">Cultura</option>
+              <option value="Tech">Tech</option>
+            </select>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

@@ -23,6 +23,7 @@ export interface Event {
   /** Data/hora de publicação agendada. null = publicação imediata ou não agendado. */
   published_at?: string | null
   image_url?: string
+  genre?: string | null
   /** Modelo de ingresso do evento. Padrão: 'ticket' (retrocompatível) */
   ticket_layout?: TicketLayout
   /** Tipo de identificação do participante. Aplica-se quando ticket_layout = 'ticket'. Padrão: 'name' */

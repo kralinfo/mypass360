@@ -34,7 +34,12 @@ export default function EventsPage() {
       !search ||
       ev.title.toLowerCase().includes(search.toLowerCase()) ||
       ev.location.toLowerCase().includes(search.toLowerCase())
-    return matchesSearch
+    
+    const matchesCategory =
+      activeCategory === 'Todos' ||
+      ev.genre === activeCategory
+
+    return matchesSearch && matchesCategory
   })
 
   const heroEvents = publishedEvents.slice(0, 8)

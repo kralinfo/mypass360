@@ -80,4 +80,8 @@ export class CreateEventDto {
   @IsString()
   @IsOptional()
   image_url?: string | null
+
+  @IsString()
+  @IsOptional()
+  genre?: string | null
 }
