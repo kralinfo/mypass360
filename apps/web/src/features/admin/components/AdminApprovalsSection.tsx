@@ -7,6 +7,9 @@ import {
   fetchPendingApprovals,
   approveEventPublication,
   rejectEventPublication,
+  fetchEventMessages,
+  contactEventOrganizer,
+  type EventMessageItem,
 } from '../admin.service'
 import { formatDate, formatCurrency } from '../admin.utils'
 
@@ -72,10 +75,30 @@ interface ReviewModalProps {
 }
 
 function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) {
-  const [action, setAction] = useState<'approve' | 'reject' | null>(null)
+  const [action, setAction] = useState<'approve' | 'reject' | 'contact' | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [contactMessage, setContactMessage] = useState('')
+  const [messages, setMessages] = useState<EventMessageItem[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  const loadMessages = useCallback(async () => {
+    setIsLoadingMessages(true)
+    try {
+      const history = await fetchEventMessages(event.id)
+      setMessages(history)
+    } catch {
+      // Ignora falha de histórico se for 1º contato
+    } finally {
+      setIsLoadingMessages(false)
+    }
+  }, [event.id])
+
+  useEffect(() => {
+    void loadMessages()
+  }, [loadMessages])
 
   const formattedEventDate = new Date(event.date).toLocaleDateString('pt-BR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -108,12 +131,35 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
     }
   }
 
+  async function handleContact() {
+    if (!contactMessage.trim()) {
+      setError('Por favor, digite a mensagem a ser enviada ao organizador.')
+      return
+    }
+    setIsLoading(true)
+    setError(null)
+    try {
+      await contactEventOrganizer(event.id, contactMessage.trim())
+      setSuccessMsg('Mensagem enviada ao organizador com sucesso!')
+      setContactMessage('')
+      void loadMessages()
+      setTimeout(() => {
+        setAction(null)
+        setSuccessMsg(null)
+      }, 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao enviar mensagem.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <>
       <style>{`
         .review-overlay {
           position: fixed; inset: 0;
-          background: rgba(15, 23, 42, 0.6);
+          background: rgba(15, 23, 42, 0.65);
           backdrop-filter: blur(4px);
           z-index: 9998;
           display: flex; align-items: center; justify-content: center;
@@ -126,8 +172,10 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
           width: 100%;
           max-width: 640px;
           max-height: 90vh;
-          overflow-y: auto;
-          box-shadow: 0 25px 60px -12px rgba(0,0,0,0.3);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 25px 60px -12px rgba(0,0,0,0.35);
           animation: slideUp 0.2s ease;
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -136,13 +184,14 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
       <div className="review-overlay" onClick={(e) => e.target === e.currentTarget && !isLoading && onClose()}>
         <div className="review-modal">
 
-          {/* Header */}
+          {/* Header (Fixo no topo) */}
           <div style={{
             background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
             padding: '1.25rem 1.5rem',
             color: '#fff',
-            borderRadius: '20px 20px 0 0',
             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+            position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           }}>
             <div>
               <p style={{ margin: '0 0 0.2rem', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -176,19 +225,19 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
             </button>
           </div>
 
-          {/* Imagem do evento */}
-          {event.imageUrl && (
-            <div style={{ width: '100%', height: '200px', overflow: 'hidden' }}>
-              <img
-                src={event.imageUrl}
-                alt={event.title}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            </div>
-          )}
+          {/* Body (Rolável) */}
+          <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1 }}>
 
-          {/* Body */}
-          <div style={{ padding: '1.25rem 1.5rem' }}>
+            {/* Imagem do evento */}
+            {event.imageUrl && (
+              <div style={{ width: '100%', height: '200px', overflow: 'hidden', borderRadius: '12px', marginBottom: '1.25rem' }}>
+                <img
+                  src={event.imageUrl}
+                  alt={event.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </div>
+            )}
 
             {/* Informações do evento */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -274,6 +323,51 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
               </div>
             </div>
 
+            {/* Histórico de Mensagens / Diálogo com Organizador */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                💬 LINHA DO TEMPO DA CONVERSA ({messages.length})
+              </p>
+              {isLoadingMessages ? (
+                <div style={{ padding: '0.75rem', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
+                  Carregando histórico...
+                </div>
+              ) : messages.length === 0 ? (
+                <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#64748b', fontSize: '0.82rem' }}>
+                  Nenhuma mensagem trocada ainda com o organizador deste evento.
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                  maxHeight: '180px', overflowY: 'auto',
+                  background: '#f8fafc', border: '1px solid #e2e8f0',
+                  borderRadius: '10px', padding: '0.75rem',
+                }}>
+                  {messages.map((m) => {
+                    const isAdmin = m.sender === 'admin'
+                    return (
+                      <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: isAdmin ? '#4f46e5' : '#059669', marginBottom: '0.1rem' }}>
+                          {isAdmin ? '🛡️ Você (Administração)' : '👤 Organizador'}
+                        </div>
+                        <div style={{
+                          background: isAdmin ? '#eef2ff' : '#ffffff',
+                          border: isAdmin ? '1px solid #c7d2fe' : '1px solid #cbd5e1',
+                          borderRadius: '8px', padding: '0.5rem 0.7rem', maxWidth: '88%',
+                          fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.4,
+                        }}>
+                          {m.message}
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.1rem' }}>
+                          {new Date(m.createdAt).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Data da solicitação */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -286,15 +380,15 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
 
             {/* ── Ações ── */}
             {action === null && (
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setAction('reject')}
                   style={{
-                    flex: 1, padding: '0.75rem', borderRadius: '12px',
+                    flex: 1, minWidth: '120px', padding: '0.75rem', borderRadius: '12px',
                     border: '1.5px solid #fca5a5',
                     background: '#fff', color: '#dc2626',
-                    fontWeight: 700, fontSize: '0.9rem',
+                    fontWeight: 700, fontSize: '0.88rem',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                     transition: 'all 0.15s',
                   }}
@@ -306,13 +400,26 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
                 </button>
                 <button
                   type="button"
+                  onClick={() => setAction('contact')}
+                  style={{
+                    flex: 1, minWidth: '140px', padding: '0.75rem', borderRadius: '12px',
+                    border: '1.5px solid #c7d2fe',
+                    background: '#eef2ff', color: '#4f46e5',
+                    fontWeight: 700, fontSize: '0.88rem',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  }}
+                >
+                  💬 Enviar Mensagem
+                </button>
+                <button
+                  type="button"
                   onClick={() => setAction('approve')}
                   style={{
-                    flex: 1, padding: '0.75rem', borderRadius: '12px',
+                    flex: 1, minWidth: '120px', padding: '0.75rem', borderRadius: '12px',
                     border: 'none',
                     background: 'linear-gradient(135deg, #16a34a, #22c55e)',
                     color: '#fff',
-                    fontWeight: 700, fontSize: '0.9rem',
+                    fontWeight: 700, fontSize: '0.88rem',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                     boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
                   }}
@@ -349,6 +456,63 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
               </div>
             )}
 
+            {/* Enviar mensagem ao organizador */}
+            {action === 'contact' && (
+              <div style={{
+                background: '#eef2ff', border: '1px solid #c7d2fe',
+                borderRadius: '12px', padding: '1rem',
+              }}>
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.88rem', fontWeight: 700, color: '#3730a3' }}>
+                  💬 Enviar Mensagem ao Organizador
+                </p>
+                <p style={{ margin: '0 0 0.75rem', fontSize: '0.82rem', color: '#4338ca', lineHeight: 1.45 }}>
+                  O organizador receberá uma notificação direta com esta mensagem.
+                </p>
+
+                {successMsg && (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '0.6rem', marginBottom: '0.75rem', color: '#15803d', fontWeight: 700, fontSize: '0.82rem', textAlign: 'center' }}>
+                    {successMsg}
+                  </div>
+                )}
+
+                {error && <p style={{ margin: '0 0 0.75rem', fontSize: '0.82rem', color: '#dc2626' }}>{error}</p>}
+
+                <div style={{ marginBottom: '0.85rem' }}>
+                  <textarea
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    placeholder="Escreva sua mensagem ou dúvida ao organizador..."
+                    rows={3}
+                    style={{
+                      width: '100%', resize: 'vertical',
+                      padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      border: '1px solid #a5b4fc', background: '#fff',
+                      fontSize: '0.84rem', color: '#1e293b', outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setAction(null); setError(null); setSuccessMsg(null) }}
+                    disabled={isLoading}
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: '1px solid #c7d2fe', background: '#fff', color: '#4338ca', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContact}
+                    disabled={isLoading || !contactMessage.trim()}
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#4f46e5', color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: isLoading || !contactMessage.trim() ? 'not-allowed' : 'pointer' }}
+                  >
+                    {isLoading ? 'Enviando...' : 'Enviar Mensagem 💬'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Confirmação de rejeição */}
             {action === 'reject' && (
               <div style={{
@@ -363,7 +527,7 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
                 </p>
                 <div style={{ marginBottom: '0.85rem' }}>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#7f1d1d', marginBottom: '0.35rem' }}>
-                    Motivo da rejeição <span style={{ fontWeight: 400, color: '#9ca3af' }}>(opcional — reservado para uso futuro)</span>
+                    Motivo da rejeição <span style={{ fontWeight: 400, color: '#9ca3af' }}>(opcional)</span>
                   </label>
                   <textarea
                     value={rejectionReason}
