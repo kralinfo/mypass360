@@ -395,7 +395,29 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
         <h1 className="detail-title">{event.title}</h1>
 
-        <div className="detail-info-grid">
+        {/* Banner de Indisponibilidade por solicitação de exclusão */}
+        {event.deletion_status === 'pending' && (
+          <div
+            style={{
+              background: '#fef2f2',
+              border: '1.5px solid #fca5a5',
+              borderRadius: '12px',
+              padding: '0.85rem 1.1rem',
+              marginBottom: '1.25rem',
+              color: '#991b1b',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+            <span>Este evento está temporariamente indisponível.</span>
+          </div>
+        )}
+
+        <div className="detail-info-grid" style={{ opacity: event.deletion_status === 'pending' ? 0.6 : 1 }}>
           <div className="detail-info-item">
             <span>📅</span>
             <time dateTime={event.date}>{formattedDate}</time>
@@ -410,7 +432,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
           </div>
         </div>
 
-        <p style={{ color: '#475569', lineHeight: '1.6', fontSize: '0.92rem', marginBottom: '1.5rem', padding: '0 0.25rem' }}>
+        <p style={{ color: '#475569', lineHeight: '1.6', fontSize: '0.92rem', marginBottom: '1.5rem', padding: '0 0.25rem', opacity: event.deletion_status === 'pending' ? 0.6 : 1 }}>
           {event.description}
         </p>
 
@@ -422,6 +444,8 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
             padding: '1rem',
             display: 'grid',
             gap: '0.75rem',
+            opacity: event.deletion_status === 'pending' ? 0.5 : 1,
+            pointerEvents: event.deletion_status === 'pending' ? 'none' : 'auto',
           }}
         >
           <div>

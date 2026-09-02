@@ -1,19 +1,42 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useMyEvents } from '@/features/events/hooks/useMyEvents'
 import { MyEventCard } from '@/features/events/components/MyEventCard'
 import { BackButton } from '@/components/BackButton'
+import { AdminMessageDialogModal } from '@/features/events/components/AdminMessageDialogModal'
+import { replyAdminMessage } from '@/features/events/services/my-events.service'
 
-export default function MeusEventosPage() {
+function MeusEventosContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlAdminMessage = searchParams.get('admin_message')
+  const urlEventId = searchParams.get('event_id')
+
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const { events, isLoading, error, refetch } = useMyEvents()
 
   const [search, setSearch] = useState('')
+  const [activeAdminMessage, setActiveAdminMessage] = useState<string | null>(null)
+  const [activeEventId, setActiveEventId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (urlAdminMessage && urlEventId) {
+      setActiveAdminMessage(urlAdminMessage)
+      setActiveEventId(urlEventId)
+    }
+  }, [urlAdminMessage, urlEventId])
+
+  async function handleSendReply(replyMessage: string) {
+    if (!activeEventId) return
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+    await replyAdminMessage(activeEventId, session.access_token, replyMessage)
+  }
 
   // Proteção no cliente — redireciona para login se não autenticado
   useEffect(() => {
@@ -286,6 +309,20 @@ export default function MeusEventosPage() {
         </>
       )}
 
+      {/* Modal de Mensagem da Administração */}
+      {activeAdminMessage && activeEventId && (
+        <AdminMessageDialogModal
+          eventId={activeEventId}
+          eventTitle={events.find((e) => e.id === activeEventId)?.title || 'Meu Evento'}
+          adminMessage={activeAdminMessage}
+          onSendReply={handleSendReply}
+          onClose={() => {
+            setActiveAdminMessage(null)
+            setActiveEventId(null)
+          }}
+        />
+      )}
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
@@ -293,5 +330,19 @@ export default function MeusEventosPage() {
         }
       `}</style>
     </main>
+  )
+}
+
+export default function MeusEventosPage() {
+  return (
+    <Suspense
+      fallback={
+        <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+          <p style={{ color: '#64748b', textAlign: 'center', marginTop: '4rem' }}>Carregando...</p>
+        </main>
+      }
+    >
+      <MeusEventosContent />
+    </Suspense>
   )
 }

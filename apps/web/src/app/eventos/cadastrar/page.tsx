@@ -15,6 +15,7 @@ function CadastrarEventoForm() {
 
   const [loading, setLoading] = useState(false)
   const [loadingEvent, setLoadingEvent] = useState(isEditMode)
+  const [isReadOnly, setIsReadOnly] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
@@ -77,6 +78,9 @@ function CadastrarEventoForm() {
                 description: '',
               },
             ]
+
+        const isCancelledOrDeleted = event.deletion_status === 'approved' || event.status === 'cancelled'
+        setIsReadOnly(isCancelledOrDeleted)
 
         setFormData({
           title: event.title,
@@ -273,7 +277,26 @@ function CadastrarEventoForm() {
           </div>
         )}
 
+        {isReadOnly && (
+          <div style={{
+            background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '14px',
+            padding: '1rem 1.25rem', marginBottom: '1.25rem', color: '#475569',
+            display: 'flex', alignItems: 'center', gap: '0.65rem',
+          }}>
+            <span style={{ fontSize: '1.5rem' }}>🚫</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.95rem', color: '#1e293b' }}>
+                Modo de Visualização Apenas (Evento Desativado / Cancelado)
+              </strong>
+              <span style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                A exclusão deste evento foi autorizada pelo administrador. Os dados estão disponíveis apenas para consulta e não podem mais ser alterados.
+              </span>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <fieldset disabled={isReadOnly} style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Uploader de Foto de Capa do Evento com Ajuste Interativo */}
           <EventCoverUploader
             value={formData.imageUrl}
@@ -738,30 +761,51 @@ function CadastrarEventoForm() {
               </label>
             </div>
           </section>
+          </fieldset>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                padding: '0.875rem 2rem',
-                background: loading ? '#94a3b8' : '#0f172a',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {loading
-                ? isEditMode
-                  ? 'Salvando...'
-                  : 'Cadastrando...'
-                : isEditMode
-                  ? 'Salvar Alterações'
-                  : 'Cadastrar Evento'}
-            </button>
+            {isReadOnly ? (
+              <button
+                type="button"
+                disabled
+                style={{
+                  padding: '0.875rem 2rem',
+                  background: '#94a3b8',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'not-allowed',
+                  opacity: 0.7,
+                }}
+              >
+                Evento Indisponível para Edição 🚫
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  padding: '0.875rem 2rem',
+                  background: '#6366f1',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {loading
+                  ? isEditMode
+                    ? 'Salvando...'
+                    : 'Cadastrando...'
+                  : isEditMode
+                    ? 'Salvar Alterações'
+                    : 'Cadastrar Evento'}
+              </button>
+            )}
 
             <button
               type="button"
@@ -778,7 +822,7 @@ function CadastrarEventoForm() {
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              Cancelar
+              Voltar
             </button>
           </div>
         </form>

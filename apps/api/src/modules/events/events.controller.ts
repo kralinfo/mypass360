@@ -12,6 +12,8 @@ import { EventsService } from './events.service'
 import { CreateEventDto } from './dto/create-event.dto'
 import { UpdateEventDto } from './dto/update-event.dto'
 import { ScheduleEventDto } from './dto/schedule-event.dto'
+import { RequestEventDeletionDto } from './dto/request-event-deletion.dto'
+import { ReplyAdminMessageDto } from './dto/reply-admin-message.dto'
 import { AuthGuard, type AuthenticatedUser } from '@/common/guards/auth.guard'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 
@@ -100,6 +102,42 @@ export class EventsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.eventsService.schedulePublication(id, user.id, dto)
+  }
+
+  /** POST /events/:id/request-approval — solicitar aprovação de publicação (protegido) */
+  @Post(':id/request-approval')
+  @UseGuards(AuthGuard)
+  requestApproval(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.requestApproval(id, user.id)
+  }
+
+  /** POST /events/:id/request-deletion — solicitar exclusão de evento publicado (protegido) */
+  @Post(':id/request-deletion')
+  @UseGuards(AuthGuard)
+  requestDeletion(
+    @Param('id') id: string,
+    @Body() dto: RequestEventDeletionDto,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.eventsService.requestDeletion(id, user.id, dto.reason)
+  }
+
+  /** POST /events/:id/reply-admin-message — responder mensagem do administrador (protegido) */
+  @Post(':id/reply-admin-message')
+  @UseGuards(AuthGuard)
+  replyAdminMessage(
+    @Param('id') id: string,
+    @Body() dto: ReplyAdminMessageDto,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.eventsService.replyAdminMessage(id, user.id, dto.replyMessage)
+  }
+
+  /** GET /events/:id/messages — lista histórico de mensagens do evento para o organizador */
+  @Get(':id/messages')
+  @UseGuards(AuthGuard)
+  getEventMessages(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.getEventMessages(id, user.id)
   }
 
   /** GET /events/:id/details — detalhes e métricas do evento (protegido) */

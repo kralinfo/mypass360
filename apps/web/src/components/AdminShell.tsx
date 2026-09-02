@@ -6,12 +6,16 @@ import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { NotificationCenter } from '@/features/notifications/components/NotificationCenter'
 
 const adminMenuItems = [
   { href: '/admin?sec=painel', secao: 'painel', label: 'Painel geral', icon: '⌂' },
-  { href: '/admin?sec=indicadores', secao: 'indicadores', label: 'Indicadores', icon: '◫' },
-  { href: '/admin?sec=eventos', secao: 'eventos', label: 'Eventos', icon: '◩' },
-  { href: '/admin?sec=usuarios', secao: 'usuarios', label: 'Usuários', icon: '◪' },
+  { href: '/admin?sec=indicadores', secao: 'indicadores', label: 'Indicadores', icon: '▫' },
+  { href: '/admin?sec=eventos', secao: 'eventos', label: 'Eventos', icon: '▩' },
+  { href: '/admin?sec=usuarios', secao: 'usuarios', label: 'Usuários', icon: '▪' },
+  { href: '/admin?sec=aprovacoes', secao: 'aprovacoes', label: 'Aprovar publicações', icon: '🚀' },
+  { href: '/admin?sec=exclusoes', secao: 'exclusoes', label: 'Aprovar exclusões', icon: '🗑️' },
+  { href: '/admin?sec=mensagens', secao: 'mensagens', label: 'Mensagens', icon: '💬' },
 ]
 
 function getTituloDaPagina(secao: string): string {
@@ -22,6 +26,12 @@ function getTituloDaPagina(secao: string): string {
       return 'Gestão de eventos'
     case 'usuarios':
       return 'Gestão de usuários'
+    case 'aprovacoes':
+      return 'Aprovar publicações'
+    case 'exclusoes':
+      return 'Aprovar exclusões'
+    case 'mensagens':
+      return 'Central de mensagens'
     default:
       return 'Módulo administrativo'
   }
@@ -35,6 +45,12 @@ function getDescricaoDaPagina(secao: string): string {
       return 'Acompanhamento e operação da agenda de eventos.'
     case 'usuarios':
       return 'Controle administrativo de contas autenticadas.'
+    case 'aprovacoes':
+      return 'Revise e decida sobre solicitações de publicação dos organizadores.'
+    case 'exclusoes':
+      return 'Análise de solicitações de exclusão de eventos enviadas pelos organizadores.'
+    case 'mensagens':
+      return 'Comunicação direta em tempo real com os organizadores de eventos.'
     default:
       return 'Acesso exclusivo do administrador.'
   }
@@ -338,9 +354,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <span className="admin-header-desc" style={{ color: '#64748b', fontSize: '0.85rem' }}>
-              {descricaoDaPagina}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <span className="admin-header-desc" style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                {descricaoDaPagina}
+              </span>
+              <NotificationCenter />
+            </div>
           </div>
         </header>
 

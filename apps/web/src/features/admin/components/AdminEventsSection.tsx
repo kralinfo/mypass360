@@ -6,6 +6,7 @@ import type { AdminDashboardData, AdminEventItem, EventStatus } from '@mypass360
 import { AdminPanelCard } from './AdminPanelCard'
 import { AttendeesModal } from './AttendeesModal'
 import { EventDetailsModal } from './EventDetailsModal'
+import { AdminDeleteConfirmModal } from './AdminDeleteConfirmModal'
 import { eventStatusOptions, eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
 
 type AdminEventsSectionProps = {
@@ -13,7 +14,7 @@ type AdminEventsSectionProps = {
   isLoading: boolean
   runningAction: string | null
   onChangeStatus: (event: AdminEventItem, status: EventStatus) => Promise<void>
-  onDelete: (event: AdminEventItem) => Promise<void>
+  onDelete: (event: AdminEventItem, reason?: string) => Promise<void>
   onSendReminders: (event: AdminEventItem) => void
   onRefresh?: () => void
 }
@@ -51,8 +52,9 @@ const IconDots = () => (
 )
 
 export function AdminEventsSection({ dashboard, isLoading, runningAction, onChangeStatus, onDelete, onSendReminders, onRefresh }: AdminEventsSectionProps) {
-  const [attendeesEvent, setAttendeesEvent] = useState<AdminEventItem | null>(null)
   const [detailsEvent, setDetailsEvent] = useState<AdminEventItem | null>(null)
+  const [attendeesEvent, setAttendeesEvent] = useState<AdminEventItem | null>(null)
+  const [eventToDelete, setEventToDelete] = useState<AdminEventItem | null>(null)
   const [openMenuEventId, setOpenMenuEventId] = useState<string | null>(null)
 
   // Fechar o menu de ações ao clicar fora
@@ -316,7 +318,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                                 disabled={isActionLoading}
                                 onClick={() => {
                                   setOpenMenuEventId(null)
-                                  void onDelete(event)
+                                  setEventToDelete(event)
                                 }}
                                 style={{
                                   display: 'flex',
@@ -351,8 +353,23 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
           </div>
         ) : null}
 
+        {attendeesEvent && (
+          <AttendeesModal
+            event={attendeesEvent}
+            onClose={() => setAttendeesEvent(null)}
+          />
+        )}
 
-
+        {/* Modal de confirmação de exclusão com motivo para notificar o organizador */}
+        {eventToDelete && (
+          <AdminDeleteConfirmModal
+            event={eventToDelete}
+            onConfirm={async (ev, reason) => {
+              await onDelete(ev, reason)
+            }}
+            onClose={() => setEventToDelete(null)}
+          />
+        )}
 
       </AdminPanelCard>
 
@@ -363,14 +380,6 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
           onUpdated={onRefresh}
         />
       )}
-
-      {attendeesEvent && (
-        <AttendeesModal
-          event={attendeesEvent}
-          onClose={() => setAttendeesEvent(null)}
-        />
-      )}
     </>
   )
 }
-

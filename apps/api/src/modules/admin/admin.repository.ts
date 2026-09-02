@@ -157,6 +157,8 @@ export class AdminRepository {
       draftEvents: mappedEvents.filter((event) => event.status === 'draft').length,
       cancelledEvents: mappedEvents.filter((event) => event.status === 'cancelled').length,
       finishedEvents: mappedEvents.filter((event) => event.status === 'finished').length,
+      pendingApprovalEvents: 0, // será preenchido abaixo via consulta separada
+      pendingDeletionEvents: 0, // será preenchido abaixo via consulta separada
       totalOrders: safeOrders.length,
       paidOrders: safeOrders.filter((order) => order.status === 'paid').length,
       pendingOrders: safeOrders.filter((order) => order.status === 'pending').length,
@@ -168,6 +170,23 @@ export class AdminRepository {
       disabledUsers: mappedUsers.filter((user) => user.disabled).length,
       organizerUsers: mappedUsers.filter((user) => user.createdEventsCount > 0).length,
     }
+
+    // Contar eventos pendentes de aprovação
+    const { count: pendingCount } = await client
+      .from('events')
+      .select('id', { count: 'exact', head: true })
+      .eq('approval_status', 'pending')
+
+    metrics.pendingApprovalEvents = pendingCount ?? 0
+
+    // Contar eventos com solicitação de exclusão pendente
+    const { count: pendingDeletionCount } = await client
+      .from('events')
+      .select('id', { count: 'exact', head: true })
+      .eq('deletion_status', 'pending')
+
+    metrics.pendingDeletionEvents = pendingDeletionCount ?? 0
+
 
     return {
       metrics,
@@ -217,9 +236,315 @@ export class AdminRepository {
   }
 
   async deleteEvent(eventId: string) {
-    const { error } = await this.supabase.getClient().from('events').delete().eq('id', eventId)
+    const client = this.supabase.getClient()
+
+    const { data: event } = await client
+      .from('events')
+      .select('id, title, organizer_id')
+      .eq('id', eventId)
+      .single()
+
+    const { error } = await client.from('events').delete().eq('id', eventId)
+    if (error) {
+      if (error.code === '23503') {
+        await client
+          .from('events')
+          .update({ status: 'cancelled', deletion_status: 'approved' })
+          .eq('id', eventId)
+      } else {
+        throw new Error(error.message)
+      }
+    }
+
+    return event
+  }
+
+  /**
+   * Lista todos os eventos com solicitação de publicação pendente.
+   * Inclui dados do organizador e tipos de ingresso para análise completa.
+   */
+  async getPendingApprovals() {
+    const client = this.supabase.getClient()
+
+    const { data: events, error } = await client
+      .from('events')
+      .select(`
+        id,
+        title,
+        slug,
+        description,
+        date,
+        location,
+        organizer_id,
+        capacity,
+        price,
+        image_url,
+        genre,
+        approval_requested_at,
+        created_at,
+        ticket_types (
+          id,
+          name,
+          price,
+          quantity,
+          description
+        )
+      `)
+      .eq('approval_status', 'pending')
+      .order('approval_requested_at', { ascending: true })
+
     if (error) throw new Error(error.message)
-    return { success: true }
+
+    const safeEvents = events ?? []
+
+    // Enriquecer com dados do organizador (busca em lote dos IDs únicos)
+    const organizerIds = [...new Set(safeEvents.map((e: any) => e.organizer_id).filter(Boolean))]
+    let organizerMap = new Map<string, { email: string; name: string }>()
+
+    if (organizerIds.length > 0) {
+      try {
+        const authUsers = await this.safeListUsers(client)
+        for (const user of authUsers) {
+          if (organizerIds.includes(user.id)) {
+            organizerMap.set(user.id, {
+              email: user.email ?? '',
+              name: user.user_metadata?.name ?? user.email ?? 'Sem nome',
+            })
+          }
+        }
+      } catch {
+        // Se falhar, continua sem dados do organizador
+      }
+    }
+
+    return safeEvents.map((event: any) => {
+      const organizer = organizerMap.get(event.organizer_id)
+      return {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        description: event.description,
+        date: event.date,
+        location: event.location,
+        organizerId: event.organizer_id,
+        organizerEmail: organizer?.email,
+        organizerName: organizer?.name,
+        capacity: event.capacity,
+        price: Number(event.price ?? 0),
+        imageUrl: event.image_url,
+        genre: event.genre,
+        approvalRequestedAt: event.approval_requested_at,
+        ticketTypes: event.ticket_types ?? [],
+        createdAt: event.created_at,
+      }
+    })
+  }
+
+  /**
+   * Aprova a solicitação de publicação de um evento.
+   * Define approval_status = 'approved' e registra o administrador responsável.
+   */
+  async approveEvent(eventId: string, adminId: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('events')
+      .update({
+        approval_status: 'approved',
+        approval_reviewed_at: new Date().toISOString(),
+        approved_by: adminId,
+      })
+      .eq('id', eventId)
+      .eq('approval_status', 'pending') // só aprova se estiver pendente
+      .select('*')
+      .single()
+
+    if (error) throw new Error(error.message)
+    if (!data) throw new Error('Evento não encontrado ou não está aguardando aprovação.')
+    return data
+  }
+
+  /**
+   * Rejeita a solicitação de publicação de um evento.
+   * Define approval_status = 'rejected' e registra o administrador e a justificativa.
+   */
+  async rejectEvent(eventId: string, adminId: string, reason?: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('events')
+      .update({
+        approval_status: 'rejected',
+        approval_reviewed_at: new Date().toISOString(),
+        approved_by: adminId,
+        approval_rejection_reason: reason ?? null,
+      })
+      .eq('id', eventId)
+      .eq('approval_status', 'pending') // só rejeita se estiver pendente
+      .select('*')
+      .single()
+
+    if (error) throw new Error(error.message)
+    if (!data) throw new Error('Evento não encontrado ou não está aguardando aprovação.')
+    return data
+  }
+
+  /**
+   * Lista todos os eventos com solicitação de exclusão pendente.
+   * Enriquecidos com dados do organizador e métricas comerciais.
+   */
+  async getPendingDeletions() {
+    const client = this.supabase.getClient()
+
+    const { data: events, error } = await client
+      .from('events')
+      .select(`
+        id,
+        title,
+        slug,
+        description,
+        date,
+        location,
+        status,
+        organizer_id,
+        capacity,
+        price,
+        image_url,
+        genre,
+        deletion_requested_at,
+        deletion_reason,
+        created_at,
+        ticket_types (
+          id,
+          name,
+          price,
+          quantity,
+          description
+        )
+      `)
+      .eq('deletion_status', 'pending')
+      .order('deletion_requested_at', { ascending: true })
+
+    if (error) throw new Error(error.message)
+
+    const safeEvents = events ?? []
+    if (safeEvents.length === 0) return []
+
+    // Buscar pedidos e ingressos associados para métricas comerciais
+    const eventIds = safeEvents.map((e: any) => e.id)
+
+    const { data: orders } = await client
+      .from('orders')
+      .select('id, event_id, status, total')
+      .in('event_id', eventIds)
+
+    const { data: tickets } = await client
+      .from('tickets')
+      .select('id, event_id')
+      .in('event_id', eventIds)
+
+    const safeOrders = orders ?? []
+    const safeTickets = tickets ?? []
+
+    // Buscar dados dos organizadores
+    const organizerIds = [...new Set(safeEvents.map((e: any) => e.organizer_id).filter(Boolean))]
+    let organizerMap = new Map<string, { email: string; name: string }>()
+
+    if (organizerIds.length > 0) {
+      try {
+        const authUsers = await this.safeListUsers(client)
+        for (const user of authUsers) {
+          if (organizerIds.includes(user.id)) {
+            organizerMap.set(user.id, {
+              email: user.email ?? '',
+              name: user.user_metadata?.name ?? user.email ?? 'Sem nome',
+            })
+          }
+        }
+      } catch {
+        // ignora se falhar listUsers
+      }
+    }
+
+    return safeEvents.map((event: any) => {
+      const organizer = organizerMap.get(event.organizer_id)
+      const eventOrders = safeOrders.filter((o: any) => o.event_id === event.id)
+      const paidOrders = eventOrders.filter((o: any) => o.status === 'paid')
+      const eventTickets = safeTickets.filter((t: any) => t.event_id === event.id)
+      const revenue = paidOrders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0)
+
+      return {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        description: event.description,
+        date: event.date,
+        location: event.location,
+        status: event.status,
+        organizerId: event.organizer_id,
+        organizerEmail: organizer?.email,
+        organizerName: organizer?.name,
+        capacity: event.capacity,
+        price: Number(event.price ?? 0),
+        imageUrl: event.image_url,
+        genre: event.genre,
+        deletionRequestedAt: event.deletion_requested_at,
+        deletionReason: event.deletion_reason ?? 'Não informado',
+        totalOrders: eventOrders.length,
+        paidOrders: paidOrders.length,
+        revenue,
+        totalAttendees: eventTickets.length,
+        ticketTypes: event.ticket_types ?? [],
+        createdAt: event.created_at,
+      }
+    })
+  }
+
+  /**
+   * Aprova a solicitação de exclusão do evento.
+   * Realiza arquivamento/desativação segura: deletion_status = 'approved', status = 'cancelled'.
+   */
+  async approveDeletion(eventId: string, adminId: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('events')
+      .update({
+        deletion_status: 'approved',
+        status: 'cancelled',
+        deletion_reviewed_at: new Date().toISOString(),
+        deletion_reviewed_by: adminId,
+      })
+      .eq('id', eventId)
+      .eq('deletion_status', 'pending')
+      .select('*')
+      .single()
+
+    if (error) throw new Error(error.message)
+    if (!data) throw new Error('Evento não encontrado ou não está aguardando solicitação de exclusão.')
+    return data
+  }
+
+  /**
+   * Rejeita a solicitação de exclusão do evento.
+   * Restaura deletion_status = 'rejected' e mantém status = 'published'.
+   */
+  async rejectDeletion(eventId: string, adminId: string, reason?: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('events')
+      .update({
+        deletion_status: 'rejected',
+        status: 'published',
+        deletion_reviewed_at: new Date().toISOString(),
+        deletion_reviewed_by: adminId,
+        deletion_rejection_reason: reason ?? null,
+      })
+      .eq('id', eventId)
+      .eq('deletion_status', 'pending')
+      .select('*')
+      .single()
+
+    if (error) throw new Error(error.message)
+    if (!data) throw new Error('Evento não encontrado ou não está aguardando solicitação de exclusão.')
+    return data
   }
 
   async remindPendingOrders(eventId: string): Promise<{ success: boolean; sentCount: number }> {
@@ -688,6 +1013,120 @@ export class AdminRepository {
       success: true,
       message: 'Check-in cancelado com sucesso. O ingresso voltou a ser válido.',
     }
+  }
+
+  /**
+   * Retorna o histórico de mensagens/diálogo trocado entre administradores e organizador sobre o evento.
+   */
+  async getEventMessages(eventId: string) {
+    const client = this.supabase.getClient()
+
+    const { data: notifs, error } = await client
+      .from('notifications')
+      .select('id, type, title, message, metadata, created_at, user_id')
+      .eq('entity_id', eventId)
+      .in('type', ['admin_message', 'organizer_reply'])
+      .order('created_at', { ascending: true })
+
+    if (error) throw new Error(error.message)
+
+    const mapped = (notifs ?? []).map((n: any) => {
+      const isAdminMsg = n.type === 'admin_message'
+      const rawMsg = isAdminMsg
+        ? (n.metadata?.adminMessage || n.message)
+        : (n.metadata?.replyMessage || n.message)
+
+      // Se a mensagem começar com "O organizador do evento ... respondeu: ", limpar prefixo para exibição limpa no chat
+      let cleanMessage = rawMsg
+      const replyPrefixMatch = cleanMessage.match(/^O organizador do evento ".*" respondeu: "(.*)"$/s)
+      if (replyPrefixMatch && replyPrefixMatch[1]) {
+        cleanMessage = replyPrefixMatch[1]
+      }
+
+      return {
+        id: n.id,
+        sender: isAdminMsg ? ('admin' as const) : ('organizer' as const),
+        senderName: isAdminMsg ? 'Administração' : 'Organizador',
+        message: cleanMessage,
+        createdAt: n.created_at,
+      }
+    })
+
+    // Deduplicar mensagens idênticas geradas por broadcast para múltiplos administradores
+    const seen = new Set<string>()
+    const deduplicated = []
+    for (const item of mapped) {
+      const timeBucket = item.createdAt ? String(item.createdAt).substring(0, 16) : ''
+      const key = `${item.sender}:${item.message.trim()}:${timeBucket}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        deduplicated.push(item)
+      }
+    }
+
+    return deduplicated
+  }
+
+  /**
+   * Retorna a lista de todas as conversas/diálogos ativos agrupados por evento.
+   */
+  async getAllConversations() {
+    const client = this.supabase.getClient()
+
+    // 1. Buscar todas as notificações de mensagem
+    const { data: notifs, error: notifError } = await client
+      .from('notifications')
+      .select('id, type, title, message, metadata, entity_id, created_at, user_id')
+      .in('type', ['admin_message', 'organizer_reply', 'event_deletion_requested'])
+      .order('created_at', { ascending: false })
+
+    if (notifError) throw new Error(notifError.message)
+
+    // Coletar IDs únicos de eventos envolvidos
+    const eventIds = Array.from(new Set((notifs ?? []).map((n) => n.entity_id).filter(Boolean)))
+    if (eventIds.length === 0) return []
+
+    // 2. Buscar detalhes dos eventos
+    const { data: events, error: eventsError } = await client
+      .from('events')
+      .select('id, title, slug, status, approval_status, deletion_status, organizer_id')
+      .in('id', eventIds)
+
+    if (eventsError) throw new Error(eventsError.message)
+    const eventMap = new Map((events ?? []).map((e) => [e.id, e]))
+
+    // 3. Montar a lista consolidada de conversas por evento
+    const conversationsMap = new Map<string, any>()
+
+    for (const n of notifs ?? []) {
+      if (!n.entity_id || conversationsMap.has(n.entity_id)) continue
+      const event = eventMap.get(n.entity_id)
+      if (!event) continue
+
+      const isAdminMsg = n.type === 'admin_message'
+      const rawMsg = isAdminMsg
+        ? (n.metadata?.adminMessage || n.message)
+        : (n.metadata?.replyMessage || n.message)
+
+      let cleanMessage = rawMsg
+      const replyPrefixMatch = cleanMessage.match(/^O organizador do evento ".*" respondeu: "(.*)"$/s)
+      if (replyPrefixMatch && replyPrefixMatch[1]) {
+        cleanMessage = replyPrefixMatch[1]
+      }
+
+      conversationsMap.set(n.entity_id, {
+        eventId: event.id,
+        eventTitle: event.title,
+        eventStatus: event.status,
+        deletionStatus: event.deletion_status ?? 'none',
+        organizerId: event.organizer_id,
+        lastMessage: cleanMessage,
+        lastSender: isAdminMsg ? 'admin' : 'organizer',
+        lastMessageAt: n.created_at,
+      })
+    }
+
+    return Array.from(conversationsMap.values())
   }
 
   /**

@@ -3,11 +3,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Event } from '@mypass360/types'
-import { getEventDisplayStatus } from '@mypass360/types'
+import {
+  getEventDisplayStatus,
+  canRequestApproval,
+  canPublishEvent,
+  canUnpublishEvent,
+  requiresDeletionApproval,
+} from '@mypass360/types'
 import { createClient } from '@/lib/supabase/client'
-import { publishEvent, unpublishEvent, scheduleEventPublication, deleteEvent } from '../services/my-events.service'
+import {
+  publishEvent,
+  unpublishEvent,
+  scheduleEventPublication,
+  deleteEvent,
+  requestEventApproval,
+  requestEventDeletion,
+} from '../services/my-events.service'
 import { ScheduleModal } from './ScheduleModal'
 import { DeleteConfirmModal } from './DeleteConfirmModal'
+import { PublishRequestModal } from './PublishRequestModal'
+import { DeleteRequestModal } from './DeleteRequestModal'
+import { AdminMessageDialogModal } from './AdminMessageDialogModal'
 import { EventDetailsModal } from '@/features/admin/components/EventDetailsModal'
 
 interface MyEventCardProps {
@@ -15,28 +31,74 @@ interface MyEventCardProps {
   onStatusChange: () => void
 }
 
+// ── Configuração visual de cada estado do ciclo de vida ──────────────────────
 const STATUS_CONFIG = {
   published: {
     color: '#10b981',
-    bg: 'rgba(240, 253, 244, 0.95)',
+    bg: 'rgba(240, 253, 244, 0.97)',
     border: '#86efac',
     label: 'Publicado',
+    dot: '#10b981',
   },
   scheduled: {
     color: '#d97706',
-    bg: 'rgba(254, 243, 199, 0.95)',
+    bg: 'rgba(254, 243, 199, 0.97)',
     border: '#fde68a',
     label: 'Agendado',
+    dot: '#d97706',
+  },
+  draft: {
+    color: '#64748b',
+    bg: 'rgba(241, 245, 249, 0.97)',
+    border: '#cbd5e1',
+    label: 'Rascunho',
+    dot: '#94a3b8',
+  },
+  pending_approval: {
+    color: '#7c3aed',
+    bg: 'rgba(245, 243, 255, 0.97)',
+    border: '#c4b5fd',
+    label: 'Aguardando aprovação',
+    dot: '#8b5cf6',
+  },
+  approved: {
+    color: '#059669',
+    bg: 'rgba(236, 253, 245, 0.97)',
+    border: '#6ee7b7',
+    label: 'Aprovado ✓',
+    dot: '#10b981',
+  },
+  rejected: {
+    color: '#dc2626',
+    bg: 'rgba(254, 242, 242, 0.97)',
+    border: '#fca5a5',
+    label: 'Reprovado',
+    dot: '#ef4444',
+  },
+  deletion_pending: {
+    color: '#dc2626',
+    bg: 'rgba(254, 242, 242, 0.97)',
+    border: '#fca5a5',
+    label: 'Exclusão em análise ⏳',
+    dot: '#ef4444',
+  },
+  deletion_approved: {
+    color: '#64748b',
+    bg: 'rgba(241, 245, 249, 0.97)',
+    border: '#cbd5e1',
+    label: 'Indisponível',
+    dot: '#64748b',
   },
   hidden: {
     color: '#475569',
-    bg: 'rgba(241, 245, 249, 0.95)',
+    bg: 'rgba(241, 245, 249, 0.97)',
     border: '#cbd5e1',
     label: 'Oculto',
+    dot: '#94a3b8',
   },
 } as const
 
-// Ícones SVG Minimalistas
+// ── Ícones SVG ────────────────────────────────────────────────────────────────
 const EditIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20h9" />
@@ -90,12 +152,27 @@ const RocketIcon = () => (
   </svg>
 )
 
+const EyeOffIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
+
+const PublishIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="10 15 15 12 10 9" />
+  </svg>
+)
+
 const ChevronDownIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 )
 
+// ── Componente principal ──────────────────────────────────────────────────────
 export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
@@ -104,11 +181,19 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showManageModal, setShowManageModal] = useState(false)
+  const [showPublishRequestModal, setShowPublishRequestModal] = useState(false)
+  const [showDeleteRequestModal, setShowDeleteRequestModal] = useState(false)
+  const [showAdminDialogModal, setShowAdminDialogModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
   const displayStatus = getEventDisplayStatus(event)
   const statusConfig = STATUS_CONFIG[displayStatus]
+
+  // Permissões calculadas a partir dos helpers centralizados
+  const showRequestApproval = canRequestApproval(event)
+  const showPublish = canPublishEvent(event)
+  const showUnpublish = canUnpublishEvent(event)
 
   const formattedDate = new Date(event.date).toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -187,6 +272,27 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
     if (!token) throw new Error('Sessão expirada. Faça login novamente.')
     await scheduleEventPublication(event.id, token, publishedAt)
     onStatusChange()
+  }
+
+  async function handleRequestApproval() {
+    const token = await getToken()
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+    await requestEventApproval(event.id, token)
+    onStatusChange()
+  }
+
+  async function handleRequestDeletion(reason: string) {
+    const token = await getToken()
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+    await requestEventDeletion(event.id, token, reason)
+    onStatusChange()
+  }
+
+  async function handleSendAdminReply(replyMessage: string) {
+    const token = await getToken()
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+    const { replyAdminMessage } = await import('../services/my-events.service')
+    await replyAdminMessage(event.id, token, replyMessage)
   }
 
   async function handleDelete() {
@@ -275,7 +381,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           color: #0f172a;
         }
         .my-event-dropdown-item:disabled {
-          opacity: 0.5;
+          opacity: 0.45;
           cursor: not-allowed !important;
           background: transparent !important;
           color: #94a3b8 !important;
@@ -294,7 +400,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
       `}</style>
 
       <article className="my-event-card">
-        {/* ── 1. ÁREA SUPERIOR — IMAGEM / BANNER DO EVENTO ── */}
+        {/* ── 1. IMAGEM / BANNER ── */}
         <div
           style={{
             position: 'relative',
@@ -308,23 +414,14 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             <img
               src={event.image_url}
               alt={event.title}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-              }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           ) : (
             <div
               style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2.2rem',
-                color: '#94a3b8',
+                width: '100%', height: '100%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '2.2rem', color: '#94a3b8',
                 background: 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)',
               }}
             >
@@ -332,12 +429,10 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             </div>
           )}
 
-          {/* Badge de Status flutuante no canto superior esquerdo */}
+          {/* Badge de Status */}
           <div
             style={{
-              position: 'absolute',
-              top: '10px',
-              left: '10px',
+              position: 'absolute', top: '10px', left: '10px',
               background: statusConfig.bg,
               color: statusConfig.color,
               border: `1px solid ${statusConfig.border}`,
@@ -345,44 +440,51 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
               padding: '3px 9px',
               fontSize: '0.72rem',
               fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
+              display: 'flex', alignItems: 'center', gap: '5px',
               backdropFilter: 'blur(6px)',
               boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
               zIndex: 2,
+              maxWidth: 'calc(100% - 20px)',
             }}
           >
             <span
               style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: statusConfig.color,
-                display: 'inline-block',
+                width: 6, height: 6, borderRadius: '50%',
+                background: statusConfig.dot,
+                display: 'inline-block', flexShrink: 0,
               }}
             />
             {statusConfig.label}
           </div>
+
+          {/* Indicador de loading sobre a imagem */}
+          {loading && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(15, 23, 42, 0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 3,
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" style={{ animation: 'spin 0.8s linear infinite' }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            </div>
+          )}
         </div>
 
-        {/* ── 2. ÁREA INFERIOR — INFORMAÇÕES COMPACTAS ── */}
+        {/* ── 2. INFORMAÇÕES ── */}
         <div style={{ padding: '0.85rem 1rem 0.75rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
-          {/* Título com destaque */}
           <h2
             style={{
               margin: '0 0 0.4rem',
-              fontSize: '1rem',
-              color: '#0f172a',
-              fontWeight: 700,
-              lineHeight: 1.3,
+              fontSize: '1rem', color: '#0f172a',
+              fontWeight: 700, lineHeight: 1.3,
               letterSpacing: '-0.01em',
             }}
           >
             {event.title}
           </h2>
 
-          {/* Informações: Data e Localização */}
           <div style={{ display: 'grid', gap: '0.25rem', marginBottom: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#64748b' }}>
               <span style={{ display: 'flex', color: '#94a3b8' }}><CalendarIcon /></span>
@@ -396,55 +498,119 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
 
           {/* Aviso de Agendamento */}
           {displayStatus === 'scheduled' && formattedScheduledAt && (
-            <div
-              style={{
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
-                borderRadius: '8px',
-                padding: '0.45rem 0.65rem',
-                marginBottom: '0.5rem',
-                fontSize: '0.74rem',
-                color: '#b45309',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-              }}
-            >
+            <div style={{
+              background: '#fffbeb', border: '1px solid #fde68a',
+              borderRadius: '8px', padding: '0.45rem 0.65rem',
+              marginBottom: '0.5rem', fontSize: '0.74rem', color: '#b45309',
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+            }}>
               <span style={{ display: 'flex', color: '#f59e0b' }}><ClockIcon /></span>
               <span>Será publicado em: <strong>{formattedScheduledAt}</strong></span>
             </div>
           )}
 
+          {/* Aviso: Aguardando aprovação */}
+          {displayStatus === 'pending_approval' && (
+            <div style={{
+              background: '#f5f3ff', border: '1px solid #c4b5fd',
+              borderRadius: '8px', padding: '0.45rem 0.65rem',
+              marginBottom: '0.5rem', fontSize: '0.74rem', color: '#6d28d9',
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+            }}>
+              <span>⏳</span>
+              <span>Solicitação enviada — aguardando análise do administrador.</span>
+            </div>
+          )}
+
+          {/* Aviso: Aprovado, pronto para publicar */}
+          {displayStatus === 'approved' && (
+            <div style={{
+              background: '#ecfdf5', border: '1px solid #6ee7b7',
+              borderRadius: '8px', padding: '0.45rem 0.65rem',
+              marginBottom: '0.5rem', fontSize: '0.74rem', color: '#065f46',
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+            }}>
+              <span>✅</span>
+              <span>Evento aprovado! Clique em <strong>Publicar</strong> para torná-lo público.</span>
+            </div>
+          )}
+
+          {/* Aviso: Reprovado */}
+          {displayStatus === 'rejected' && (
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fca5a5',
+              borderRadius: '8px', padding: '0.45rem 0.65rem',
+              marginBottom: '0.5rem', fontSize: '0.74rem', color: '#991b1b',
+              display: 'flex', alignItems: 'flex-start', gap: '0.35rem',
+            }}>
+              <span style={{ flexShrink: 0 }}>❌</span>
+              <span>
+                Solicitação reprovada.{' '}
+                {event.approval_rejection_reason
+                  ? <>Motivo: <em>{event.approval_rejection_reason}</em>. </>
+                  : ''}
+                Você pode editar o evento e solicitar novamente.
+              </span>
+            </div>
+          )}
+
+          {/* Aviso: Exclusão em Análise (Clicável para ver diálogo) */}
+          {displayStatus === 'deletion_pending' && (
+            <div
+              onClick={() => setShowAdminDialogModal(true)}
+              style={{
+                background: '#fef2f2', border: '1px solid #fca5a5',
+                borderRadius: '8px', padding: '0.5rem 0.75rem',
+                marginBottom: '0.5rem', fontSize: '0.74rem', color: '#991b1b',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Clique para ver a conversa e as mensagens com a administração"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span>⏳</span>
+                <span>Solicitação de exclusão enviada. Aguardando análise do administrador.</span>
+              </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textDecoration: 'underline', color: '#dc2626', flexShrink: 0 }}>
+                Ver diálogo 💬
+              </span>
+            </div>
+          )}
+
+          {/* Aviso: Exclusão Aprovada pelo Admin */}
+          {displayStatus === 'deletion_approved' && (
+            <div style={{
+              background: '#f8fafc', border: '1px solid #cbd5e1',
+              borderRadius: '8px', padding: '0.45rem 0.65rem',
+              marginBottom: '0.5rem', fontSize: '0.74rem', color: '#475569',
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+            }}>
+              <span>🚫</span>
+              <span>Este evento foi desativado/excluído e está permanentemente indisponível.</span>
+            </div>
+          )}
+
           {/* Feedback de erro */}
           {error && (
-            <div
-              style={{
-                background: '#fef2f2',
-                border: '1px solid #fca5a5',
-                borderRadius: '6px',
-                padding: '0.4rem 0.6rem',
-                marginBottom: '0.5rem',
-                color: '#991b1b',
-                fontSize: '0.75rem',
-              }}
-            >
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fca5a5',
+              borderRadius: '6px', padding: '0.4rem 0.6rem',
+              marginBottom: '0.5rem', color: '#991b1b', fontSize: '0.75rem',
+            }}>
               {error}
             </div>
           )}
 
-          {/* ── 3. CONTROLES INFERIORES: EDITAR + MENU DE AÇÕES (... ˅) ── */}
+          {/* ── 3. CONTROLES ── */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              paddingTop: '0.65rem',
-              borderTop: '1px solid #f1f5f9',
-              marginTop: 'auto',
-              position: 'relative',
+              display: 'flex', alignItems: 'center', gap: '0.45rem',
+              paddingTop: '0.65rem', borderTop: '1px solid #f1f5f9',
+              marginTop: 'auto', position: 'relative',
             }}
           >
-            {/* Botão 1 — Editar */}
+            {/* Botão Editar */}
             <button
               type="button"
               className="my-event-btn-edit"
@@ -455,7 +621,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
               <span>Editar</span>
             </button>
 
-            {/* Botão 2 — Menu de Ações (... ˅) */}
+            {/* Menu de Ações (... ˅) */}
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button
                 type="button"
@@ -470,39 +636,87 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                 </span>
               </button>
 
-              {/* ── 4. DROPDOWN DE AÇÕES ── */}
+              {/* ── DROPDOWN ── */}
               {menuOpen && (
                 <div
                   style={{
-                    position: 'absolute',
-                    right: 0,
-                    bottom: '100%',
-                    marginBottom: '8px',
-                    width: '200px',
-                    background: '#ffffff',
-                    borderRadius: '12px',
+                    position: 'absolute', right: 0, bottom: '100%',
+                    marginBottom: '8px', width: '210px',
+                    background: '#ffffff', borderRadius: '12px',
                     border: '1px solid #e2e8f0',
                     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
-                    padding: '6px',
-                    zIndex: 100,
+                    padding: '6px', zIndex: 100,
                   }}
                 >
-                  {/* 1. Solicitar Publicação (Nova opção) */}
-                  <button
-                    type="button"
-                    className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      // TODO: Implementar fluxo de solicitação de publicação
-                    }}
-                    style={{ color: '#4f46e5', fontWeight: 700 }}
-                    title="Solicitar publicação do evento para a plataforma"
-                  >
-                    <span style={{ display: 'flex', color: '#4f46e5' }}><RocketIcon /></span>
-                    <span>Solicitar publicação</span>
-                  </button>
 
-                  {/* 2. Gerenciar (Abre EventDetailsModal) */}
+                  {/* 1. Solicitar publicação — visível apenas quando aplicável */}
+                  {showRequestApproval && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setShowPublishRequestModal(true)
+                      }}
+                      style={{ color: '#4f46e5' }}
+                      title="Solicitar aprovação de publicação"
+                    >
+                      <span style={{ display: 'flex', color: '#4f46e5' }}><RocketIcon /></span>
+                      <span>
+                        {displayStatus === 'rejected' ? 'Solicitar novamente' : 'Solicitar publicação'}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Informativo: aguardando aprovação */}
+                  {displayStatus === 'pending_approval' && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      disabled
+                      title="Aguardando análise do administrador"
+                    >
+                      <span style={{ display: 'flex', color: '#8b5cf6' }}>⏳</span>
+                      <span style={{ color: '#6d28d9' }}>Aguardando aprovação</span>
+                    </button>
+                  )}
+
+                  {/* 2. Publicar — apenas quando aprovado */}
+                  {showPublish && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        void handlePublish()
+                      }}
+                      disabled={loading === 'publish'}
+                      title="Publicar evento agora"
+                      style={{ color: '#059669' }}
+                    >
+                      <span style={{ display: 'flex', color: '#059669' }}><PublishIcon /></span>
+                      <span>{loading === 'publish' ? 'Publicando...' : 'Publicar'}</span>
+                    </button>
+                  )}
+
+                  {/* 3. Ocultar — apenas quando publicado */}
+                  {showUnpublish && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        void handleUnpublish()
+                      }}
+                      disabled={loading === 'unpublish'}
+                      title="Ocultar evento (voltar para rascunho)"
+                    >
+                      <span style={{ display: 'flex', color: '#64748b' }}><EyeOffIcon /></span>
+                      <span>{loading === 'unpublish' ? 'Ocultando...' : 'Ocultar'}</span>
+                    </button>
+                  )}
+
+                  {/* 4. Gerenciar */}
                   <button
                     type="button"
                     className="my-event-dropdown-item"
@@ -515,38 +729,32 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <span>Gerenciar</span>
                   </button>
 
-                  {/* 3. Publicar / Ocultar (Temporariamente inclicável) */}
-                  {displayStatus === 'hidden' ? (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      disabled={true}
-                      title="Opção temporariamente desabilitada"
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
-                      <span>Publicar</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      disabled={true}
-                      title="Opção temporariamente desabilitada"
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
-                      <span>Ocultar</span>
-                    </button>
-                  )}
+                  {/* 4.5 Ver mensagens / diálogo */}
+                  <button
+                    type="button"
+                    className="my-event-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setShowAdminDialogModal(true)
+                    }}
+                    title="Ver mensagens e diálogo com a administração"
+                    style={{ color: '#4f46e5' }}
+                  >
+                    <span style={{ display: 'flex', color: '#4f46e5' }}>💬</span>
+                    <span>Ver mensagens</span>
+                  </button>
 
-                  {/* 4. Agendar Publicação (Temporariamente inclicável) */}
-                  {displayStatus === 'hidden' && (
+                  {/* 5. Agendar publicação — apenas quando aprovado e não publicado */}
+                  {displayStatus === 'approved' && (
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      disabled={true}
-                      title="Opção temporariamente desabilitada"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setShowScheduleModal(true)
+                      }}
                     >
-                      <span style={{ display: 'flex', color: '#94a3b8' }}><CalendarIcon /></span>
+                      <span style={{ display: 'flex', color: '#0ea5e9' }}><CalendarIcon /></span>
                       <span>Agendar publicação</span>
                     </button>
                   )}
@@ -554,22 +762,52 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   {/* Divisória */}
                   <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
 
-                  {/* 5. Excluir (Temporariamente inclicável) */}
-                  <button
-                    type="button"
-                    className="my-event-dropdown-item danger"
-                    disabled={true}
-                    title="Opção temporariamente desabilitada"
-                  >
-                    <span style={{ display: 'flex', color: '#94a3b8' }}><TrashIcon /></span>
-                    <span>Excluir</span>
-                  </button>
+                  {/* 6. Excluir / Solicitar exclusão */}
+                  {requiresDeletionApproval(event) ? (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item danger"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setShowDeleteRequestModal(true)
+                      }}
+                      disabled={displayStatus === 'deletion_pending'}
+                      title="Solicitar exclusão deste evento publicado ao administrador"
+                    >
+                      <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
+                      <span>
+                        {displayStatus === 'deletion_pending' ? 'Exclusão em análise' : 'Solicitar exclusão'}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item danger"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setShowDeleteModal(true)
+                      }}
+                      title="Excluir rascunho permanentemente"
+                    >
+                      <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
+                      <span>Excluir</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
       </article>
+
+      {/* Modal de Solicitação de Publicação */}
+      {showPublishRequestModal && (
+        <PublishRequestModal
+          eventTitle={event.title}
+          onConfirm={handleRequestApproval}
+          onClose={() => setShowPublishRequestModal(false)}
+        />
+      )}
 
       {/* Modal de Agendamento */}
       {showScheduleModal && (
@@ -589,7 +827,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         />
       )}
 
-      {/* Modal de Gerenciamento do Evento (Reutilizado do Admin) */}
+      {/* Modal de Gerenciamento */}
       {showManageModal && (
         <EventDetailsModal
           event={event}
@@ -597,6 +835,28 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           onUpdated={onStatusChange}
         />
       )}
+
+      {/* Modal de Solicitação de Exclusão */}
+      {showDeleteRequestModal && (
+        <DeleteRequestModal
+          eventTitle={event.title}
+          onConfirm={handleRequestDeletion}
+          onClose={() => setShowDeleteRequestModal(false)}
+        />
+      )}
+
+      {/* Modal de Diálogo com a Administração */}
+      {showAdminDialogModal && (
+        <AdminMessageDialogModal
+          eventId={event.id}
+          eventTitle={event.title}
+          adminMessage="Clique para ver o histórico de mensagens trocadas com a administração."
+          onSendReply={handleSendAdminReply}
+          onClose={() => setShowAdminDialogModal(false)}
+        />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }

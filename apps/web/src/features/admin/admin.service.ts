@@ -8,6 +8,8 @@ import type {
   CheckinRecord,
   Event,
   EventStatus,
+  PendingApprovalEventItem,
+  PendingDeletionEventItem,
 } from '@mypass360/types'
 
 export interface AdminAttendee {
@@ -57,8 +59,11 @@ export async function updateAdminEventStatus(eventId: string, status: EventStatu
   return api.patch<AdminEventItem>(`/admin/events/${eventId}/status`, { status })
 }
 
-export async function deleteAdminEvent(eventId: string): Promise<{ success: boolean }> {
-  return api.delete<{ success: boolean }>(`/admin/events/${eventId}`)
+export async function deleteAdminEvent(eventId: string, reason?: string): Promise<{ success: boolean }> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authApi = apiWithAuth(session?.access_token ?? '')
+  return authApi.post<{ success: boolean }>(`/admin/events/${eventId}/delete`, { reason })
 }
 
 export async function updateAdminUserStatus(userId: string, disabled: boolean): Promise<AdminUserItem> {
@@ -71,6 +76,105 @@ export async function deleteAdminUser(userId: string): Promise<{ success: boolea
 
 export async function sendPendingReminders(eventId: string): Promise<{ success: boolean; sentCount: number }> {
   return api.post<{ success: boolean; sentCount: number }>(`/admin/events/${eventId}/remind-pending`, {})
+}
+
+/**
+ * Lista eventos com solicitação de publicação pendente.
+ */
+export async function fetchPendingApprovals(): Promise<PendingApprovalEventItem[]> {
+  return api.get<PendingApprovalEventItem[]>('/admin/events/pending-approvals')
+}
+
+/**
+ * Aprova a solicitação de publicação de um evento.
+ * Requer autenticação com token de administrador.
+ */
+export async function approveEventPublication(eventId: string): Promise<Event> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authApi = apiWithAuth(session?.access_token ?? '')
+  return authApi.post<Event>(`/admin/events/${eventId}/approve`, {})
+}
+
+/**
+ * Rejeita a solicitação de publicação de um evento.
+ * Requer autenticação com token de administrador.
+ */
+export async function rejectEventPublication(eventId: string, reason?: string): Promise<Event> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authApi = apiWithAuth(session?.access_token ?? '')
+  return authApi.post<Event>(`/admin/events/${eventId}/reject`, { reason })
+}
+
+/**
+ * Lista eventos com solicitação de exclusão pendente.
+ */
+export async function fetchPendingDeletions(): Promise<PendingDeletionEventItem[]> {
+  return api.get<PendingDeletionEventItem[]>('/admin/events/pending-deletions')
+}
+
+/**
+ * Aprova a exclusão do evento (arquivamento/desativação segura).
+ */
+export async function approveEventDeletion(eventId: string): Promise<Event> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authApi = apiWithAuth(session?.access_token ?? '')
+  return authApi.post<Event>(`/admin/events/${eventId}/approve-deletion`, {})
+}
+
+/**
+ * Rejeita a solicitação de exclusão do evento.
+ */
+export async function rejectEventDeletion(eventId: string, reason?: string): Promise<Event> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authApi = apiWithAuth(session?.access_token ?? '')
+  return authApi.post<Event>(`/admin/events/${eventId}/reject-deletion`, { reason })
+}
+
+export interface EventMessageItem {
+  id: string
+  sender: 'admin' | 'organizer'
+  senderName: string
+  message: string
+  createdAt: string
+}
+
+/**
+ * Envia mensagem personalizada da administração para o organizador do evento.
+ */
+export async function contactEventOrganizer(eventId: string, message: string): Promise<{ success: boolean }> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const authApi = apiWithAuth(session?.access_token ?? '')
+  return authApi.post<{ success: boolean }>(`/admin/events/${eventId}/contact-organizer`, { message })
+}
+
+export interface AdminConversationItem {
+  eventId: string
+  eventTitle: string
+  eventStatus: string
+  deletionStatus: string
+  organizerId: string
+  lastMessage: string
+  lastSender: 'admin' | 'organizer'
+  lastMessageAt: string
+}
+
+/**
+ * Busca todas as conversas/diálogos ativos com os organizadores.
+ */
+export async function fetchConversations(): Promise<AdminConversationItem[]> {
+  return api.get<AdminConversationItem[]>('/admin/conversations')
+}
+
+/**
+ * Busca o histórico completo de mensagens/diálogo trocado entre admin e organizador sobre o evento.
+ */
+export async function fetchEventMessages(eventId: string): Promise<EventMessageItem[]> {
+  return api.get<EventMessageItem[]>(`/admin/events/${eventId}/messages`)
 }
 
 export async function fetchEventAttendees(eventId: string): Promise<AdminAttendee[]> {

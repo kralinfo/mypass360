@@ -4,11 +4,14 @@ import { AdminEventsSection } from '@/features/admin/components/AdminEventsSecti
 import { AdminMetricsSection } from '@/features/admin/components/AdminMetricsSection'
 import { AdminOverviewSection } from '@/features/admin/components/AdminOverviewSection'
 import { AdminUsersSection } from '@/features/admin/components/AdminUsersSection'
+import { AdminApprovalsSection } from '@/features/admin/components/AdminApprovalsSection'
+import { AdminDeletionSection } from '@/features/admin/components/AdminDeletionSection'
+import { AdminMessagesSection } from '@/features/admin/components/AdminMessagesSection'
 import { ReminderModal } from '@/features/admin/components/ReminderModal'
 import type { AdminSection } from '@/features/admin/admin.types'
 import { getAdminSection } from '@/features/admin/admin.utils'
 import { useAdminDashboard } from '@/features/admin/useAdminDashboard'
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 const sectionContent: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
@@ -32,12 +35,28 @@ const sectionContent: Record<AdminSection, { eyebrow: string; title: string; des
     title: 'Gestão de usuários',
     description: 'Controle contas ativas, organizadores e ações administrativas sobre acessos.',
   },
+  aprovacoes: {
+    eyebrow: 'PUBLICAÇÕES',
+    title: 'Aprovar publicações',
+    description: 'Revise e decida sobre as solicitações de publicação enviadas pelos organizadores.',
+  },
+  exclusoes: {
+    eyebrow: 'EXCLUSÕES',
+    title: 'Aprovar exclusões',
+    description: 'Análise detalhada e decisão sobre solicitações de exclusão de eventos.',
+  },
+  mensagens: {
+    eyebrow: 'MENSAGENS',
+    title: 'Central de mensagens e diálogo',
+    description: 'Comunicação direta em tempo real com os organizadores de eventos.',
+  },
 }
 
 export function AdminPageContent() {
   const searchParams = useSearchParams()
   const activeSection = useMemo(() => getAdminSection(searchParams.get('sec')), [searchParams])
   const sectionHeader = sectionContent[activeSection]
+  const [refreshKey, setRefreshKey] = useState(0)
   const {
     dashboard,
     isLoading,
@@ -54,6 +73,11 @@ export function AdminPageContent() {
     handleReminderClose,
   } = useAdminDashboard()
 
+  const handleRefreshAll = useCallback(async () => {
+    await loadDashboard()
+    setRefreshKey((prev) => prev + 1)
+  }, [loadDashboard])
+
   const currentSection = useMemo(() => {
     switch (activeSection) {
       case 'indicadores':
@@ -67,6 +91,7 @@ export function AdminPageContent() {
             onChangeStatus={handleEventStatusChange}
             onDelete={handleEventDelete}
             onSendReminders={handleSendPendingReminders}
+            onRefresh={handleRefreshAll}
           />
         )
       case 'usuarios':
@@ -79,6 +104,12 @@ export function AdminPageContent() {
             onDelete={handleUserDelete}
           />
         )
+      case 'aprovacoes':
+        return <AdminApprovalsSection key={refreshKey} />
+      case 'exclusoes':
+        return <AdminDeletionSection key={refreshKey} />
+      case 'mensagens':
+        return <AdminMessagesSection dashboard={dashboard} refreshKey={refreshKey} onRefresh={handleRefreshAll} />
       default:
         return (
           <AdminOverviewSection
@@ -93,13 +124,14 @@ export function AdminPageContent() {
     dashboard,
     handleEventDelete,
     handleEventStatusChange,
+    handleRefreshAll,
     handleUserDelete,
     handleUserToggle,
     handleSendPendingReminders,
     isLoading,
+    refreshKey,
     runningAction,
   ])
-
 
   return (
     <main
@@ -127,7 +159,7 @@ export function AdminPageContent() {
 
         <button
           type="button"
-          onClick={() => void loadDashboard()}
+          onClick={() => void handleRefreshAll()}
           disabled={isLoading}
           style={{
             border: '1px solid #cbd5e1',
