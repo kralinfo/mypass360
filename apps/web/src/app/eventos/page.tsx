@@ -55,17 +55,17 @@ export default function EventsPage() {
       {/* Loading hero skeleton */}
       {isLoading && (
         <div style={{
-          height: '520px',
-          background: 'linear-gradient(135deg, #0a0a0f 0%, #1e1b4b 100%)',
+          height: '280px',
+          background: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}>
           <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid rgba(255,255,255,0.15)',
-            borderTopColor: '#fff',
+            width: '36px',
+            height: '36px',
+            border: '3px solid #cbd5e1',
+            borderTopColor: '#4f46e5',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
