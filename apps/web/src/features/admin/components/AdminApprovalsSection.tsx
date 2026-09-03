@@ -440,7 +440,7 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
                   ✅ Confirmar aprovação?
                 </p>
                 <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
-                  O organizador receberá permissão para publicar o evento. O evento NÃO será publicado automaticamente — o organizador ainda precisará clicar em "Publicar".
+                  O organizador receberá permissão para publicar o evento. O evento NÃO será publicado automaticamente — o organizador ainda precisará clicar em &quot;Publicar&quot;.
                 </p>
                 {error && <p style={{ margin: '0 0 0.75rem', fontSize: '0.82rem', color: '#dc2626' }}>{error}</p>}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>

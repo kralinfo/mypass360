@@ -306,7 +306,7 @@ function SearchableEventDropdown({
   )
 }
 
-export function AdminMessagesSection({ dashboard, refreshKey, onRefresh }: AdminMessagesSectionProps) {
+export function AdminMessagesSection({ dashboard, refreshKey }: AdminMessagesSectionProps) {
   const [conversations, setConversations] = useState<AdminConversationItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -352,7 +352,7 @@ export function AdminMessagesSection({ dashboard, refreshKey, onRefresh }: Admin
     if (activeModalEvent) {
       void fetchEventMessages(activeModalEvent.eventId).then(setMessages)
     }
-  }, [refreshKey])
+  }, [refreshKey, activeModalEvent])
 
   async function openChatModal(eventId: string, eventTitle: string) {
     setActiveModalEvent({ eventId, eventTitle })
@@ -579,7 +579,7 @@ export function AdminMessagesSection({ dashboard, refreshKey, onRefresh }: Admin
                     padding: '0.65rem 0.75rem', fontSize: '0.83rem', color: '#334155',
                     lineHeight: 1.4, margin: '0.5rem 0',
                   }}>
-                    "{c.lastMessage}"
+                    &quot;{c.lastMessage}&quot;
                   </div>
 
                   <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block' }}>

@@ -129,7 +129,7 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
               color: '#92400e',
               lineHeight: 1.5,
             }}>
-              ⚠️ Após enviar a solicitação, o evento ficará em modo <strong>"Aguardando aprovação"</strong> e não poderá ser publicado até a decisão do administrador.
+              ⚠️ Após enviar a solicitação, o evento ficará em modo <strong>&quot;Aguardando aprovação&quot;</strong> e não poderá ser publicado até a decisão do administrador.
             </div>
 
             {/* Erro */}

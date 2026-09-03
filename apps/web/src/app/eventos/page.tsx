@@ -24,7 +24,7 @@ export default function EventsPage() {
 
   // "Mais Vendidos": eventos com maior número de ingressos vendidos
   const hotEvents = [...publishedEvents]
-    .sort((a, b) => (Number((b as any).sold ?? 0) - Number((a as any).sold ?? 0)))
+    .sort((a, b) => (Number((b as unknown as { sold?: number }).sold ?? 0) - Number((a as unknown as { sold?: number }).sold ?? 0)))
     .slice(0, Math.min(4, publishedEvents.length))
 
   const hotIds = new Set(hotEvents.map((e) => e.id))

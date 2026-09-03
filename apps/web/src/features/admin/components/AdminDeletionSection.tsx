@@ -241,7 +241,7 @@ function DeletionReviewModal({
                 margin: 0, fontSize: '0.92rem', color: '#7f1d1d', fontWeight: 600,
                 lineHeight: 1.5, whiteSpace: 'pre-wrap',
               }}>
-                "{event.deletionReason}"
+                &quot;{event.deletionReason}&quot;
               </p>
               <p style={{ margin: '0.5rem 0 0', fontSize: '0.74rem', color: '#991b1b' }}>
                 Solicitado em {formatDate(event.deletionRequestedAt)} por <strong>{event.organizerName || event.organizerEmail || 'Organizador'}</strong>
@@ -311,7 +311,7 @@ function DeletionReviewModal({
                 <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>Carregando diálogo...</p>
               ) : messages.length === 0 ? (
                 <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
-                  Nenhuma mensagem trocada ainda. Clique em "Entrar em contato" abaixo para enviar uma mensagem.
+                  Nenhuma mensagem trocada ainda. Clique em &quot;Entrar em contato&quot; abaixo para enviar uma mensagem.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '220px', overflowY: 'auto', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem' }}>
@@ -660,7 +660,7 @@ export function AdminDeletionSection() {
                   {item.title}
                 </h3>
                 <p style={{ margin: '0 0 0.4rem', fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Motivo: "{item.deletionReason}"
+                  Motivo: &quot;{item.deletionReason}&quot;
                 </p>
                 <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#64748b' }}>
                   <span>Organizador: {item.organizerName || item.organizerEmail}</span>

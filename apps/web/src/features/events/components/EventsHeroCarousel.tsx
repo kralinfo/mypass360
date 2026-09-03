@@ -15,9 +15,8 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
   const touchStartX = useRef(0)
 
   const total = events.length
-  if (total === 0) return null
 
-  const getIndex = (offset: number) => ((current + offset) % total + total) % total
+  const getIndex = (offset: number) => total > 0 ? ((current + offset) % total + total) % total : 0
 
   // Verifica responsividade no client
   useEffect(() => {
@@ -30,7 +29,7 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
   }, [])
 
   const go = useCallback((dir: 1 | -1) => {
-    if (isAnimating) return
+    if (isAnimating || total === 0) return
     setIsAnimating(true)
     setCurrent((c) => ((c + dir) % total + total) % total)
     setTimeout(() => setIsAnimating(false), 400)
@@ -57,6 +56,8 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
     return () => clearInterval(id)
   }, [go, total])
 
+  if (total === 0) return null
+
   // Card positions: [-2, -1, 0, 1, 2]
   const positions = [-2, -1, 0, 1, 2]
 
@@ -68,7 +69,7 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
     let translateZ = abs === 0 ? 0 : abs === 1 ? -100 : -200
     let scale = abs === 0 ? 1 : abs === 1 ? 0.85 : 0.7
     let rotateY = sign * (abs === 1 ? -15 : abs === 2 ? -25 : 0)
-    let zIndex = 10 - abs * 2
+    const zIndex = 10 - abs * 2
     let opacity = abs <= 2 ? 1 : 0
 
     if (isMobile) {

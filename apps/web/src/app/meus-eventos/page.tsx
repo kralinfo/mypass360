@@ -281,7 +281,7 @@ function MeusEventosContent() {
               }}
             >
               <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
-                Nenhum evento corresponde à busca "<strong>{search}</strong>".
+                Nenhum evento corresponde à busca &quot;<strong>{search}</strong>&quot;.
               </p>
             </div>
           ) : (
