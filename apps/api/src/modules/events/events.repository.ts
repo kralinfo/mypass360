@@ -11,7 +11,7 @@ export class EventsRepository {
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
-   * Lista eventos públicos: publicados e cuja data de publicação já passou (ou não há data agendada).
+   * Lista eventos públicos: publicados, data agendada válida e SEM solicitação de exclusão pendente.
    */
   async findAll() {
     const now = new Date().toISOString()
@@ -21,6 +21,7 @@ export class EventsRepository {
       .from(this.table)
       .select('*')
       .eq('status', 'published')
+      .neq('deletion_status', 'pending')
       .or(`published_at.is.null,published_at.lte.${now}`)
       .order('date', { ascending: true })
 
@@ -114,6 +115,8 @@ export class EventsRepository {
         status: dto.status ?? 'draft',
         ticket_layout: dto.ticket_layout ?? 'ticket',
         participant_id_type: dto.participant_id_type ?? 'name',
+        image_url: dto.image_url ?? null,
+        genre: dto.genre ?? null,
       })
       .select()
       .single()
@@ -264,8 +267,30 @@ export class EventsRepository {
 
   /**
    * Publica o evento imediatamente.
+   * EXIGE que approval_status = 'approved' antes de publicar.
+   * Lança erro se a condição não for atendida.
    */
   async publish(id: string, userId: string) {
+    // Verificar se o evento está aprovado antes de publicar
+    const { data: current, error: fetchError } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('approval_status, organizer_id')
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .single()
+
+    if (fetchError || !current) {
+      throw new Error('Evento não encontrado ou sem permissão para publicar.')
+    }
+
+    if (current.approval_status !== 'approved') {
+      throw new Error(
+        'APPROVAL_REQUIRED: Este evento ainda não foi aprovado para publicação. ' +
+        'Solicite a publicação e aguarde a análise do administrador.'
+      )
+    }
+
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
@@ -284,6 +309,7 @@ export class EventsRepository {
 
   /**
    * Oculta o evento (volta para draft).
+   * Não altera o approval_status — organizador mantém a aprovação pós-ocultamento.
    */
   async unpublish(id: string, userId: string) {
     const { data, error } = await this.supabase
@@ -304,14 +330,128 @@ export class EventsRepository {
 
   /**
    * Agenda a publicação para uma data futura.
+   * EXIGE que approval_status = 'approved' antes de agendar.
    */
   async schedule(id: string, userId: string, publishedAt: string) {
+    const { data: current, error: fetchError } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('approval_status, organizer_id')
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .single()
+
+    if (fetchError || !current) {
+      throw new Error('Evento não encontrado ou sem permissão para agendar.')
+    }
+
+    if (current.approval_status !== 'approved') {
+      throw new Error(
+        'APPROVAL_REQUIRED: Este evento ainda não foi aprovado para publicação. ' +
+        'Solicite a publicação e aguarde a análise do administrador.'
+      )
+    }
+
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
       .update({
         status: 'published',
         published_at: publishedAt,
+      })
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+    return data
+  }
+  /**
+   * Registra uma solicitação de aprovação pelo organizador.
+   * Apenas permitido para eventos em draft com approval_status 'none' ou 'rejected'.
+   */
+  async requestApproval(id: string, userId: string) {
+    // Verificar condições antes de solicitar
+    const { data: current, error: fetchError } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('approval_status, status')
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .single()
+
+    if (fetchError || !current) {
+      throw new Error('Evento não encontrado ou sem permissão.')
+    }
+
+    if (current.status !== 'draft') {
+      throw new Error(
+        'INVALID_STATUS: Apenas eventos em rascunho podem solicitar publicação.'
+      )
+    }
+
+    const approval = current.approval_status ?? 'none'
+    if (approval === 'pending') {
+      throw new Error(
+        'ALREADY_PENDING: Este evento já possui uma solicitação de publicação aguardando análise.'
+      )
+    }
+    if (approval === 'approved') {
+      throw new Error(
+        'ALREADY_APPROVED: Este evento já foi aprovado. Utilize a opção Publicar.'
+      )
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .update({
+        approval_status: 'pending',
+        approval_requested_at: new Date().toISOString(),
+        approval_reviewed_at: null,
+        approved_by: null,
+      })
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+
+  /**
+   * Registra uma solicitação de exclusão pelo organizador.
+   * Exige motivo obrigatório.
+   */
+  async requestDeletion(id: string, userId: string, reason: string) {
+    const { data: current, error: fetchError } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('deletion_status, status, approval_status, published_at')
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .single()
+
+    if (fetchError || !current) {
+      throw new Error('Evento não encontrado ou sem permissão.')
+    }
+
+    if (current.deletion_status === 'pending') {
+      throw new Error('ALREADY_PENDING_DELETION: Este evento já possui uma solicitação de exclusão em análise.')
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .update({
+        deletion_status: 'pending',
+        deletion_requested_at: new Date().toISOString(),
+        deletion_reason: reason,
+        deletion_reviewed_at: null,
+        deletion_reviewed_by: null,
       })
       .eq('id', id)
       .eq('organizer_id', userId)
@@ -338,3 +478,4 @@ export class EventsRepository {
     }
   }
 }
+

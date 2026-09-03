@@ -1,4 +1,4 @@
-import type { EventStatus } from '@mypass360/types'
+import type { ApprovalStatus, DeletionStatus, EventStatus } from '@mypass360/types'
 import type { AdminSection } from './admin.types'
 
 export const eventStatusOptions: EventStatus[] = ['draft', 'published', 'cancelled', 'finished']
@@ -10,7 +10,36 @@ export const eventStatusLabels: Record<EventStatus, string> = {
   finished: 'Encerrado',
 }
 
-const validSections: AdminSection[] = ['painel', 'indicadores', 'eventos', 'usuarios']
+export const approvalStatusLabels: Record<ApprovalStatus, string> = {
+  none: 'Sem aprovação',
+  pending: 'Aguardando aprovação',
+  approved: 'Aprovado',
+  rejected: 'Reprovado',
+}
+
+export const approvalStatusColors: Record<ApprovalStatus, string> = {
+  none: '#64748b',
+  pending: '#d97706',
+  approved: '#16a34a',
+  rejected: '#dc2626',
+}
+
+export const deletionStatusLabels: Record<DeletionStatus, string> = {
+  none: 'Sem solicitação',
+  pending: 'Exclusão em análise',
+  approved: 'Exclusão aprovada',
+  rejected: 'Exclusão mantida',
+}
+
+export const deletionStatusColors: Record<DeletionStatus, string> = {
+  none: '#64748b',
+  pending: '#dc2626',
+  approved: '#64748b',
+  rejected: '#16a34a',
+}
+
+const validSections: AdminSection[] = ['painel', 'indicadores', 'eventos', 'usuarios', 'aprovacoes', 'exclusoes', 'mensagens']
+
 
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)

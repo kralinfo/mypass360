@@ -12,6 +12,7 @@ export async function fetchMyEvents(token: string): Promise<Event[]> {
 /**
  * Publica o evento imediatamente.
  * Define status = 'published' e published_at = null.
+ * EXIGE que o evento tenha sido aprovado pelo administrador.
  */
 export async function publishEvent(id: string, token: string): Promise<Event> {
   return apiWithAuth(token).patch<Event>(`/events/${id}/publish`, {})
@@ -20,9 +21,18 @@ export async function publishEvent(id: string, token: string): Promise<Event> {
 /**
  * Oculta o evento (volta para draft).
  * Define status = 'draft' e published_at = null.
+ * Não altera o approval_status.
  */
 export async function unpublishEvent(id: string, token: string): Promise<Event> {
   return apiWithAuth(token).patch<Event>(`/events/${id}/unpublish`, {})
+}
+
+/**
+ * Solicita aprovação de publicação para o administrador.
+ * Só pode ser feito para eventos em draft com approval_status 'none' ou 'rejected'.
+ */
+export async function requestEventApproval(id: string, token: string): Promise<Event> {
+  return apiWithAuth(token).post<Event>(`/events/${id}/request-approval`, {})
 }
 
 /**
@@ -65,8 +75,44 @@ export async function fetchEventById(id: string, token: string): Promise<Event> 
 }
 
 /**
- * Exclui um evento (autenticado, apenas o proprietário).
+ * Exclui um evento (autenticado, apenas o proprietário — apenas para rascunhos).
  */
 export async function deleteEvent(id: string, token: string): Promise<void> {
   return apiWithAuth(token).delete<void>(`/events/${id}`)
 }
+
+/**
+ * Solicita a exclusão de um evento publicado ao administrador.
+ * Exige justificativa obrigatória.
+ */
+export async function requestEventDeletion(
+  id: string,
+  token: string,
+  reason: string
+): Promise<Event> {
+  return apiWithAuth(token).post<Event>(`/events/${id}/request-deletion`, { reason })
+}
+
+/**
+ * Envia uma resposta do organizador para a mensagem do administrador.
+ */
+export async function replyAdminMessage(
+  id: string,
+  token: string,
+  replyMessage: string
+): Promise<{ success: boolean }> {
+  return apiWithAuth(token).post<{ success: boolean }>(`/events/${id}/reply-admin-message`, {
+    replyMessage,
+  })
+}
+
+/**
+ * Busca o histórico de mensagens trocadas no evento para o organizador.
+ */
+export async function fetchEventMessages(
+  id: string,
+  token: string
+): Promise<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>> {
+  return apiWithAuth(token).get<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>>(`/events/${id}/messages`)
+}
+

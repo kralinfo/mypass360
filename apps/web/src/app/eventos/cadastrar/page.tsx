@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BackButton } from '@/components/BackButton'
 import { createEvent, updateEvent, fetchEventById } from '@/features/events/services/my-events.service'
+import { EventCoverUploader } from '@/features/events/components/EventCoverUploader'
 
 function CadastrarEventoForm() {
   const router = useRouter()
@@ -14,12 +15,15 @@ function CadastrarEventoForm() {
 
   const [loading, setLoading] = useState(false)
   const [loadingEvent, setLoadingEvent] = useState(isEditMode)
+  const [isReadOnly, setIsReadOnly] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
     description: '',
+    imageUrl: '',
+    genre: '',
     date: '',
     time: '',
     location: '',
@@ -75,10 +79,15 @@ function CadastrarEventoForm() {
               },
             ]
 
+        const isCancelledOrDeleted = event.deletion_status === 'approved' || event.status === 'cancelled'
+        setIsReadOnly(isCancelledOrDeleted)
+
         setFormData({
           title: event.title,
           slug: event.slug,
           description: event.description ?? '',
+          imageUrl: event.image_url ?? '',
+          genre: event.genre ?? '',
           date: dateStr,
           time: timeStr,
           location: event.location,
@@ -98,7 +107,7 @@ function CadastrarEventoForm() {
     void loadEvent()
   }, [editId, router])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
 
     if (name === 'title') {
@@ -203,6 +212,8 @@ function CadastrarEventoForm() {
         title: formData.title,
         slug: formData.slug,
         description: formData.description,
+        image_url: formData.imageUrl || null,
+        genre: formData.genre || null,
         date: dateTime,
         location: formData.location,
         capacity: parseInt(formData.capacity, 10),
@@ -266,7 +277,33 @@ function CadastrarEventoForm() {
           </div>
         )}
 
+        {isReadOnly && (
+          <div style={{
+            background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '14px',
+            padding: '1rem 1.25rem', marginBottom: '1.25rem', color: '#475569',
+            display: 'flex', alignItems: 'center', gap: '0.65rem',
+          }}>
+            <span style={{ fontSize: '1.5rem' }}>🚫</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.95rem', color: '#1e293b' }}>
+                Modo de Visualização Apenas (Evento Desativado / Cancelado)
+              </strong>
+              <span style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                A exclusão deste evento foi autorizada pelo administrador. Os dados estão disponíveis apenas para consulta e não podem mais ser alterados.
+              </span>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <fieldset disabled={isReadOnly} style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Uploader de Foto de Capa do Evento com Ajuste Interativo */}
+          <EventCoverUploader
+            value={formData.imageUrl}
+            onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url ?? '' }))}
+            eventId={editId ?? undefined}
+          />
+
           <div>
             <label htmlFor="title" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Título do Evento *
@@ -338,6 +375,39 @@ function CadastrarEventoForm() {
               }}
               placeholder="Descreva o evento..."
             />
+          </div>
+
+          <div>
+            <label htmlFor="genre" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
+              Gênero / Categoria *
+            </label>
+            <select
+              id="genre"
+              name="genre"
+              value={formData.genre}
+              onChange={handleChange}
+              required
+              style={{
+                width: '100%',
+                padding: '0.6rem 0.75rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '0.95rem',
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="">Selecione um gênero...</option>
+              <option value="Música">Música</option>
+              <option value="Festival">Festival</option>
+              <option value="Esportes">Esportes</option>
+              <option value="Teatro">Teatro</option>
+              <option value="Gastronomia">Gastronomia</option>
+              <option value="Cultura">Cultura</option>
+              <option value="Tech">Tech</option>
+            </select>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -691,30 +761,51 @@ function CadastrarEventoForm() {
               </label>
             </div>
           </section>
+          </fieldset>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                padding: '0.875rem 2rem',
-                background: loading ? '#94a3b8' : '#0f172a',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {loading
-                ? isEditMode
-                  ? 'Salvando...'
-                  : 'Cadastrando...'
-                : isEditMode
-                  ? 'Salvar Alterações'
-                  : 'Cadastrar Evento'}
-            </button>
+            {isReadOnly ? (
+              <button
+                type="button"
+                disabled
+                style={{
+                  padding: '0.875rem 2rem',
+                  background: '#94a3b8',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'not-allowed',
+                  opacity: 0.7,
+                }}
+              >
+                Evento Indisponível para Edição 🚫
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  padding: '0.875rem 2rem',
+                  background: '#6366f1',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {loading
+                  ? isEditMode
+                    ? 'Salvando...'
+                    : 'Cadastrando...'
+                  : isEditMode
+                    ? 'Salvar Alterações'
+                    : 'Cadastrar Evento'}
+              </button>
+            )}
 
             <button
               type="button"
@@ -731,7 +822,7 @@ function CadastrarEventoForm() {
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              Cancelar
+              Voltar
             </button>
           </div>
         </form>

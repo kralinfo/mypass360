@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { SignOutButton } from '@/features/auth/components/SignOutButton'
 import { useCart } from '@/features/cart/cart-context'
+import { NotificationCenter } from '@/features/notifications/components/NotificationCenter'
 
 export function Navbar() {
   const [user, setUser] = useState<User | null>(null)
@@ -203,6 +204,7 @@ export function Navbar() {
 
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginLeft: '0.25rem' }}>
+              <NotificationCenter />
               <span style={{ fontSize: '0.88rem', color: '#cbd5e1', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user.user_metadata?.name ?? user.email}
               </span>
@@ -226,7 +228,7 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Mobile Layout Right Side: Cart + Hamburger */}
+        {/* Mobile Layout Right Side: Cart + Notifications + Hamburger */}
         <div style={{ display: 'none', alignItems: 'center', gap: '0.85rem' }} className="menu-toggle-wrapper">
           <style>{`
             @media (max-width: 768px) {
@@ -235,6 +237,8 @@ export function Navbar() {
               }
             }
           `}</style>
+
+          {user && <NotificationCenter />}
           
           <Link
             href="/carrinho"

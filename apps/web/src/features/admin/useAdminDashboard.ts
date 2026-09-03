@@ -74,16 +74,12 @@ export function useAdminDashboard(): AdminDashboardState {
     }
   }, [loadDashboard])
 
-  const handleEventDelete = useCallback(async (event: AdminEventItem) => {
-    if (!window.confirm(`Remover o evento "${event.title}"?`)) {
-      return
-    }
-
+  const handleEventDelete = useCallback(async (event: AdminEventItem, reason?: string) => {
     const actionKey = `event-delete-${event.id}`
     setRunningAction(actionKey)
 
     try {
-      await deleteAdminEvent(event.id)
+      await deleteAdminEvent(event.id, reason)
       await loadDashboard()
     } catch (actionError) {
       alert(actionError instanceof Error ? actionError.message : 'Erro ao remover evento.')

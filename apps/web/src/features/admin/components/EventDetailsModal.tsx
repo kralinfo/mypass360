@@ -1,7 +1,5 @@
-'use client'
-
 import { useCallback, useEffect, useState } from 'react'
-import type { AdminEventItem, CheckinAccess, CheckinRecord } from '@mypass360/types'
+import type { AdminEventItem, CheckinAccess, CheckinRecord, Event } from '@mypass360/types'
 import {
   createEventCheckinAccess,
   deleteEventCheckin,
@@ -15,16 +13,15 @@ import {
   type AdminEventDetails,
 } from '../admin.service'
 
-
 import { eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
 
 interface EventDetailsModalProps {
-  event: AdminEventItem
+  event: AdminEventItem | Event
   onClose: () => void
   onUpdated?: () => void
 }
 
-type TabType = 'overview' | 'accesses' | 'checkins'
+type TabType = 'overview' | 'financial' | 'accesses' | 'checkins'
 
 function formatCpf(cpf: string | null): string {
   if (!cpf) return '—'
@@ -306,86 +303,204 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   })
 
   const checkedInCount = checkins.length
-  const totalTickets = details?.totalTickets ?? event.paidOrders
+  const totalTickets = details?.totalTickets ?? ('paidOrders' in event ? event.paidOrders : 0)
   const attendanceRate = totalTickets > 0 ? Math.round((checkedInCount / totalTickets) * 100) : 0
   const isAnonymousEvent = details?.ticket_layout !== 'formal_pdf' && details?.participant_id_type === 'none'
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: '1rem',
-      }}
+      className="ed-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '920px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden',
-          animation: 'ed-modal-scale 0.2s ease-out',
-        }}
-      >
+      <div className="ed-modal">
         <style>{`
           @keyframes ed-modal-scale {
             from { opacity: 0; transform: scale(0.97); }
             to { opacity: 1; transform: scale(1); }
           }
+          .ed-overlay {
+            position: fixed; inset: 0;
+            background-color: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; padding: 1rem;
+          }
+          .ed-modal {
+            background: #ffffff;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 920px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            animation: ed-modal-scale 0.2s ease-out;
+          }
+          .ed-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            background: linear-gradient(to right, #f8fafc, #ffffff);
+          }
+          .ed-header-top-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            width: 100%;
+          }
+          .ed-header-info {
+            flex: 1;
+            min-width: 0;
+          }
+          .ed-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+          }
+          .ed-tabs-bar {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+            background: #fafafa;
+            padding: 0 1.5rem;
+            gap: 0.5rem;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+          }
+          .ed-tabs-bar::-webkit-scrollbar {
+            height: 3px;
+          }
+          .ed-tabs-bar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+          }
+          .ed-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+          }
+          .ed-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+          }
+          .ed-config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+          }
+          @media (max-width: 640px) {
+            .ed-overlay {
+              padding: 0.4rem !important;
+            }
+            .ed-modal {
+              max-height: 96vh !important;
+              border-radius: 14px !important;
+            }
+            .ed-header {
+              padding: 0.85rem 1rem !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 0.65rem !important;
+            }
+            .ed-header-actions {
+              display: flex !important;
+              flex-wrap: wrap !important;
+              gap: 0.35rem !important;
+              width: 100% !important;
+            }
+            .ed-header-actions button, .ed-header-actions a {
+              flex: 1 1 calc(33.33% - 0.35rem) !important;
+              min-width: 90px !important;
+              padding: 6px 4px !important;
+              font-size: 0.72rem !important;
+              justify-content: center !important;
+              text-align: center !important;
+              box-sizing: border-box !important;
+            }
+            .ed-tabs-bar {
+              padding: 0 0.5rem !important;
+              gap: 0.25rem !important;
+            }
+            .ed-tabs-bar button {
+              padding: 0.6rem 0.5rem !important;
+              font-size: 0.76rem !important;
+              flex-shrink: 0 !important;
+            }
+            .ed-body {
+              padding: 0.85rem !important;
+            }
+            .ed-metrics-grid {
+              grid-template-columns: 1fr !important;
+              gap: 0.6rem !important;
+            }
+            .ed-config-grid {
+              grid-template-columns: 1fr !important;
+              gap: 0.65rem !important;
+            }
+          }
         `}</style>
 
-        {/* ── HEADER ── */}
-        <div
-          style={{
-            padding: '1.25rem 1.5rem',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            background: 'linear-gradient(to right, #f8fafc, #ffffff)',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                {event.title}
-              </h2>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  background: `${statusColor(event.status)}1a`,
-                  color: statusColor(event.status),
-                  fontWeight: 700,
-                  fontSize: '0.72rem',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {eventStatusLabels[event.status]}
-              </span>
+        {/* ── HEADER RESPONSIVO ── */}
+        <div className="ed-header">
+          <div className="ed-header-top-row">
+            <div className="ed-header-info">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>
+                  {event.title}
+                </h2>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    background: `${statusColor(event.status)}1a`,
+                    color: statusColor(event.status),
+                    fontWeight: 700,
+                    fontSize: '0.7rem',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {eventStatusLabels[event.status]}
+                </span>
+              </div>
+              <p style={{ margin: '3px 0 0', color: '#64748b', fontSize: '0.8rem', lineHeight: 1.3 }}>
+                📍 {event.location} • 📅 {formatDate(event.date)}
+              </p>
             </div>
-            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.85rem' }}>
-              📍 {event.location} • 📅 {formatDate(event.date)}
-            </p>
+
+            <button
+              onClick={onClose}
+              title="Fechar Detalhes"
+              style={{
+                border: 'none',
+                background: '#f1f5f9',
+                borderRadius: '6px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap', flexShrink: 0 }}>
+          <div className="ed-header-actions">
             {/* Botão Mestre de Ativação/Desativação de Check-in */}
             <button
               type="button"
@@ -395,7 +510,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 padding: '6px 12px',
                 borderRadius: '6px',
                 border: details?.checkin_enabled !== false ? '1px solid #bbf7d0' : '1px solid #fecaca',
@@ -410,7 +525,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
             >
               <IconDot color={details?.checkin_enabled !== false ? '#16a34a' : '#dc2626'} />
               {isTogglingCheckin
-                ? 'Atualizando...'
+                ? '...'
                 : details?.checkin_enabled !== false
                 ? 'Portaria Aberta'
                 : 'Portaria Fechada'}
@@ -443,7 +558,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               }}
             >
               {copiedCode === 'header-checkin-link' ? <IconCheck /> : <IconLink />}
-              {copiedCode === 'header-checkin-link' ? 'Link Copiado!' : 'Copiar Link'}
+              {copiedCode === 'header-checkin-link' ? 'Copiado!' : 'Copiar Link'}
             </button>
 
             <a
@@ -470,42 +585,11 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               <IconExternal />
               Abrir Portaria
             </a>
-
-            <button
-              onClick={onClose}
-              title="Fechar Detalhes"
-              style={{
-                border: 'none',
-                background: '#f1f5f9',
-                borderRadius: '6px',
-                width: '30px',
-                height: '30px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748b',
-                fontSize: '0.9rem',
-                fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >
-              ✕
-            </button>
           </div>
-
         </div>
 
-        {/* ── TABS NAV ── */}
-        <div
-          style={{
-            display: 'flex',
-            borderBottom: '1px solid #e2e8f0',
-            background: '#fafafa',
-            padding: '0 1.5rem',
-            gap: '0.5rem',
-          }}
-        >
+        {/* ── TABS NAV RESPONSIVA ── */}
+        <div className="ed-tabs-bar">
           <button
             onClick={() => setActiveTab('overview')}
             style={{
@@ -523,6 +607,24 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
             }}
           >
             Visão Geral
+          </button>
+          <button
+            onClick={() => setActiveTab('financial')}
+            style={{
+              padding: '0.75rem 1rem',
+              border: 'none',
+              background: 'transparent',
+              fontSize: '0.85rem',
+              fontWeight: activeTab === 'financial' ? 700 : 500,
+              color: activeTab === 'financial' ? '#4f46e5' : '#64748b',
+              borderBottom: activeTab === 'financial' ? '2px solid #4f46e5' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            Vendas & Financeiro
           </button>
           <button
             onClick={() => setActiveTab('accesses')}
@@ -562,9 +664,8 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
           </button>
         </div>
 
-
-        {/* ── BODY ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+        {/* ── BODY RESPONSIVO ── */}
+        <div className="ed-body">
           {isLoading && !details ? (
             <p style={{ textAlign: 'center', color: '#64748b', padding: '2rem 0' }}>
               Carregando detalhes do evento...
@@ -594,7 +695,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               {activeTab === 'overview' && (
                 <div style={{ display: 'grid', gap: '1.25rem' }}>
                   {/* Cards de Métricas */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div className="ed-metrics-grid">
                     <div style={{ padding: '1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                       <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                         Ingressos Emitidos
@@ -623,7 +724,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                         Receita Aprovada
                       </p>
                       <strong style={{ display: 'block', fontSize: '1.5rem', color: '#1e40af', marginTop: '4px' }}>
-                        {formatCurrency(event.revenue)}
+                        {formatCurrency(details?.financialSummary?.totalRevenue ?? ('revenue' in event ? event.revenue : (details?.price ? details.price * (details.totalTickets ?? 0) : 0)))}
                       </strong>
                     </div>
                   </div>
@@ -633,7 +734,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                     <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
                       Configurações de Identificação e Layout
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                    <div className="ed-config-grid">
                       <div>
                         <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Modelo de Layout:</span>
                         <p style={{ margin: '2px 0 0', fontWeight: 700, color: '#1e293b' }}>
@@ -688,6 +789,186 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB NOVA: VENDAS & FINANCEIRO ── */}
+              {activeTab === 'financial' && (
+                <div style={{ display: 'grid', gap: '1.25rem' }}>
+                  {/* Grid de Métricas Financeiras Consolidadas */}
+                  <div className="ed-metrics-grid" style={{ gap: '0.85rem' }}>
+                    {/* Receita Aprovada */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase' }}>
+                        Receita Aprovada
+                      </p>
+                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#1e40af', marginTop: '4px' }}>
+                        {formatCurrency(details?.financialSummary?.totalRevenue ?? ('revenue' in event ? event.revenue : (details?.price ? details.price * (details.totalTickets ?? 0) : 0)))}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: '#3b82f6', fontWeight: 600 }}>
+                        {details?.financialSummary?.paidOrdersCount ?? 0} pedidos pagos
+                      </span>
+                    </div>
+
+                    {/* Ingressos Vendidos */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        Ingressos Emitidos
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginTop: '4px' }}>
+                        <strong style={{ fontSize: '1.45rem', color: '#0f172a' }}>
+                          {totalTickets}
+                        </strong>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          de {details?.capacity || event.capacity || '∞'}
+                        </span>
+                      </div>
+                      {/* Barra de Ocupação */}
+                      <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${details?.financialSummary?.occupancyRate ?? attendanceRate}%`,
+                          height: '100%',
+                          background: '#4f46e5',
+                          borderRadius: '3px',
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#4f46e5', fontWeight: 600, display: 'block', marginTop: '4px' }}>
+                        {details?.financialSummary?.occupancyRate ?? 0}% da capacidade
+                      </span>
+                    </div>
+
+                    {/* Ticket Médio */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#faf5ff', border: '1px solid #e9d5ff' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#7e22ce', textTransform: 'uppercase' }}>
+                        Ticket Médio
+                      </p>
+                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#6b21a8', marginTop: '4px' }}>
+                        {formatCurrency(details?.financialSummary?.averageTicketPrice ?? (details?.price || 0))}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: '#9333ea', fontWeight: 600 }}>
+                        Média por ingresso
+                      </span>
+                    </div>
+
+                    {/* Presença / Portaria */}
+                    <div style={{ padding: '1rem', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>
+                        Presença na Portaria
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginTop: '4px' }}>
+                        <strong style={{ fontSize: '1.45rem', color: '#15803d' }}>
+                          {checkedInCount}
+                        </strong>
+                        <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>
+                          ({attendanceRate}%)
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 600 }}>
+                        {totalTickets - checkedInCount} pendentes
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Detalhamento por Lotes / Tipos de Ingresso */}
+                  <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
+                          Vendas por Lote / Tipo de Ingresso
+                        </h3>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                          Acompanhamento detalhado de quantidade emitida e receita gerada por cada categoria
+                        </p>
+                      </div>
+                    </div>
+
+                    {details?.ticketTypes && details.ticketTypes.length > 0 ? (
+                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        {details.ticketTypes.map((tt) => (
+                          <div
+                            key={tt.id}
+                            style={{
+                              padding: '1rem',
+                              borderRadius: '10px',
+                              border: '1px solid #e2e8f0',
+                              background: '#f8fafc',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <div>
+                                <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>
+                                  {tt.name}
+                                </strong>
+                                {tt.description && (
+                                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                                    {tt.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>
+                                  Preço Unitário: <strong>{formatCurrency(tt.price)}</strong>
+                                </span>
+                                <strong style={{ fontSize: '1rem', color: '#1e40af' }}>
+                                  Receita: {formatCurrency(tt.revenue)}
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* Barra de Progresso de Vendas */}
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', marginBottom: '4px' }}>
+                                <span>
+                                  Vendidos: <strong>{tt.sold}</strong> {tt.quantity > 0 ? `de ${tt.quantity}` : '(Lote Aberto)'}
+                                </span>
+                                {tt.quantity > 0 && (
+                                  <span style={{ fontWeight: 700, color: tt.percentageSold >= 90 ? '#dc2626' : '#4f46e5' }}>
+                                    {tt.percentageSold}% vendido {tt.percentageSold >= 100 ? '🔥 ESGOTADO' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {tt.quantity > 0 && (
+                                <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div
+                                    style={{
+                                      width: `${tt.percentageSold}%`,
+                                      height: '100%',
+                                      background: tt.percentageSold >= 90 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : 'linear-gradient(90deg, #6366f1, #4f46e5)',
+                                      borderRadius: '4px',
+                                      transition: 'width 0.3s ease',
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: '1.25rem',
+                          borderRadius: '10px',
+                          border: '1px dashed #cbd5e1',
+                          background: '#f8fafc',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <p style={{ margin: 0, color: '#475569', fontSize: '0.88rem' }}>
+                          Ingresso Geral • Valor: <strong>{formatCurrency(Number(details?.price || event.price || 0))}</strong>
+                        </p>
+                        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.8rem' }}>
+                          Total emitido: <strong>{totalTickets}</strong> ingressos • Receita acumulada:{' '}
+                          <strong style={{ color: '#166534' }}>
+                            {formatCurrency(Number(details?.price || event.price || 0) * totalTickets)}
+                          </strong>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

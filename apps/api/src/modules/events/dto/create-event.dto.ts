@@ -76,4 +76,12 @@ export class CreateEventDto {
   @IsOptional()
   @IsIn(['none', 'name', 'name_cpf'])
   participant_id_type?: string
+
+  @IsString()
+  @IsOptional()
+  image_url?: string | null
+
+  @IsString()
+  @IsOptional()
+  genre?: string | null
 }

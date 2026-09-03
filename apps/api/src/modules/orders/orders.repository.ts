@@ -33,13 +33,29 @@ export class OrdersRepository {
   }
 
   async create(dto: CreateOrderDto) {
+    const client = this.supabase.getClient()
+
+    // Validar se o evento existe, está publicado e NÃO está com exclusão pendente
+    const { data: event, error: eventErrorFetch } = await client
+      .from('events')
+      .select('id, status, deletion_status')
+      .eq('id', dto.eventId)
+      .single()
+
+    if (eventErrorFetch || !event) {
+      throw new Error('Evento informado não foi encontrado.')
+    }
+
+    if (event.status !== 'published' || event.deletion_status === 'pending') {
+      throw new Error('UNAVAILABLE_EVENT: Este evento está temporariamente indisponível para compras.')
+    }
+
     const total = dto.items.reduce<number>(
       (accumulator, item) => accumulator + item.quantity * item.unitPrice,
       0
     )
 
-    const { data: order, error: orderError } = await this.supabase
-      .getClient()
+    const { data: order, error: orderError } = await client
       .from(this.table)
       .insert({
         event_id: dto.eventId,
