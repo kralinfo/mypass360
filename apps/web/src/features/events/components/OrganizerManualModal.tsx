@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import Link from 'next/link'
 
 interface OrganizerManualModalProps {
   isOpen: boolean
@@ -240,7 +239,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                   </div>
                   <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Informações Básicas</h4>
                   <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Insira o <strong>Título</strong>, <strong>Descrição completa</strong>, <strong>Categoria</strong> e <strong>Banner Promocional</strong> (formato recomendado 16:9).
+                    Insira o <strong>Título</strong>, <strong>Descrição completa</strong>, <strong>Categoria</strong> (ex: Festas, Reuniões, Aniversários) e <strong>Banner Promocional</strong> (16:9).
                   </p>
                 </div>
 
@@ -248,9 +247,9 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
                     Passo 2
                   </div>
-                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Datas e Localização</h4>
+                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Tipo e Visibilidade</h4>
                   <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Defina a <strong>Data e Hora de Início/Término</strong> e o <strong>Endereço do Local</strong> com CEP e Cidade para busca no mapa.
+                    Escolha entre <strong>Evento Pago</strong> ou <strong>Gratuito</strong>, e defina se será <strong>Público</strong> (exibido na vitrine) ou <strong>Privado</strong> (acesso restrito por link).
                   </p>
                 </div>
 
@@ -258,10 +257,57 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
                     Passo 3
                   </div>
-                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Status Inicial</h4>
+                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Datas, Local e Status</h4>
                   <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Todo novo evento nasce no status <span style={{ background: '#fef3c7', color: '#92400e', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>Rascunho / Pendente</span>, garantindo que você revise tudo antes de publicar.
+                    Defina <strong>Data/Hora</strong>, <strong>Localização</strong> e salve como <span style={{ background: '#fef3c7', color: '#92400e', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>Rascunho</span> para revisar antes de publicar.
                   </p>
+                </div>
+              </div>
+
+              {/* Event Types & Visibilty Section */}
+              <div style={{ padding: '1.25rem', borderRadius: '14px', background: '#f0f9ff', border: '1px solid #bae6fd', color: '#0369a1' }}>
+                <h4 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', color: '#0369a1', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>🎁</span> Guia de Eventos Gratuitos, Visibilidade & Senha
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
+                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
+                      🏷️ Tipo: Pago vs. Gratuito
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
+                      <strong>Pago:</strong> Venda por lotes com checkout via cartão/PIX.<br />
+                      <strong>Gratuito:</strong> Fluxo rápido de confirmação de presença (nome + CPF) sem checkout, gerando ingresso digital com QR Code.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
+                      👁️ Visibilidade: Público vs. Privado
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
+                      <strong>Público:</strong> Aparece na vitrine e buscas do MyPass360.<br />
+                      <strong>Privado:</strong> Oculto da vitrine. Ideal para reuniões, aniversários, casamentos e festas fechadas. Acessível apenas por link.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
+                      🔑 Senha de Acesso e Visualização
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
+                      Você pode definir uma senha obrigatória para confirmação de presença. O organizador pode visualizar/copiar a senha a qualquer momento no card do evento.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
+                      🔗 Compartilhamento por Link Direto
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
+                      Copie o link exclusivo do evento no modal de compartilhamento e envie aos convidados via WhatsApp ou redes sociais.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -301,15 +347,37 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     cursor: 'pointer',
+                    marginBottom: '0.5rem',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
-                    <span>Onde meu evento fica visível após ser criado?</span>
+                    <span>Como funciona a visibilidade Privada para aniversários ou reuniões?</span>
                     <span>{expandedFaq === 'faq-2' ? '▲' : '▼'}</span>
                   </div>
                   {expandedFaq === 'faq-2' && (
                     <p style={{ margin: '0.6rem 0 0', fontSize: '0.85rem', color: '#475569' }}>
-                      Ele estará visível somente na sua tela de <strong>Meus Eventos</strong>. Para aparecer na vitrine pública e permitir vendas aos clientes, é necessário solicitar a publicação!
+                      Ao selecionar &quot;Privado&quot;, seu evento fica oculto no catálogo e nos buscadores. Apenas convidados que receberem o link direto conseguem visualizar e confirmar a presença (informando a senha, se houver).
+                    </p>
+                  )}
+                </div>
+
+                <div
+                  onClick={() => toggleFaq('faq-3')}
+                  style={{
+                    padding: '0.9rem 1.1rem',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
+                    <span>Onde meu evento fica visível após ser publicado?</span>
+                    <span>{expandedFaq === 'faq-3' ? '▲' : '▼'}</span>
+                  </div>
+                  {expandedFaq === 'faq-3' && (
+                    <p style={{ margin: '0.6rem 0 0', fontSize: '0.85rem', color: '#475569' }}>
+                      Eventos Públicos aparecem na vitrine do MyPass360 assim que aprovados. Eventos Privados ficam disponíveis exclusivamente através do link direto do evento.
                     </p>
                   )}
                 </div>
