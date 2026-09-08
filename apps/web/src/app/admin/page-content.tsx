@@ -4,8 +4,8 @@ import { AdminEventsSection } from '@/features/admin/components/AdminEventsSecti
 import { AdminMetricsSection } from '@/features/admin/components/AdminMetricsSection'
 import { AdminOverviewSection } from '@/features/admin/components/AdminOverviewSection'
 import { AdminUsersSection } from '@/features/admin/components/AdminUsersSection'
-import { AdminApprovalsSection } from '@/features/admin/components/AdminApprovalsSection'
-import { AdminDeletionSection } from '@/features/admin/components/AdminDeletionSection'
+import { AdminPublicationsTabContainer } from '@/features/admin/components/AdminPublicationsTabContainer'
+import { AdminDeletionsTabContainer } from '@/features/admin/components/AdminDeletionsTabContainer'
 import { AdminMessagesSection } from '@/features/admin/components/AdminMessagesSection'
 import { ReminderModal } from '@/features/admin/components/ReminderModal'
 import type { AdminSection } from '@/features/admin/admin.types'
@@ -37,13 +37,18 @@ const sectionContent: Record<AdminSection, { eyebrow: string; title: string; des
   },
   aprovacoes: {
     eyebrow: 'PUBLICAÇÕES',
-    title: 'Aprovar publicações',
-    description: 'Revise e decida sobre as solicitações de publicação enviadas pelos organizadores.',
+    title: 'Publicações',
+    description: 'Gestão de solicitações de publicação e histórico de análises de eventos.',
+  },
+  publicacoes: {
+    eyebrow: 'PUBLICAÇÕES',
+    title: 'Publicações',
+    description: 'Gestão de solicitações de publicação e histórico de análises de eventos.',
   },
   exclusoes: {
     eyebrow: 'EXCLUSÕES',
-    title: 'Aprovar exclusões',
-    description: 'Análise detalhada e decisão sobre solicitações de exclusão de eventos.',
+    title: 'Exclusões',
+    description: 'Gestão de solicitações de exclusão de eventos e histórico de análises.',
   },
   mensagens: {
     eyebrow: 'MENSAGENS',
@@ -105,9 +110,10 @@ export function AdminPageContent() {
           />
         )
       case 'aprovacoes':
-        return <AdminApprovalsSection key={refreshKey} />
+      case 'publicacoes':
+        return <AdminPublicationsTabContainer key={refreshKey} />
       case 'exclusoes':
-        return <AdminDeletionSection key={refreshKey} />
+        return <AdminDeletionsTabContainer key={refreshKey} />
       case 'mensagens':
         return <AdminMessagesSection dashboard={dashboard} refreshKey={refreshKey} onRefresh={handleRefreshAll} />
       default:

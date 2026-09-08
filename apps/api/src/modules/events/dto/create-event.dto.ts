@@ -84,4 +84,16 @@ export class CreateEventDto {
   @IsString()
   @IsOptional()
   genre?: string | null
+
+  @IsOptional()
+  @IsIn(['PAID', 'FREE'])
+  event_type?: string
+
+  @IsOptional()
+  @IsIn(['PUBLIC', 'PRIVATE'])
+  visibility?: string
+
+  @IsString()
+  @IsOptional()
+  access_password?: string | null
 }

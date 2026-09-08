@@ -24,6 +24,8 @@ import { DeleteConfirmModal } from './DeleteConfirmModal'
 import { PublishRequestModal } from './PublishRequestModal'
 import { DeleteRequestModal } from './DeleteRequestModal'
 import { AdminMessageDialogModal } from './AdminMessageDialogModal'
+import { DeletionRejectedModal } from './DeletionRejectedModal'
+import { ShareEventModal } from './ShareEventModal'
 import { EventDetailsModal } from '@/features/admin/components/EventDetailsModal'
 
 interface MyEventCardProps {
@@ -184,6 +186,8 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showPublishRequestModal, setShowPublishRequestModal] = useState(false)
   const [showDeleteRequestModal, setShowDeleteRequestModal] = useState(false)
   const [showAdminDialogModal, setShowAdminDialogModal] = useState(false)
+  const [showDeletionRejectedModal, setShowDeletionRejectedModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -457,6 +461,28 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             {statusConfig.label}
           </div>
 
+          {/* Badge de Visibilidade Privada */}
+          {event.visibility === 'PRIVATE' && (
+            <div
+              style={{
+                position: 'absolute', top: '10px', right: '10px',
+                background: 'rgba(124, 58, 237, 0.95)',
+                color: '#ffffff',
+                border: '1px solid #c4b5fd',
+                borderRadius: '999px',
+                padding: '3px 9px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: '4px',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                zIndex: 2,
+              }}
+            >
+              <span>🔒</span> Privado
+            </div>
+          )}
+
           {/* Indicador de loading sobre a imagem */}
           {loading && (
             <div style={{
@@ -574,6 +600,30 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
               </div>
               <span style={{ fontSize: '0.72rem', fontWeight: 700, textDecoration: 'underline', color: '#dc2626', flexShrink: 0 }}>
                 Ver diálogo 💬
+              </span>
+            </div>
+          )}
+
+          {/* Aviso: Exclusão Reprovada pelo Admin (Clicável para ver detalhes) */}
+          {(event.deletion_status === 'rejected' || event.deletion_rejection_reason) && (
+            <div
+              onClick={() => setShowDeletionRejectedModal(true)}
+              style={{
+                background: '#fef2f2', border: '1px solid #fca5a5',
+                borderRadius: '8px', padding: '0.5rem 0.75rem',
+                marginBottom: '0.5rem', fontSize: '0.74rem', color: '#991b1b',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Clique para ver o motivo da reprovação da exclusão"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span>🛡️</span>
+                <span><strong>Exclusão reprovada.</strong> Motivo: {event.deletion_rejection_reason ?? 'Solicitação mantida pela administração'}</span>
+              </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textDecoration: 'underline', color: '#dc2626', flexShrink: 0 }}>
+                Ver detalhes 💬
               </span>
             </div>
           )}
@@ -729,6 +779,20 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <span>Gerenciar</span>
                   </button>
 
+                  {/* 4.1 Compartilhar evento */}
+                  <button
+                    type="button"
+                    className="my-event-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setShowShareModal(true)
+                    }}
+                    title="Copiar e compartilhar o link do evento"
+                  >
+                    <span style={{ display: 'flex', color: '#0ea5e9' }}>🔗</span>
+                    <span>Compartilhar evento</span>
+                  </button>
+
                   {/* 4.5 Ver mensagens / diálogo */}
                   <button
                     type="button"
@@ -855,6 +919,24 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           onClose={() => setShowAdminDialogModal(false)}
         />
       )}
+
+      {/* Modal de Detalhes da Reprovação da Exclusão */}
+      {showDeletionRejectedModal && (
+        <DeletionRejectedModal
+          eventId={event.id}
+          eventTitle={event.title}
+          rejectionReason={event.deletion_rejection_reason}
+          onSendReply={handleSendAdminReply}
+          onClose={() => setShowDeletionRejectedModal(false)}
+        />
+      )}
+
+      {/* Modal de Compartilhamento do Evento */}
+      <ShareEventModal
+        event={event}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>

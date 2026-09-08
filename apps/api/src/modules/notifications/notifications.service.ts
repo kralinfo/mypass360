@@ -147,10 +147,11 @@ export class NotificationsService {
       await this.notificationsRepository.create({
         userId: event.organizerId,
         type: 'event_deletion_rejected',
-        title: 'Solicitação de exclusão mantida 🛡️',
-        message: `A solicitação de exclusão do evento "${event.title}" foi analisada e rejeitada.${messageReason} O evento foi mantido disponível.`,
+        title: 'Solicitação de exclusão rejeitada 🛡️',
+        message: `A solicitação de exclusão do evento "${event.title}" foi analisada e rejeitada por um administrador.${messageReason}`,
         entityType: 'event',
         entityId: event.id,
+        actionUrl: `/meus-eventos?event_id=${event.id}&deletion_rejected=true${reason ? `&reason=${encodeURIComponent(reason)}` : ''}`,
         metadata: { eventTitle: event.title, reason },
       })
     } catch (err) {

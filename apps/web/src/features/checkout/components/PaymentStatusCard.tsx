@@ -355,8 +355,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
           </button>
         </div>
 
-        {/* Dev Manual Confirmation */}
-        <ManualConfirmationBox
+        {/* Resgate de Cupom de Desconto */}
+        <CouponConfirmationBox
           orderId={orderId}
           manualCode={manualCode}
           setManualCode={setManualCode}
@@ -407,9 +407,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       {/* Success banner */}
       {isApproved && <SuccessBanner />}
 
-      {/* TODO: Remover quando a integração oficial do Mercado Pago estiver concluída. */}
       {isPending && (
-        <ManualConfirmationBox
+        <CouponConfirmationBox
           orderId={orderId}
           manualCode={manualCode}
           setManualCode={setManualCode}
@@ -453,9 +452,8 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   )
 }
 
-// ─── Manual confirmation sub-component (dev only) ─────────────────────────────
-// TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
-function ManualConfirmationBox({
+// ─── Componente de Resgate de Cupom de Desconto ─────────────────────────────────
+function CouponConfirmationBox({
   orderId,
   manualCode,
   setManualCode,
@@ -472,63 +470,76 @@ function ManualConfirmationBox({
 }) {
   return (
     <div style={{
-      background: '#fefce8',
-      border: '1px dashed #fbbf24',
-      borderRadius: '10px',
-      padding: '1rem',
+      background: '#f8fafc',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      padding: '1.25rem',
       display: 'grid',
       gap: '0.75rem',
       marginTop: '1rem',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span>🛠️</span>
-        <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#92400e', margin: 0 }}>
-          Confirmação Manual — Somente Desenvolvimento
+        <span style={{ fontSize: '1.2rem' }}>🎟️</span>
+        <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          Cupom de Desconto / Código Promocional
         </p>
       </div>
-      <p style={{ fontSize: '0.78rem', color: '#78350f', lineHeight: 1.5, margin: 0 }}>
-        Pedido: <code style={{ fontFamily: 'monospace' }}>{orderId}</code><br />
-        Insira o código para simular a aprovação e gerar os ingressos automaticamente.
+      <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+        Possui um cupom de desconto ou código de cortesia? Digite o código abaixo para resgatar sua oferta.
       </p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Código de confirmação"
+          placeholder="Digite o código do cupom"
           value={manualCode}
           onChange={(e) => setManualCode(e.target.value)}
           style={{
             flex: 1,
-            padding: '0.6rem 0.75rem',
+            minWidth: '200px',
+            padding: '0.65rem 0.85rem',
             borderRadius: '8px',
-            border: '1px solid #fbbf24',
-            background: '#fff',
-            fontSize: '0.875rem',
-            fontFamily: 'monospace',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            letterSpacing: '0.5px',
             outline: 'none',
+            color: '#0f172a',
           }}
+          onFocus={(e) => (e.target.style.borderColor = '#4f46e5')}
+          onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
         />
         <button
           type="button"
           onClick={onConfirm}
           disabled={isManualConfirming || !manualCode.trim()}
           style={{
-            padding: '0.6rem 1rem',
+            padding: '0.65rem 1.25rem',
             borderRadius: '8px',
             border: 'none',
-            background: '#d97706',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: '0.875rem',
+            background: '#4f46e5',
+            color: '#ffffff',
+            fontWeight: 600,
+            fontSize: '0.88rem',
             cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
             opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
             whiteSpace: 'nowrap',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            if (!isManualConfirming && manualCode.trim()) e.currentTarget.style.background = '#4338ca'
+          }}
+          onMouseLeave={(e) => {
+            if (!isManualConfirming && manualCode.trim()) e.currentTarget.style.background = '#4f46e5'
           }}
         >
-          {isManualConfirming ? 'Confirmando...' : 'Confirmar'}
+          {isManualConfirming ? 'Aplicando...' : 'Aplicar Cupom'}
         </button>
       </div>
       {manualError && (
-        <p style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: 600, margin: 0 }}>{manualError}</p>
+        <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
+          {manualError.includes('manual') ? 'Código de cupom inválido ou expirado.' : manualError}
+        </p>
       )}
     </div>
   )

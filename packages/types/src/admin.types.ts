@@ -124,6 +124,47 @@ export interface AdminDashboardData {
   users: AdminUserItem[]
 }
 
+export interface PublicationHistoryItem {
+  id: string
+  title: string
+  slug: string
+  organizerId: string
+  organizerName?: string
+  organizerEmail?: string
+  approvalStatus: ApprovalStatus
+  approvalRequestedAt?: string | null
+  approvalReviewedAt?: string | null
+  approvedBy?: string | null
+  reviewerName?: string | null
+  reviewerEmail?: string | null
+  approvalRejectionReason?: string | null
+  createdAt: string
+}
+
+export interface DeletionHistoryItem {
+  id: string
+  title: string
+  slug: string
+  organizerId: string
+  organizerName?: string
+  organizerEmail?: string
+  deletionStatus: DeletionStatus
+  deletionRequestedAt?: string | null
+  deletionReason?: string | null
+  deletionReviewedAt?: string | null
+  deletionReviewedBy?: string | null
+  reviewerName?: string | null
+  reviewerEmail?: string | null
+  deletionRejectionReason?: string | null
+  createdAt: string
+}
+
+export interface EventOptionItem {
+  id: string
+  title: string
+  slug: string
+}
+
 export interface UpdateAdminUserStatusInput {
   disabled: boolean
 }

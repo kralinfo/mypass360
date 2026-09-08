@@ -13,8 +13,8 @@ const adminMenuItems = [
   { href: '/admin?sec=indicadores', secao: 'indicadores', label: 'Indicadores', icon: '▫' },
   { href: '/admin?sec=eventos', secao: 'eventos', label: 'Eventos', icon: '▩' },
   { href: '/admin?sec=usuarios', secao: 'usuarios', label: 'Usuários', icon: '▪' },
-  { href: '/admin?sec=aprovacoes', secao: 'aprovacoes', label: 'Aprovar publicações', icon: '🚀' },
-  { href: '/admin?sec=exclusoes', secao: 'exclusoes', label: 'Aprovar exclusões', icon: '🗑️' },
+  { href: '/admin?sec=aprovacoes', secao: 'aprovacoes', label: 'Publicações', icon: '🚀' },
+  { href: '/admin?sec=exclusoes', secao: 'exclusoes', label: 'Exclusões', icon: '🗑️' },
   { href: '/admin?sec=mensagens', secao: 'mensagens', label: 'Mensagens', icon: '💬' },
 ]
 
@@ -27,9 +27,10 @@ function getTituloDaPagina(secao: string): string {
     case 'usuarios':
       return 'Gestão de usuários'
     case 'aprovacoes':
-      return 'Aprovar publicações'
+    case 'publicacoes':
+      return 'Publicações'
     case 'exclusoes':
-      return 'Aprovar exclusões'
+      return 'Exclusões'
     case 'mensagens':
       return 'Central de mensagens'
     default:
@@ -46,9 +47,10 @@ function getDescricaoDaPagina(secao: string): string {
     case 'usuarios':
       return 'Controle administrativo de contas autenticadas.'
     case 'aprovacoes':
-      return 'Revise e decida sobre solicitações de publicação dos organizadores.'
+    case 'publicacoes':
+      return 'Análise de solicitações de publicação e histórico de decisões.'
     case 'exclusoes':
-      return 'Análise de solicitações de exclusão de eventos enviadas pelos organizadores.'
+      return 'Análise de solicitações de exclusão de eventos e histórico de decisões.'
     case 'mensagens':
       return 'Comunicação direta em tempo real com os organizadores de eventos.'
     default:
