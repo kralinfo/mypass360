@@ -120,12 +120,27 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
         const res = await validateCheckinTicket(trimmed, access.code)
         setResult(res)
 
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate(res.valid ? 200 : [100, 50, 100, 50, 100])
+          } catch {
+            // Silencioso
+          }
+        }
+
         if (res.valid) {
           setCheckedInCount((c) => c + 1)
           setManualCode('')
           loadRecent()
         }
       } catch (err) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate([100, 50, 100, 50, 100])
+          } catch {
+            // Silencioso
+          }
+        }
         setResult({
           valid: false,
           reason: err instanceof Error ? err.message : 'Erro na comunicação com o servidor.',
@@ -514,34 +529,153 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               }}
             />
 
-            {/* Overlay de Câmera Pausada durante o feedback de 5s */}
-
+            {/* Overlay de Feedback em destaque sobre a Câmera */}
             {cameraActive && result && (
               <div
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  background: result.valid ? 'rgba(22, 101, 52, 0.75)' : 'rgba(153, 27, 27, 0.75)',
-                  backdropFilter: 'blur(3px)',
+                  background: result.valid
+                    ? 'linear-gradient(180deg, rgba(22, 101, 52, 0.96) 0%, rgba(20, 83, 45, 0.97) 100%)'
+                    : 'linear-gradient(180deg, rgba(153, 27, 27, 0.96) 0%, rgba(127, 29, 29, 0.97) 100%)',
+                  backdropFilter: 'blur(6px)',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  justifyContent: 'space-between',
                   color: '#fff',
                   zIndex: 10,
                   padding: '1rem',
-                  textAlign: 'center',
+                  boxSizing: 'border-box',
+                  overflowY: 'auto',
                 }}
               >
-                <span style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>
-                  {result.valid ? '✓' : '⏸️'}
-                </span>
-                <strong style={{ fontSize: '1rem' }}>
-                  {result.valid ? 'Check-in Registrado!' : 'Aguarde um instante'}
-                </strong>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#f1f5f9' }}>
-                  Câmera pausada por 5 segundos...
-                </p>
+                {/* Botão para Retomar Scanner Rapidamente */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                  <button
+                    type="button"
+                    onClick={() => setResult(null)}
+                    style={{
+                      border: 'none',
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      color: '#fff',
+                      borderRadius: '999px',
+                      padding: '5px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    <span>✕</span> Nova Leitura
+                  </button>
+                </div>
+
+                {/* Conteúdo Principal do Resultado */}
+                <div style={{ textAlign: 'center', margin: 'auto 0', padding: '0.5rem 0' }}>
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      color: result.valid ? '#15803d' : '#dc2626',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.75rem',
+                      fontWeight: 900,
+                      margin: '0 auto 0.5rem',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    {result.valid ? '✓' : '✕'}
+                  </div>
+
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>
+                    {result.valid ? 'Check-in Realizado com Sucesso!' : 'Entrada Não Permitida'}
+                  </h3>
+
+                  {result.valid ? (
+                    <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#dcfce7', fontWeight: 600 }}>
+                      Entrada autorizada às {formatTime(result.checkedInAt)}
+                    </p>
+                  ) : (
+                    <p style={{ margin: '6px 0 0', fontSize: '0.9rem', color: '#fecaca', fontWeight: 700, lineHeight: 1.3 }}>
+                      {result.reason ?? 'Ingresso inválido ou não autorizado.'}
+                    </p>
+                  )}
+
+                  {/* Card Interno com Detalhes do Participante / Ingresso / 1ª Leitura */}
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      borderRadius: '10px',
+                      padding: '0.65rem 0.85rem',
+                      textAlign: 'left',
+                      fontSize: '0.8rem',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                    }}
+                  >
+                    {result.valid ? (
+                      <>
+                        {!isAnonymousEvent && result.participantName && (
+                          <div style={{ marginBottom: '4px' }}>
+                            <span style={{ opacity: 0.8, fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>
+                              Participante:
+                            </span>
+                            <strong style={{ fontSize: '0.95rem', color: '#fff', wordBreak: 'break-word' }}>
+                              {result.participantName}
+                            </strong>
+                          </div>
+                        )}
+                        {!isAnonymousEvent && result.participantCpf && (
+                          <div style={{ marginBottom: '4px' }}>
+                            <span style={{ opacity: 0.8, fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>
+                              CPF:
+                            </span>
+                            <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                              {formatCpf(result.participantCpf)}
+                            </span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                          <span>Tipo: <strong>{result.ticketTypeName ?? 'Ingresso'}</strong></span>
+                          <span>Cód: <strong style={{ fontFamily: 'monospace' }}>{result.publicCode}</strong></span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {result.firstCheckedInAt && (
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.75rem', color: '#fee2e2', textTransform: 'uppercase' }}>
+                              Detalhes da 1ª Entrada:
+                            </strong>
+                            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#fff' }}>
+                              🕒 Realizado em: {formatTime(result.firstCheckedInAt)}
+                              {result.firstCheckedInBy ? ` • Por: ${result.firstCheckedInBy}` : ''}
+                            </p>
+                          </div>
+                        )}
+                        {result.publicCode && (
+                          <div style={{ marginTop: result.firstCheckedInAt ? '4px' : '0', paddingTop: result.firstCheckedInAt ? '4px' : '0', borderTop: result.firstCheckedInAt ? '1px solid rgba(255, 255, 255, 0.2)' : 'none' }}>
+                            <span>Código Lido: <strong style={{ fontFamily: 'monospace' }}>{result.publicCode}</strong></span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Rodapé com aviso de tempo de leitura */}
+                <div style={{ textAlign: 'center', paddingTop: '0.25rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.72rem', opacity: 0.85 }}>
+                    ⏱️ Scanner retoma em 5s (ou toque em Nova Leitura)
+                  </p>
+                </div>
               </div>
             )}
 
