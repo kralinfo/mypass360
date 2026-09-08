@@ -209,11 +209,10 @@ export class PaymentsService {
    * @param code - Código de confirmação (aceito: "mypass360pg")
    */
   async manualConfirmation(orderId: string, code: string) {
-    // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
-    const VALID_CODE = 'mypass360pg'
+    const codeNormalized = code.trim().toLowerCase()
 
-    if (code !== VALID_CODE) {
-      throw new BadRequestException('Código de confirmação inválido.')
+    if (!codeNormalized) {
+      throw new BadRequestException('Por favor, informe o código do cupom de desconto.')
     }
 
     // Buscar QUALQUER pagamento para este pedido (independente do status)
