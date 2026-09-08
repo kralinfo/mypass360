@@ -8,6 +8,7 @@ import { useMyEvents } from '@/features/events/hooks/useMyEvents'
 import { MyEventCard } from '@/features/events/components/MyEventCard'
 import { BackButton } from '@/components/BackButton'
 import { AdminMessageDialogModal } from '@/features/events/components/AdminMessageDialogModal'
+import { DeletionRejectedModal } from '@/features/events/components/DeletionRejectedModal'
 import { replyAdminMessage } from '@/features/events/services/my-events.service'
 
 function MeusEventosContent() {
@@ -15,6 +16,8 @@ function MeusEventosContent() {
   const searchParams = useSearchParams()
   const urlAdminMessage = searchParams.get('admin_message')
   const urlEventId = searchParams.get('event_id')
+  const urlDeletionRejected = searchParams.get('deletion_rejected')
+  const urlReason = searchParams.get('reason')
 
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const { events, isLoading, error, refetch } = useMyEvents()
@@ -22,13 +25,16 @@ function MeusEventosContent() {
   const [search, setSearch] = useState('')
   const [activeAdminMessage, setActiveAdminMessage] = useState<string | null>(null)
   const [activeEventId, setActiveEventId] = useState<string | null>(null)
+  const [activeDeletionRejectedEventId, setActiveDeletionRejectedEventId] = useState<string | null>(null)
 
   useEffect(() => {
     if (urlAdminMessage && urlEventId) {
       setActiveAdminMessage(urlAdminMessage)
       setActiveEventId(urlEventId)
+    } else if (urlDeletionRejected && urlEventId) {
+      setActiveDeletionRejectedEventId(urlEventId)
     }
-  }, [urlAdminMessage, urlEventId])
+  }, [urlAdminMessage, urlEventId, urlDeletionRejected])
 
   async function handleSendReply(replyMessage: string) {
     if (!activeEventId) return
@@ -319,6 +325,28 @@ function MeusEventosContent() {
           onClose={() => {
             setActiveAdminMessage(null)
             setActiveEventId(null)
+          }}
+        />
+      )}
+
+      {/* Modal de Detalhes da Reprovação da Exclusão */}
+      {activeDeletionRejectedEventId && (
+        <DeletionRejectedModal
+          eventId={activeDeletionRejectedEventId}
+          eventTitle={events.find((e) => e.id === activeDeletionRejectedEventId)?.title || 'Meu Evento'}
+          rejectionReason={
+            urlReason ||
+            events.find((e) => e.id === activeDeletionRejectedEventId)?.deletion_rejection_reason ||
+            'Solicitação analisada e mantida pela administração.'
+          }
+          onSendReply={async (replyMessage) => {
+            const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+            await replyAdminMessage(activeDeletionRejectedEventId, session.access_token, replyMessage)
+          }}
+          onClose={() => {
+            setActiveDeletionRejectedEventId(null)
           }}
         />
       )}

@@ -24,6 +24,7 @@ import { DeleteConfirmModal } from './DeleteConfirmModal'
 import { PublishRequestModal } from './PublishRequestModal'
 import { DeleteRequestModal } from './DeleteRequestModal'
 import { AdminMessageDialogModal } from './AdminMessageDialogModal'
+import { DeletionRejectedModal } from './DeletionRejectedModal'
 import { EventDetailsModal } from '@/features/admin/components/EventDetailsModal'
 
 interface MyEventCardProps {
@@ -184,6 +185,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showPublishRequestModal, setShowPublishRequestModal] = useState(false)
   const [showDeleteRequestModal, setShowDeleteRequestModal] = useState(false)
   const [showAdminDialogModal, setShowAdminDialogModal] = useState(false)
+  const [showDeletionRejectedModal, setShowDeletionRejectedModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -578,6 +580,30 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             </div>
           )}
 
+          {/* Aviso: Exclusão Reprovada pelo Admin (Clicável para ver detalhes) */}
+          {(event.deletion_status === 'rejected' || event.deletion_rejection_reason) && (
+            <div
+              onClick={() => setShowDeletionRejectedModal(true)}
+              style={{
+                background: '#fef2f2', border: '1px solid #fca5a5',
+                borderRadius: '8px', padding: '0.5rem 0.75rem',
+                marginBottom: '0.5rem', fontSize: '0.74rem', color: '#991b1b',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Clique para ver o motivo da reprovação da exclusão"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span>🛡️</span>
+                <span><strong>Exclusão reprovada.</strong> Motivo: {event.deletion_rejection_reason ?? 'Solicitação mantida pela administração'}</span>
+              </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textDecoration: 'underline', color: '#dc2626', flexShrink: 0 }}>
+                Ver detalhes 💬
+              </span>
+            </div>
+          )}
+
           {/* Aviso: Exclusão Aprovada pelo Admin */}
           {displayStatus === 'deletion_approved' && (
             <div style={{
@@ -853,6 +879,17 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           adminMessage="Clique para ver o histórico de mensagens trocadas com a administração."
           onSendReply={handleSendAdminReply}
           onClose={() => setShowAdminDialogModal(false)}
+        />
+      )}
+
+      {/* Modal de Detalhes da Reprovação da Exclusão */}
+      {showDeletionRejectedModal && (
+        <DeletionRejectedModal
+          eventId={event.id}
+          eventTitle={event.title}
+          rejectionReason={event.deletion_rejection_reason}
+          onSendReply={handleSendAdminReply}
+          onClose={() => setShowDeletionRejectedModal(false)}
         />
       )}
 

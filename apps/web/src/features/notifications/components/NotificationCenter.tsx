@@ -39,12 +39,53 @@ function NotificationIcon({ type }: { type: NotificationType }) {
       return <span style={{ fontSize: '1.1rem' }}>❌</span>
     case 'event_published':
       return <span style={{ fontSize: '1.1rem' }}>🎉</span>
+    case 'event_deletion_requested':
+      return <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+    case 'event_deletion_approved':
+      return <span style={{ fontSize: '1.1rem' }}>🗑️</span>
+    case 'event_deletion_rejected':
+      return <span style={{ fontSize: '1.1rem' }}>🛡️</span>
+    case 'event_deleted_by_admin':
+      return <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+    case 'admin_message':
+    case 'organizer_reply':
+      return <span style={{ fontSize: '1.1rem' }}>💬</span>
     case 'order_paid':
       return <span style={{ fontSize: '1.1rem' }}>💰</span>
     case 'checkin_completed':
       return <span style={{ fontSize: '1.1rem' }}>🎟️</span>
     default:
       return <span style={{ fontSize: '1.1rem' }}>🔔</span>
+  }
+}
+
+function resolveNotificationUrl(n: Notification): string | null {
+  if (n.action_url) return n.action_url
+
+  switch (n.type) {
+    case 'event_approval_requested':
+      return `/admin?sec=aprovacoes${n.entity_id ? `&event_id=${n.entity_id}` : ''}`
+    case 'event_deletion_requested':
+    case 'organizer_reply':
+      return `/admin?sec=exclusoes${n.entity_id ? `&event_id=${n.entity_id}` : ''}`
+    case 'event_deletion_rejected':
+      return `/meus-eventos?event_id=${n.entity_id}&deletion_rejected=true${n.metadata?.reason ? `&reason=${encodeURIComponent(String(n.metadata.reason))}` : ''}`
+    case 'event_rejected':
+      return `/meus-eventos?event_id=${n.entity_id}&approval_rejected=true`
+    case 'admin_message':
+      const msg = n.metadata?.adminMessage || n.message
+      return `/meus-eventos?event_id=${n.entity_id}&admin_message=${encodeURIComponent(String(msg))}`
+    case 'event_approved':
+    case 'event_published':
+    case 'event_deletion_approved':
+    case 'event_deleted_by_admin':
+    case 'checkin_completed':
+      return n.entity_id ? `/meus-eventos?event_id=${n.entity_id}` : '/meus-eventos'
+    case 'order_paid':
+      return '/meus-ingressos'
+    default:
+      if (n.entity_id) return `/meus-eventos?event_id=${n.entity_id}`
+      return null
   }
 }
 
@@ -79,14 +120,9 @@ export function NotificationCenter() {
     }
     setIsOpen(false)
 
-    if (n.action_url) {
-      const isCurrentlyOnAdminPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')
-      if (n.action_url.startsWith('/admin') && !isCurrentlyOnAdminPage) {
-        const targetUrl = n.entity_id ? `/meus-eventos?event_id=${n.entity_id}` : '/meus-eventos'
-        router.push(targetUrl)
-      } else {
-        router.push(n.action_url)
-      }
+    const targetUrl = resolveNotificationUrl(n)
+    if (targetUrl) {
+      router.push(targetUrl)
     }
   }
 
