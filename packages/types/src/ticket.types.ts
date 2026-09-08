@@ -3,7 +3,7 @@ export type TicketStatus = 'PENDING' | 'VALID' | 'CHECKED_IN' | 'CANCELED'
 export interface Ticket {
   id: string
   publicCode: string
-  orderId: string
+  orderId?: string | null
   orderItemId?: string
   eventId: string
   ticketTypeId?: string
@@ -11,6 +11,7 @@ export interface Ticket {
   buyerName?: string
   buyerEmail?: string
   buyerCpf?: string
+  registrationType?: 'PAID' | 'FREE'
   qrCode: string
   status: TicketStatus
   issuedAt?: string

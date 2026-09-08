@@ -25,6 +25,7 @@ import { PublishRequestModal } from './PublishRequestModal'
 import { DeleteRequestModal } from './DeleteRequestModal'
 import { AdminMessageDialogModal } from './AdminMessageDialogModal'
 import { DeletionRejectedModal } from './DeletionRejectedModal'
+import { ShareEventModal } from './ShareEventModal'
 import { EventDetailsModal } from '@/features/admin/components/EventDetailsModal'
 
 interface MyEventCardProps {
@@ -186,6 +187,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showDeleteRequestModal, setShowDeleteRequestModal] = useState(false)
   const [showAdminDialogModal, setShowAdminDialogModal] = useState(false)
   const [showDeletionRejectedModal, setShowDeletionRejectedModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -458,6 +460,28 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             />
             {statusConfig.label}
           </div>
+
+          {/* Badge de Visibilidade Privada */}
+          {event.visibility === 'PRIVATE' && (
+            <div
+              style={{
+                position: 'absolute', top: '10px', right: '10px',
+                background: 'rgba(124, 58, 237, 0.95)',
+                color: '#ffffff',
+                border: '1px solid #c4b5fd',
+                borderRadius: '999px',
+                padding: '3px 9px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: '4px',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+                zIndex: 2,
+              }}
+            >
+              <span>🔒</span> Privado
+            </div>
+          )}
 
           {/* Indicador de loading sobre a imagem */}
           {loading && (
@@ -755,6 +779,20 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <span>Gerenciar</span>
                   </button>
 
+                  {/* 4.1 Compartilhar evento */}
+                  <button
+                    type="button"
+                    className="my-event-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setShowShareModal(true)
+                    }}
+                    title="Copiar e compartilhar o link do evento"
+                  >
+                    <span style={{ display: 'flex', color: '#0ea5e9' }}>🔗</span>
+                    <span>Compartilhar evento</span>
+                  </button>
+
                   {/* 4.5 Ver mensagens / diálogo */}
                   <button
                     type="button"
@@ -892,6 +930,13 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           onClose={() => setShowDeletionRejectedModal(false)}
         />
       )}
+
+      {/* Modal de Compartilhamento do Evento */}
+      <ShareEventModal
+        event={event}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>

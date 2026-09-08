@@ -141,8 +141,13 @@ export function TicketCard({ ticket, buyerName, onNameUpdated }: TicketCardProps
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.4rem' }}>
-            {ticket.ticketType?.name?.toUpperCase() ?? 'INGRESSO'}
+          <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span>{ticket.ticketType?.name?.toUpperCase() ?? (ticket.registrationType === 'FREE' ? 'CONFIRMAÇÃO DE PRESENÇA' : 'INGRESSO')}</span>
+            {ticket.registrationType === 'FREE' && (
+              <span style={{ background: '#16a34a', color: '#ffffff', fontSize: '0.65rem', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 800 }}>
+                GRATUITO
+              </span>
+            )}
           </p>
           <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0, lineHeight: 1.2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
             {ticket.event?.title ?? 'Evento'}

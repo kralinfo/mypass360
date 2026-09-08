@@ -415,7 +415,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                     1
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 0.2rem', fontSize: '0.95rem', color: '#0f172a' }}>Clique no botão "Solicitar Publicação"</h4>
+                    <h4 style={{ margin: '0 0 0.2rem', fontSize: '0.95rem', color: '#0f172a' }}>Clique no botão &quot;Solicitar Publicação&quot;</h4>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
                       No card do seu evento em <strong>Meus Eventos</strong>, clique no botão azul de publicação quando os dados e ingressos estiverem prontos.
                     </p>
@@ -577,7 +577,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                   <div style={{ padding: '1.1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#4f46e5', marginBottom: '0.3rem' }}>Opção A: Botão no Painel</div>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      Acesse <strong>Meus Eventos</strong> e no card do evento desejado clique em <strong>"Check-in / Terminal"</strong>.
+                      Acesse <strong>Meus Eventos</strong> e no card do evento desejado clique em <strong>&quot;Check-in / Terminal&quot;</strong>.
                     </p>
                   </div>
 
@@ -608,10 +608,10 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                     <strong>Abrir no Navegador do Celular:</strong> Use o Google Chrome (Android/iOS) ou Safari (iPhone).
                   </li>
                   <li>
-                    <strong>Digitar o Código da Portaria:</strong> Insira o código PIN do evento e clique em <em>"Entrar no Terminal"</em>. A sessão ficará salva no celular durante todo o evento.
+                    <strong>Digitar o Código da Portaria:</strong> Insira o código PIN do evento e clique em <em>&quot;Entrar no Terminal&quot;</em>. A sessão ficará salva no celular durante todo o evento.
                   </li>
                   <li>
-                    <strong>Conceder Permissão de Câmera:</strong> Quando o navegador perguntar <em>"Deseja permitir o acesso à câmera?"</em>, toque em <strong>Permitir</strong>.
+                    <strong>Conceder Permissão de Câmera:</strong> Quando o navegador perguntar <em>&quot;Deseja permitir o acesso à câmera?&quot;</em>, toque em <strong>Permitir</strong>.
                   </li>
                   <li>
                     <strong>Apontar para o QR Code:</strong> Posicione a câmera traseira do smartphone em frente ao QR Code do ingresso (seja impresso em papel ou na tela do celular do cliente).
@@ -628,7 +628,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                     </div>
                   </li>
                   <li>
-                    <strong>Participante sem bateria / Sem celular:</strong> Clique na opção <strong>"Buscar por Nome ou CPF"</strong> na parte inferior da câmera para realizar a baixa manual rápida.
+                    <strong>Participante sem bateria / Sem celular:</strong> Clique na opção <strong>&quot;Buscar por Nome ou CPF&quot;</strong> na parte inferior da câmera para realizar a baixa manual rápida.
                   </li>
                 </ol>
               </div>

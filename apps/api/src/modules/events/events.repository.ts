@@ -1,8 +1,18 @@
 import { Injectable } from '@nestjs/common'
+import * as bcrypt from 'bcryptjs'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { CreateEventDto } from './dto/create-event.dto'
 
 type UpdateEventDto = Partial<CreateEventDto>
+
+function sanitizeEvent<T extends Record<string, any>>(event: T | null): T | null {
+  if (!event) return null
+  const { access_password_hash, ...rest } = event
+  return ({
+    ...rest,
+    has_password: Boolean(access_password_hash),
+  } as unknown) as T
+}
 
 @Injectable()
 export class EventsRepository {
@@ -11,7 +21,7 @@ export class EventsRepository {
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
-   * Lista eventos públicos: publicados, data agendada válida e SEM solicitação de exclusão pendente.
+   * Lista eventos públicos: publicados, visibilidade pública (PUBLIC), data agendada válida e SEM solicitação de exclusão pendente.
    */
   async findAll() {
     const now = new Date().toISOString()
@@ -21,12 +31,13 @@ export class EventsRepository {
       .from(this.table)
       .select('*')
       .eq('status', 'published')
+      .eq('visibility', 'PUBLIC')
       .neq('deletion_status', 'pending')
       .or(`published_at.is.null,published_at.lte.${now}`)
       .order('date', { ascending: true })
 
     if (error) throw new Error(error.message)
-    return data
+    return (data ?? []).map((item) => sanitizeEvent(item))
   }
 
   /**
@@ -45,7 +56,7 @@ export class EventsRepository {
       .single()
 
     if (error) return null
-    return data
+    return sanitizeEvent(data)
   }
 
   /**
@@ -61,7 +72,7 @@ export class EventsRepository {
       .order('created_at', { ascending: false })
 
     if (error) throw new Error(error.message)
-    return data ?? []
+    return (data ?? []).map((item) => sanitizeEvent(item))
   }
 
   /**
@@ -72,6 +83,21 @@ export class EventsRepository {
       .getClient()
       .from(this.table)
       .select('*, ticket_types(*)')
+      .eq('id', id)
+      .single()
+
+    if (error) return null
+    return sanitizeEvent(data)
+  }
+
+  /**
+   * Busca o hash da senha de acesso do evento (uso interno seguro no backend).
+   */
+  async getAccessPasswordHash(id: string): Promise<{ access_password_hash: string | null; event_type: string } | null> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('access_password_hash, event_type')
       .eq('id', id)
       .single()
 
@@ -93,13 +119,20 @@ export class EventsRepository {
       .single()
 
     if (error) return null
-    return data
+    return sanitizeEvent(data)
   }
 
   /**
    * Cria novo evento preenchendo organizer_id automaticamente com o userId autenticado.
    */
   async create(dto: CreateEventDto, userId: string) {
+    const eventType = dto.event_type ?? 'PAID'
+    let accessPasswordHash: string | null = null
+
+    if (eventType === 'FREE' && dto.access_password && dto.access_password.trim() !== '') {
+      accessPasswordHash = bcrypt.hashSync(dto.access_password.trim(), 10)
+    }
+
     const { data: event, error: eventError } = await this.supabase
       .getClient()
       .from(this.table)
@@ -111,8 +144,11 @@ export class EventsRepository {
         location: dto.location,
         organizer_id: userId, // sempre do JWT, nunca do body
         capacity: dto.capacity,
-        price: dto.price ?? 0,
+        price: eventType === 'FREE' ? 0 : (dto.price ?? 0),
         status: dto.status ?? 'draft',
+        event_type: eventType,
+        visibility: dto.visibility ?? 'PUBLIC',
+        access_password_hash: accessPasswordHash,
         ticket_layout: dto.ticket_layout ?? 'ticket',
         participant_id_type: dto.participant_id_type ?? 'name',
         image_url: dto.image_url ?? null,
@@ -127,7 +163,7 @@ export class EventsRepository {
       const ticketTypesToInsert = dto.ticket_types.map((ticketType) => ({
         event_id: event.id,
         name: ticketType.name,
-        price: ticketType.price,
+        price: eventType === 'FREE' ? 0 : ticketType.price,
         quantity: ticketType.quantity,
         description: ticketType.description ?? null,
         sold: ticketType.sold ?? 0,
@@ -143,7 +179,7 @@ export class EventsRepository {
       }
     }
 
-    return event
+    return sanitizeEvent(event)
   }
 
   /**
@@ -151,16 +187,39 @@ export class EventsRepository {
    */
   async update(id: string, userId: string, dto: UpdateEventDto) {
     // Remover campos que o usuário não deve poder alterar diretamente ou que não pertencem à tabela
-    const { status: _s, ticket_types: _tt, ...safeDto } = dto
-    // ticket_layout e participant_id_type fazem parte de safeDto e serão incluídos no update
+    const { status: _s, ticket_types: _tt, access_password, ...safeDto } = dto as any
+
+    const updatePayload: Record<string, any> = {
+      ...safeDto,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (dto.event_type !== undefined) {
+      updatePayload.event_type = dto.event_type
+      if (dto.event_type === 'FREE') {
+        updatePayload.price = 0
+      }
+    }
+
+    if (dto.visibility !== undefined) {
+      updatePayload.visibility = dto.visibility
+    }
+
+    if (access_password !== undefined) {
+      if (access_password && typeof access_password === 'string' && access_password.trim() !== '') {
+        updatePayload.access_password_hash = bcrypt.hashSync(access_password.trim(), 10)
+      } else {
+        updatePayload.access_password_hash = null
+      }
+    }
 
     // Log para diagnóstico
-    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'fields:', Object.keys(safeDto))
+    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'fields:', Object.keys(updatePayload))
 
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
-      .update({ ...safeDto, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id)
       .eq('organizer_id', userId)
       .select()
@@ -262,7 +321,7 @@ export class EventsRepository {
       }
     }
 
-    return data
+    return sanitizeEvent(data)
   }
 
   /**

@@ -39,6 +39,12 @@ export type TicketLayout = 'ticket' | 'formal_pdf'
 /** Tipo de identificação exigida no checkout */
 export type ParticipantIdType = 'none' | 'name' | 'name_cpf'
 
+/** Tipo de evento: Pago vs Gratuito (RSVP) */
+export type EventType = 'PAID' | 'FREE'
+
+/** Visibilidade do evento: Público vs Privado */
+export type EventVisibility = 'PUBLIC' | 'PRIVATE'
+
 export interface Event {
   id: string
   title: string
@@ -50,6 +56,12 @@ export interface Event {
   capacity: number
   price: number
   status: EventStatus
+  /** Tipo de evento (PAID ou FREE) */
+  event_type?: EventType
+  /** Visibilidade do evento: PUBLIC (catálogo público) ou PRIVATE (apenas via link direto) */
+  visibility?: EventVisibility
+  /** Indica se o evento gratuito exige senha de acesso */
+  has_password?: boolean
   /** Data/hora de publicação agendada. null = publicação imediata ou não agendado. */
   published_at?: string | null
   image_url?: string
@@ -91,6 +103,22 @@ export interface Event {
   }>
   created_at: string
   updated_at: string
+}
+
+export interface ValidatePasswordPayload {
+  access_password: string
+}
+
+export interface ValidatePasswordResponse {
+  valid: boolean
+  registration_token?: string
+  message?: string
+}
+
+export interface FreeRegistrationPayload {
+  participant_name?: string
+  participant_cpf?: string
+  registration_token?: string
 }
 
 /**

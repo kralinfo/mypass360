@@ -1,6 +1,15 @@
 import type { Event } from '@mypass360/types'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 
+/** Espelha a lógica do backend: remove o hash e calcula has_password */
+function sanitizeEvent(data: Record<string, unknown>): Event {
+  const { access_password_hash, ...rest } = data
+  return {
+    ...rest,
+    has_password: Boolean(access_password_hash),
+  } as Event
+}
+
 export async function fetchPublishedEvents(): Promise<Event[]> {
   const supabase = createBrowserClient()
   const now = new Date().toISOString()
@@ -17,7 +26,7 @@ export async function fetchPublishedEvents(): Promise<Event[]> {
     return []
   }
 
-  return (data ?? []) as Event[]
+  return (data ?? []).map((item) => sanitizeEvent(item as Record<string, unknown>))
 }
 
 export async function fetchPublishedEventBySlug(slug: string): Promise<Event | null> {
@@ -37,5 +46,5 @@ export async function fetchPublishedEventBySlug(slug: string): Promise<Event | n
     return null
   }
 
-  return data as Event
+  return sanitizeEvent(data as Record<string, unknown>)
 }
