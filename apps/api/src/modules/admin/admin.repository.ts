@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { SupabaseService } from '@/common/supabase/supabase.service'
-import type { AdminDashboardData, AdminEventItem, AdminUserItem } from '@mypass360/types'
+import type {
+  AdminDashboardData,
+  AdminEventItem,
+  AdminUserItem,
+  PublicationHistoryItem,
+  DeletionHistoryItem,
+  EventOptionItem,
+} from '@mypass360/types'
 import { MailService } from '@/common/mail/mail.service'
 
 export interface AdminAttendee {
@@ -1140,6 +1147,188 @@ export class AdminRepository {
       code += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     return code
+  }
+
+  /**
+   * Consulta o histórico de solicitações de publicação processadas (aprovadas/rejeitadas).
+   */
+  async getPublicationHistory(query: { limit?: number; page?: number; eventId?: string }) {
+    const client = this.supabase.getClient()
+    const page = query.page && query.page > 0 ? query.page : 1
+    const eventId = query.eventId?.trim()
+    const limit = query.limit ?? (eventId ? 100 : 10)
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    let req = client
+      .from('events')
+      .select('*', { count: 'exact' })
+      .in('approval_status', ['approved', 'rejected'])
+      .order('approval_reviewed_at', { ascending: false, nullsFirst: false })
+
+    if (eventId) {
+      req = req.eq('id', eventId)
+    }
+
+    req = req.range(from, to)
+
+    const { data: events, count, error } = await req
+    if (error) throw new Error(error.message)
+
+    const safeEvents = events ?? []
+    if (safeEvents.length === 0) {
+      return { items: [], total: count ?? 0, page, limit }
+    }
+
+    const userIds = [
+      ...new Set([
+        ...safeEvents.map((e: any) => e.organizer_id),
+        ...safeEvents.map((e: any) => e.approved_by),
+      ].filter(Boolean))
+    ]
+
+    let userMap = new Map<string, { email: string; name: string }>()
+    if (userIds.length > 0) {
+      try {
+        const authUsers = await this.safeListUsers(client)
+        for (const user of authUsers) {
+          if (userIds.includes(user.id)) {
+            userMap.set(user.id, {
+              email: user.email ?? '',
+              name: user.user_metadata?.name ?? user.email ?? 'Sem nome',
+            })
+          }
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+
+    const items: PublicationHistoryItem[] = safeEvents.map((e: any) => {
+      const organizer = userMap.get(e.organizer_id)
+      const reviewer = userMap.get(e.approved_by)
+
+      return {
+        id: e.id,
+        title: e.title,
+        slug: e.slug,
+        organizerId: e.organizer_id,
+        organizerName: organizer?.name,
+        organizerEmail: organizer?.email,
+        approvalStatus: e.approval_status,
+        approvalRequestedAt: e.approval_requested_at,
+        approvalReviewedAt: e.approval_reviewed_at,
+        approvedBy: e.approved_by,
+        reviewerName: reviewer?.name,
+        reviewerEmail: reviewer?.email,
+        approvalRejectionReason: e.approval_rejection_reason,
+        createdAt: e.created_at,
+      }
+    })
+
+    return { items, total: count ?? items.length, page, limit }
+  }
+
+  /**
+   * Consulta o histórico de solicitações de exclusão processadas (aprovadas/rejeitadas).
+   */
+  async getDeletionHistory(query: { limit?: number; page?: number; eventId?: string }) {
+    const client = this.supabase.getClient()
+    const page = query.page && query.page > 0 ? query.page : 1
+    const eventId = query.eventId?.trim()
+    const limit = query.limit ?? (eventId ? 100 : 10)
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    let req = client
+      .from('events')
+      .select('*', { count: 'exact' })
+      .in('deletion_status', ['approved', 'rejected'])
+      .order('deletion_reviewed_at', { ascending: false, nullsFirst: false })
+
+    if (eventId) {
+      req = req.eq('id', eventId)
+    }
+
+    req = req.range(from, to)
+
+    const { data: events, count, error } = await req
+    if (error) throw new Error(error.message)
+
+    const safeEvents = events ?? []
+    if (safeEvents.length === 0) {
+      return { items: [], total: count ?? 0, page, limit }
+    }
+
+    const userIds = [
+      ...new Set([
+        ...safeEvents.map((e: any) => e.organizer_id),
+        ...safeEvents.map((e: any) => e.deletion_reviewed_by),
+      ].filter(Boolean))
+    ]
+
+    let userMap = new Map<string, { email: string; name: string }>()
+    if (userIds.length > 0) {
+      try {
+        const authUsers = await this.safeListUsers(client)
+        for (const user of authUsers) {
+          if (userIds.includes(user.id)) {
+            userMap.set(user.id, {
+              email: user.email ?? '',
+              name: user.user_metadata?.name ?? user.email ?? 'Sem nome',
+            })
+          }
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+
+    const items: DeletionHistoryItem[] = safeEvents.map((e: any) => {
+      const organizer = userMap.get(e.organizer_id)
+      const reviewer = userMap.get(e.deletion_reviewed_by)
+
+      return {
+        id: e.id,
+        title: e.title,
+        slug: e.slug,
+        organizerId: e.organizer_id,
+        organizerName: organizer?.name,
+        organizerEmail: organizer?.email,
+        deletionStatus: e.deletion_status,
+        deletionRequestedAt: e.deletion_requested_at,
+        deletionReason: e.deletion_reason,
+        deletionReviewedAt: e.deletion_reviewed_at,
+        deletionReviewedBy: e.deletion_reviewed_by,
+        reviewerName: reviewer?.name,
+        reviewerEmail: reviewer?.email,
+        deletionRejectionReason: e.deletion_rejection_reason,
+        createdAt: e.created_at,
+      }
+    })
+
+    return { items, total: count ?? items.length, page, limit }
+  }
+
+  /**
+   * Retorna opções de eventos para o seletor pesquisável.
+   */
+  async getEventOptions(search?: string) {
+    const client = this.supabase.getClient()
+
+    let query = client
+      .from('events')
+      .select('id, title, slug')
+      .order('title', { ascending: true })
+      .limit(50)
+
+    if (search && search.trim().length > 0) {
+      query = query.ilike('title', `%${search.trim()}%`)
+    }
+
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    return (data ?? []) as EventOptionItem[]
   }
 }
 

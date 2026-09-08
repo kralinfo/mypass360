@@ -176,6 +176,18 @@ export class AdminService {
   getAllConversations() {
     return this.adminRepository.getAllConversations()
   }
+
+  getPublicationHistory(query: { limit?: number; page?: number; eventId?: string }) {
+    return this.adminRepository.getPublicationHistory(query)
+  }
+
+  getDeletionHistory(query: { limit?: number; page?: number; eventId?: string }) {
+    return this.adminRepository.getDeletionHistory(query)
+  }
+
+  getEventOptions(search?: string) {
+    return this.adminRepository.getEventOptions(search)
+  }
 }
 
 

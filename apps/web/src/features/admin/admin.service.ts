@@ -10,6 +10,9 @@ import type {
   EventStatus,
   PendingApprovalEventItem,
   PendingDeletionEventItem,
+  PublicationHistoryItem,
+  DeletionHistoryItem,
+  EventOptionItem,
 } from '@mypass360/types'
 
 export interface AdminAttendee {
@@ -321,6 +324,44 @@ export async function resetEventCheckins(eventId: string): Promise<{ success: bo
   } catch {
     return api.delete<{ success: boolean; message: string; restoredCount: number }>(`/admin/events/${eventId}/checkins`)
   }
+}
+
+export interface HistoryResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  limit: number
+}
+
+export async function fetchPublicationHistory(params?: {
+  eventId?: string
+  limit?: number
+  page?: number
+}): Promise<HistoryResponse<PublicationHistoryItem>> {
+  const query = new URLSearchParams()
+  if (params?.eventId) query.append('eventId', params.eventId)
+  if (params?.limit) query.append('limit', params.limit.toString())
+  if (params?.page) query.append('page', params.page.toString())
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  return api.get<HistoryResponse<PublicationHistoryItem>>(`/admin/publications/history${queryString}`)
+}
+
+export async function fetchDeletionHistory(params?: {
+  eventId?: string
+  limit?: number
+  page?: number
+}): Promise<HistoryResponse<DeletionHistoryItem>> {
+  const query = new URLSearchParams()
+  if (params?.eventId) query.append('eventId', params.eventId)
+  if (params?.limit) query.append('limit', params.limit.toString())
+  if (params?.page) query.append('page', params.page.toString())
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  return api.get<HistoryResponse<DeletionHistoryItem>>(`/admin/deletions/history${queryString}`)
+}
+
+export async function fetchEventOptions(search?: string): Promise<EventOptionItem[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : ''
+  return api.get<EventOptionItem[]>(`/admin/events/options${query}`)
 }
 
 

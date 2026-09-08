@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { AdminService } from './admin.service'
 import { UpdateAdminUserStatusDto } from './dto/update-admin-user-status.dto'
 import { UpdateAdminEventStatusDto } from './dto/update-admin-event-status.dto'
@@ -107,6 +107,44 @@ export class AdminController {
     @CurrentUser() admin: AuthenticatedUser
   ) {
     return this.adminService.contactOrganizer(id, admin.id, dto.message)
+  }
+
+  /** GET /admin/publications/history — lista histórico de solicitações de publicação */
+  @Get('publications/history')
+  getPublicationHistory(
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('eventId') eventId?: string
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined
+    const parsedPage = page ? parseInt(page, 10) : undefined
+    return this.adminService.getPublicationHistory({
+      limit: isNaN(parsedLimit as number) ? undefined : parsedLimit,
+      page: isNaN(parsedPage as number) ? undefined : parsedPage,
+      eventId,
+    })
+  }
+
+  /** GET /admin/deletions/history — lista histórico de solicitações de exclusão */
+  @Get('deletions/history')
+  getDeletionHistory(
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('eventId') eventId?: string
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined
+    const parsedPage = page ? parseInt(page, 10) : undefined
+    return this.adminService.getDeletionHistory({
+      limit: isNaN(parsedLimit as number) ? undefined : parsedLimit,
+      page: isNaN(parsedPage as number) ? undefined : parsedPage,
+      eventId,
+    })
+  }
+
+  /** GET /admin/events/options — retorna opções de eventos para o seletor pesquisável */
+  @Get('events/options')
+  getEventOptions(@Query('search') search?: string) {
+    return this.adminService.getEventOptions(search)
   }
 
   /** GET /admin/events/:id/messages — lista o histórico de mensagens trocadas no evento */

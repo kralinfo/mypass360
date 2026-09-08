@@ -38,7 +38,7 @@ export const deletionStatusColors: Record<DeletionStatus, string> = {
   rejected: '#16a34a',
 }
 
-const validSections: AdminSection[] = ['painel', 'indicadores', 'eventos', 'usuarios', 'aprovacoes', 'exclusoes', 'mensagens']
+const validSections: AdminSection[] = ['painel', 'indicadores', 'eventos', 'usuarios', 'aprovacoes', 'publicacoes', 'exclusoes', 'mensagens']
 
 
 export function formatCurrency(value: number): string {
