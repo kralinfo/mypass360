@@ -9,6 +9,7 @@ import { MyEventCard } from '@/features/events/components/MyEventCard'
 import { BackButton } from '@/components/BackButton'
 import { AdminMessageDialogModal } from '@/features/events/components/AdminMessageDialogModal'
 import { DeletionRejectedModal } from '@/features/events/components/DeletionRejectedModal'
+import { OrganizerManualModal } from '@/features/events/components/OrganizerManualModal'
 import { replyAdminMessage } from '@/features/events/services/my-events.service'
 
 function MeusEventosContent() {
@@ -26,6 +27,13 @@ function MeusEventosContent() {
   const [activeAdminMessage, setActiveAdminMessage] = useState<string | null>(null)
   const [activeEventId, setActiveEventId] = useState<string | null>(null)
   const [activeDeletionRejectedEventId, setActiveDeletionRejectedEventId] = useState<string | null>(null)
+  const [isManualOpen, setIsManualOpen] = useState(false)
+  const [manualInitialTab, setManualInitialTab] = useState<string>('criacao')
+
+  const openManualTab = (tabId: string) => {
+    setManualInitialTab(tabId)
+    setIsManualOpen(true)
+  }
 
   useEffect(() => {
     if (urlAdminMessage && urlEventId) {
@@ -92,7 +100,7 @@ function MeusEventosContent() {
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '1rem',
-          marginBottom: '2rem',
+          marginBottom: '1.5rem',
         }}
       >
         <div>
@@ -129,6 +137,200 @@ function MeusEventosContent() {
         >
           + Cadastrar Evento
         </Link>
+      </div>
+
+      {/* Banner de Ajuda Interativo */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+          borderRadius: '16px',
+          padding: '1.25rem 1.5rem',
+          marginBottom: '2rem',
+          color: '#0f172a',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.03)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>💡</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                Guia Rápido do Organizador MyPass360
+              </h3>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.88rem', color: '#64748b' }}>
+                Entenda como cadastrar eventos, criar lotes, solicitar aprovação/exclusão e usar a validação de QR Code na portaria.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => openManualTab('criacao')}
+            style={{
+              background: '#4f46e5',
+              color: '#ffffff',
+              border: 'none',
+              padding: '0.55rem 1.15rem',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#4338ca')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#4f46e5')}
+          >
+            Abrir Manual Completo ➔
+          </button>
+        </div>
+
+        {/* Quick Topic Chips */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+          <button
+            onClick={() => openManualTab('criacao')}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f1f5f9'
+              e.currentTarget.style.borderColor = '#94a3b8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff'
+              e.currentTarget.style.borderColor = '#cbd5e1'
+            }}
+          >
+            📝 Criação do Evento
+          </button>
+
+          <button
+            onClick={() => openManualTab('ingressos')}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f1f5f9'
+              e.currentTarget.style.borderColor = '#94a3b8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff'
+              e.currentTarget.style.borderColor = '#cbd5e1'
+            }}
+          >
+            🎟️ Ingressos e Lotes
+          </button>
+
+          <button
+            onClick={() => openManualTab('publicacao')}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f1f5f9'
+              e.currentTarget.style.borderColor = '#94a3b8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff'
+              e.currentTarget.style.borderColor = '#cbd5e1'
+            }}
+          >
+            🚀 Solicitar Publicação
+          </button>
+
+          <button
+            onClick={() => openManualTab('exclusao')}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f1f5f9'
+              e.currentTarget.style.borderColor = '#94a3b8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff'
+              e.currentTarget.style.borderColor = '#cbd5e1'
+            }}
+          >
+            🗑️ Solicitar Exclusão
+          </button>
+
+          <button
+            onClick={() => openManualTab('checkin')}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#334155',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f1f5f9'
+              e.currentTarget.style.borderColor = '#94a3b8'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff'
+              e.currentTarget.style.borderColor = '#cbd5e1'
+            }}
+          >
+            📱 Validação & Check-in
+          </button>
+        </div>
       </div>
 
       {/* Barra de Pesquisa */}
@@ -350,6 +552,13 @@ function MeusEventosContent() {
           }}
         />
       )}
+
+      {/* Modal Interativo do Manual do Organizador */}
+      <OrganizerManualModal
+        isOpen={isManualOpen}
+        initialTab={manualInitialTab}
+        onClose={() => setIsManualOpen(false)}
+      />
 
       <style>{`
         @keyframes pulse {
