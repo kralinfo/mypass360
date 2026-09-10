@@ -14,6 +14,7 @@ import {
 } from '../admin.service'
 
 import { eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
+import { getAllOrganizerBankAccounts, type BankAccountData } from '@/features/events/services/bank-account.service'
 
 interface EventDetailsModalProps {
   event: AdminEventItem | Event
@@ -74,6 +75,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [details, setDetails] = useState<AdminEventDetails | null>(null)
   const [accesses, setAccesses] = useState<CheckinAccess[]>([])
   const [checkins, setCheckins] = useState<CheckinRecord[]>([])
+  const [bankAccount, setBankAccount] = useState<BankAccountData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchCheckin, setSearchCheckin] = useState('')
@@ -125,6 +127,14 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
       setDetails(detailsData)
       setAccesses(accessesData)
       setCheckins(checkinsData)
+
+      getAllOrganizerBankAccounts()
+        .then((map) => {
+          const organizerId = 'organizer_id' in event ? (event as Event).organizer_id : (event as unknown as { organizer_id: string }).organizer_id
+          const acc = map[event.id] || (organizerId ? map[organizerId] : null) || null
+          setBankAccount(acc)
+        })
+        .catch((err) => console.warn('Erro ao carregar conta bancária:', err))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar detalhes do evento.')
     } finally {
@@ -967,6 +977,53 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                             {formatCurrency(Number(details?.price || event.price || 0) * totalTickets)}
                           </strong>
                         </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── CONTA BANCÁRIA DO ORGANIZADOR PARA REPASSE ── */}
+                  <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff' }}>
+                    <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: '#0f172a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span>🏦</span> Dados Bancários para Repasse ao Organizador
+                    </h3>
+                    {bankAccount ? (
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '1rem', color: '#166534' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.95rem', color: '#15803d' }}>{bankAccount.bank_name} ({bankAccount.bank_code})</strong>
+                            <div style={{ fontSize: '0.85rem', color: '#334155', marginTop: '0.2rem' }}>
+                              <strong>Titular:</strong> {bankAccount.holder_name} ({bankAccount.person_type.toUpperCase()}: {bankAccount.document})
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '0.1rem' }}>
+                              <strong>Agência:</strong> {bankAccount.agency} | <strong>Conta:</strong> {bankAccount.account_number}-{bankAccount.account_digit} ({bankAccount.account_type === 'corrente' ? 'Conta Corrente' : 'Conta Poupança'})
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const text = `Titular: ${bankAccount.holder_name}\nCPF/CNPJ: ${bankAccount.document}\nBanco: ${bankAccount.bank_name}\nAgência: ${bankAccount.agency}\nConta: ${bankAccount.account_number}-${bankAccount.account_digit}`
+                              navigator.clipboard.writeText(text)
+                              alert('Dados bancários copiados para a área de transferência!')
+                            }}
+                            style={{
+                              backgroundColor: '#059669',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '0.55rem 0.95rem',
+                              borderRadius: '8px',
+                              fontWeight: 600,
+                              fontSize: '0.8rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)',
+                            }}
+                          >
+                            📋 Copiar Dados Bancários
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.85rem 1rem', color: '#b45309', fontSize: '0.85rem' }}>
+                        ⚠️ <strong>Pendente:</strong> O organizador deste evento ainda não cadastrou os dados da sua conta bancária para repasse.
                       </div>
                     )}
                   </div>

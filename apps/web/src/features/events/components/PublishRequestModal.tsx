@@ -118,6 +118,30 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
               </div>
             </div>
 
+            {/* Lembrete Financeiro & Repasse */}
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '10px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.82rem',
+              color: '#166534',
+              lineHeight: 1.5,
+            }}>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#15803d', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>💰</span> Como você recebe o dinheiro das vendas:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <li>O valor das vendas cai na sua conta bancária em <strong>até 3 dias úteis</strong> após a conclusão do evento.</li>
+                <li>Taxa de serviço: <strong>10%</strong> + <strong>2% a 2,5%</strong> por venda.</li>
+                <li>Transferência <strong>gratuita</strong> para Banco do Brasil, Bradesco, Itaú e Santander (R$ 7,50 para outros).</li>
+              </ul>
+              <div style={{ marginTop: '0.45rem', fontSize: '0.78rem', color: '#047857', fontWeight: 600 }}>
+                💡 Cadastre sua conta corrente ou poupança no menu <strong>“Financeiro”</strong>.
+              </div>
+            </div>
+
             {/* Aviso */}
             <div style={{
               background: '#fffbeb',

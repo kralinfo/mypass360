@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { OrganizerFinancialGuide } from './OrganizerFinancialGuide'
+import { BankAccountSetupModal } from './BankAccountSetupModal'
 
 interface OrganizerManualModalProps {
   isOpen: boolean
@@ -8,23 +10,30 @@ interface OrganizerManualModalProps {
   initialTab?: string
 }
 
-type TabType = 'criacao' | 'ingressos' | 'publicacao' | 'exclusao' | 'checkin'
+type TabType = 'criacao' | 'ingressos' | 'publicacao' | 'exclusao' | 'checkin' | 'financeiro'
 
 export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }: OrganizerManualModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>((initialTab as TabType) || 'criacao')
-  const [expandedFaq, setExpandedFaq] = useState<string | null>(null)
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab as TabType)
+    }
+  }, [isOpen, initialTab])
 
   if (!isOpen) return null
 
-  const tabs: { id: TabType; label: string; icon: string }[] = [
-    { id: 'criacao', label: '1. Criação do Evento', icon: '📝' },
-    { id: 'ingressos', label: '2. Ingressos e Lotes', icon: '🎟️' },
-    { id: 'publicacao', label: '3. Solicitar Publicação', icon: '🚀' },
-    { id: 'exclusao', label: '4. Solicitar Exclusão', icon: '🗑️' },
-    { id: 'checkin', label: '5. Validação & Check-in', icon: '📱' },
+  const tabs: { id: TabType; label: string }[] = [
+    { id: 'criacao', label: '1. Criação do Evento' },
+    { id: 'ingressos', label: '2. Ingressos' },
+    { id: 'publicacao', label: '3. Solicitar Publicação' },
+    { id: 'exclusao', label: '4. Solicitar Exclusão' },
+    { id: 'checkin', label: '5. Validação & Check-in' },
+    { id: 'financeiro', label: '6. Financeiro & Repasses' },
   ]
 
-  const tabKeys: TabType[] = ['criacao', 'ingressos', 'publicacao', 'exclusao', 'checkin']
+  const tabKeys: TabType[] = ['criacao', 'ingressos', 'publicacao', 'exclusao', 'checkin', 'financeiro']
   const currentIndex = tabKeys.indexOf(activeTab)
 
   const handleNext = () => {
@@ -39,10 +48,6 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
     }
   }
 
-  const toggleFaq = (id: string) => {
-    setExpandedFaq((prev) => (prev === id ? null : id))
-  }
-
   return (
     <div
       style={{
@@ -52,7 +57,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15, 23, 42, 0.4)',
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
         backdropFilter: 'blur(4px)',
         padding: '1rem',
         animation: 'fadeIn 0.2s ease-out',
@@ -62,11 +67,11 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
       <div
         style={{
           width: '100%',
-          maxWidth: '900px',
+          maxWidth: '920px',
           maxHeight: '90vh',
           backgroundColor: '#ffffff',
           borderRadius: '16px',
-          boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -74,52 +79,33 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
+        {/* Modal Header Limpo e Profissional (Executive Dark) */}
         <div
           style={{
-            background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
-            color: '#0f172a',
-            padding: '1.4rem 1.75rem',
+            background: 'linear-gradient(135deg, #070a13 0%, #0f172a 100%)',
+            color: '#ffffff',
+            padding: '1.35rem 1.75rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            position: 'relative',
-            borderBottom: '1px solid #e2e8f0',
+            borderBottom: '1px solid #1e293b',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: '#e0e7ff',
-                color: '#4338ca',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.4rem',
-                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.15)',
-              }}
-            >
-              📖
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Manual do Organizador MyPass360
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.2rem 0 0' }}>
-                Guia interativo completo de gestão de eventos, ingressos, aprovações e check-in
-              </p>
-            </div>
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f8fafc', background: '#1e293b', padding: '0.2rem 0.6rem', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.06em', border: '1px solid #334155' }}>
+              Documentação Oficial
+            </span>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0.35rem 0 0', color: '#ffffff', letterSpacing: '-0.02em' }}>
+              Manual de Gestão & Operações MyPass360
+            </h2>
           </div>
 
           <button
             onClick={onClose}
             style={{
-              background: '#e2e8f0',
-              border: 'none',
-              color: '#64748b',
+              background: '#1e293b',
+              border: '1px solid #334155',
+              color: '#94a3b8',
               width: '34px',
               height: '34px',
               borderRadius: '50%',
@@ -127,16 +113,16 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              fontSize: '1.1rem',
-              transition: 'all 0.2s',
+              fontSize: '1rem',
+              transition: 'all 0.15s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#cbd5e1'
-              e.currentTarget.style.color = '#0f172a'
+              e.currentTarget.style.background = '#334155'
+              e.currentTarget.style.color = '#ffffff'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#e2e8f0'
-              e.currentTarget.style.color = '#64748b'
+              e.currentTarget.style.background = '#1e293b'
+              e.currentTarget.style.color = '#94a3b8'
             }}
             title="Fechar manual"
           >
@@ -149,10 +135,10 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
           style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '0.4rem',
+            gap: '0.35rem',
             borderBottom: '1px solid #e2e8f0',
             backgroundColor: '#f8fafc',
-            padding: '0.75rem 1.25rem',
+            padding: '0.65rem 1.25rem',
           }}
         >
           {tabs.map((tab) => {
@@ -164,32 +150,17 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.45rem',
-                  padding: '0.55rem 0.95rem',
-                  borderRadius: '10px',
-                  border: isActive ? '1px solid #4f46e5' : '1px solid #cbd5e1',
-                  background: isActive ? '#4f46e5' : '#ffffff',
-                  color: isActive ? '#ffffff' : '#334155',
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: '0.88rem',
+                  padding: '0.5rem 0.85rem',
+                  borderRadius: '8px',
+                  border: isActive ? '1px solid #0f172a' : '1px solid transparent',
+                  background: isActive ? '#0f172a' : 'transparent',
+                  color: isActive ? '#ffffff' : '#475569',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: '0.85rem',
                   cursor: 'pointer',
-                  boxShadow: isActive ? '0 2px 6px rgba(79, 70, 229, 0.25)' : 'none',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = '#f1f5f9'
-                    e.currentTarget.style.borderColor = '#94a3b8'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = '#ffffff'
-                    e.currentTarget.style.borderColor = '#cbd5e1'
-                  }
+                  transition: 'all 0.15s',
                 }}
               >
-                <span style={{ fontSize: '1.05rem' }}>{tab.icon}</span>
                 {tab.label}
               </button>
             )
@@ -201,7 +172,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '1.75rem',
+            padding: '1.5rem 1.75rem',
             color: '#1e293b',
             lineHeight: 1.6,
           }}
@@ -209,508 +180,253 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
           {/* TAB 1: CRIAÇÃO DO EVENTO */}
           {activeTab === 'criacao' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div
-                  style={{
-                    background: '#e0e7ff',
-                    color: '#4338ca',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '1.5rem',
-                  }}
-                >
-                  📝
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.4rem', color: '#0f172a' }}>
-                    Como criar um evento no MyPass360
-                  </h3>
-                  <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
-                    Criar um evento é simples e leva apenas alguns minutos. Siga os passos essenciais para estruturar seu evento com todas as informações necessárias.
-                  </p>
-                </div>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.4rem', color: '#0f172a' }}>
+                  Como criar um evento no MyPass360
+                </h3>
+                <p style={{ color: '#475569', fontSize: '0.9rem', margin: 0 }}>
+                  Estruture seu evento com título, descrição, imagens, datas e tipo de acesso.
+                </p>
               </div>
 
-              {/* Step Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                    Passo 1
-                  </div>
-                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Informações Básicas</h4>
-                  <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Insira o <strong>Título</strong>, <strong>Descrição completa</strong>, <strong>Categoria</strong> (ex: Festas, Reuniões, Aniversários) e <strong>Banner Promocional</strong> (16:9).
-                  </p>
+              {/* Destaque Importante: OBRIGATORIEDADE DE PUBLICAÇÃO */}
+              <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '10px', padding: '1rem 1.15rem', color: '#ffffff' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#38bdf8', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  Aviso Obrigatório de Publicação
                 </div>
-
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                    Passo 2
-                  </div>
-                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Tipo e Visibilidade</h4>
-                  <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Escolha entre <strong>Evento Pago</strong> ou <strong>Gratuito</strong>, e defina se será <strong>Público</strong> (exibido na vitrine) ou <strong>Privado</strong> (acesso restrito por link).
-                  </p>
-                </div>
-
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                    Passo 3
-                  </div>
-                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a' }}>Datas, Local e Status</h4>
-                  <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Defina <strong>Data/Hora</strong>, <strong>Localização</strong> e salve como <span style={{ background: '#fef3c7', color: '#92400e', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>Rascunho</span> para revisar antes de publicar.
-                  </p>
-                </div>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                  Ao salvar o formulário de cadastro, seu evento é criado como <strong>Rascunho</strong>. Para que o evento fique visível ao público e seus participantes possam comprar/reservar ingressos, ele <strong>PRECISA SER ENVIADO PARA ANÁLISE E PUBLICADO</strong>.
+                </p>
               </div>
 
-              {/* Event Types & Visibilty Section */}
-              <div style={{ padding: '1.25rem', borderRadius: '14px', background: '#f0f9ff', border: '1px solid #bae6fd', color: '#0369a1' }}>
-                <h4 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', color: '#0369a1', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>🎁</span> Guia de Eventos Gratuitos, Visibilidade & Senha
-                </h4>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
-                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
-                      🏷️ Tipo: Pago vs. Gratuito
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
-                      <strong>Pago:</strong> Venda por lotes com checkout via cartão/PIX.<br />
-                      <strong>Gratuito:</strong> Fluxo rápido de confirmação de presença (nome + CPF) sem checkout, gerando ingresso digital com QR Code.
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
-                      👁️ Visibilidade: Público vs. Privado
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
-                      <strong>Público:</strong> Aparece na vitrine e buscas do MyPass360.<br />
-                      <strong>Privado:</strong> Oculto da vitrine. Ideal para reuniões, aniversários, casamentos e festas fechadas. Acessível apenas por link.
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
-                      🔑 Senha de Acesso e Visualização
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
-                      Você pode definir uma senha obrigatória para confirmação de presença. O organizador pode visualizar/copiar a senha a qualquer momento no card do evento.
-                    </p>
-                  </div>
-
-                  <div style={{ background: '#ffffff', padding: '0.9rem', borderRadius: '10px', border: '1px solid #e0f2fe' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '0.2rem' }}>
-                      🔗 Compartilhamento por Link Direto
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155' }}>
-                      Copie o link exclusivo do evento no modal de compartilhamento e envie aos convidados via WhatsApp ou redes sociais.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Accordion FAQ */}
-              <div style={{ marginTop: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', marginBottom: '0.75rem' }}>
-                  💡 Dicas para uma excelente aprovação
-                </h4>
-
-                <div
-                  onClick={() => toggleFaq('faq-1')}
-                  style={{
-                    padding: '0.9rem 1.1rem',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    cursor: 'pointer',
-                    marginBottom: '0.5rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
-                    <span>Qual o tamanho ideal do banner do evento?</span>
-                    <span>{expandedFaq === 'faq-1' ? '▲' : '▼'}</span>
-                  </div>
-                  {expandedFaq === 'faq-1' && (
-                    <p style={{ margin: '0.6rem 0 0', fontSize: '0.85rem', color: '#475569' }}>
-                      Recomendamos imagens horizontais (1200x675 pixels ou proporção 16:9). Evite textos muito pequenos na capa para boa leitura em celulares.
-                    </p>
-                  )}
+              {/* Passos de Cadastro */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>Etapa 1</span>
+                  <h4 style={{ margin: '0.3rem 0 0.4rem', fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>Informações Gerais</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Preencha o título do evento, descrição detalhada, categoria e envie o banner promocional no formato 16:9.
+                  </p>
                 </div>
 
-                <div
-                  onClick={() => toggleFaq('faq-2')}
-                  style={{
-                    padding: '0.9rem 1.1rem',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    cursor: 'pointer',
-                    marginBottom: '0.5rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
-                    <span>Como funciona a visibilidade Privada para aniversários ou reuniões?</span>
-                    <span>{expandedFaq === 'faq-2' ? '▲' : '▼'}</span>
-                  </div>
-                  {expandedFaq === 'faq-2' && (
-                    <p style={{ margin: '0.6rem 0 0', fontSize: '0.85rem', color: '#475569' }}>
-                      Ao selecionar &quot;Privado&quot;, seu evento fica oculto no catálogo e nos buscadores. Apenas convidados que receberem o link direto conseguem visualizar e confirmar a presença (informando a senha, se houver).
-                    </p>
-                  )}
+                <div style={{ padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>Etapa 2</span>
+                  <h4 style={{ margin: '0.3rem 0 0.4rem', fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>Tipo e Visibilidade</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Defina se o evento será <strong>Pago</strong> ou <strong>Gratuito</strong>, e escolha a visibilidade: <strong>Pública</strong> (vitrine) ou <strong>Privada</strong> (apenas link direto).
+                  </p>
                 </div>
 
-                <div
-                  onClick={() => toggleFaq('faq-3')}
-                  style={{
-                    padding: '0.9rem 1.1rem',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: '0.9rem', color: '#0f172a' }}>
-                    <span>Onde meu evento fica visível após ser publicado?</span>
-                    <span>{expandedFaq === 'faq-3' ? '▲' : '▼'}</span>
-                  </div>
-                  {expandedFaq === 'faq-3' && (
-                    <p style={{ margin: '0.6rem 0 0', fontSize: '0.85rem', color: '#475569' }}>
-                      Eventos Públicos aparecem na vitrine do MyPass360 assim que aprovados. Eventos Privados ficam disponíveis exclusivamente através do link direto do evento.
-                    </p>
-                  )}
+                <div style={{ padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>Etapa 3</span>
+                  <h4 style={{ margin: '0.3rem 0 0.4rem', fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>Solicitar Publicação</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Após revisar, clique em <strong>“Solicitar Publicação”</strong> para que a administração analise e libere a divulgação oficial.
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: INGRESSOS E LOTES */}
+          {/* TAB 2: INGRESSOS */}
           {activeTab === 'ingressos' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div
-                  style={{
-                    background: '#fae8ff',
-                    color: '#86198f',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '1.5rem',
-                  }}
-                >
-                  🎟️
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.4rem', color: '#0f172a' }}>
-                    Gerenciando Ingressos e Lotes
-                  </h3>
-                  <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
-                    Você pode cadastrar diferentes modalidades de ingressos para atender variados perfis de participantes e estratégias de venda.
-                  </p>
-                </div>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.4rem', color: '#0f172a' }}>
+                  Gerenciando Ingressos do Evento
+                </h3>
+                <p style={{ color: '#475569', fontSize: '0.9rem', margin: 0 }}>
+                  Cadastre as categorias de ingressos disponíveis com preços unitários e quantidades específicas para os participantes.
+                </p>
               </div>
 
-              {/* Types Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                    <span style={{ background: '#dcfce7', color: '#15803d', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
-                      GRATUITO
-                    </span>
-                    <h4 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>Ingresso Grátis / VIP</h4>
-                  </div>
-                  <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Ideal para eventos abertos, cortesias, palestras gratuitas ou lista VIP. Não há cobrança de taxa de conveniência.
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
+                  <span style={{ background: '#f1f5f9', color: '#0f172a', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid #cbd5e1' }}>
+                    INGRESSO GRATUITO
+                  </span>
+                  <h4 style={{ margin: '0.5rem 0 0.3rem', fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>Confirmação de Presença / VIP</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Indicado para reuniões, palestras abertas e festas fechadas. O participante confirma presença informando nome e CPF sem passar por checkout de pagamento.
                   </p>
                 </div>
 
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                    <span style={{ background: '#e0e7ff', color: '#4338ca', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
-                      PAGO
-                    </span>
-                    <h4 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>Ingresso Pago (por Lotes)</h4>
-                  </div>
-                  <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                    Configure o preço individual em R$, quantidade total disponível e prazo de venda. Permite criar 1º Lote, 2º Lote, Pista, VIP, etc.
+                <div style={{ padding: '1.1rem', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
+                  <span style={{ background: '#0f172a', color: '#ffffff', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    INGRESSO PAGO
+                  </span>
+                  <h4 style={{ margin: '0.5rem 0 0.3rem', fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>Venda por Categoria Unitária</h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                    Cadastre cada tipo de ingresso (ex: Pista, Camarote, Meia-entrada) informando o valor unitário individual em R$ e o limite de quantidade de vagas disponíveis.
                   </p>
                 </div>
-              </div>
-
-              {/* Best practices box */}
-              <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>🎯</span> Estratégia Recomendada de Lotes
-                </h4>
-                <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.88rem', color: '#15803d', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                  <li><strong>Lote 1 (Promocional):</strong> Preço reduzido e quantidade limitada para gerar urgência de compra inicial.</li>
-                  <li><strong>Lote 2 (Regular):</strong> Preço normal de venda à medida que a data do evento se aproxima.</li>
-                  <li><strong>Limite por Usuário:</strong> Defina um limite de ingressos por CPF para evitar revenda ilegal (cambistas).</li>
-                </ul>
               </div>
             </div>
           )}
 
           {/* TAB 3: SOLICITAR PUBLICAÇÃO */}
           {activeTab === 'publicacao' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div
-                  style={{
-                    background: '#e0f2fe',
-                    color: '#0369a1',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '1.5rem',
-                  }}
-                >
-                  🚀
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.4rem', color: '#0f172a' }}>
-                    Como funciona a Solicitação de Publicação
-                  </h3>
-                  <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
-                    Para garantir a segurança, integridade e qualidade das ofertas no MyPass360, todo evento passa por uma análise antes de ser publicado.
-                  </p>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.4rem', color: '#0f172a' }}>
+                  Fluxo de Aprovação e Publicação
+                </h3>
+                <p style={{ color: '#475569', fontSize: '0.9rem', margin: 0 }}>
+                  Todos os eventos passam por validação administrativa para garantir a integridade da plataforma.
+                </p>
               </div>
 
-              {/* Process Workflow Diagram */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#4f46e5', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
-                    1
-                  </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 0.2rem', fontSize: '0.95rem', color: '#0f172a' }}>Clique no botão &quot;Solicitar Publicação&quot;</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      No card do seu evento em <strong>Meus Eventos</strong>, clique no botão azul de publicação quando os dados e ingressos estiverem prontos.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#0284c7', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
-                    2
-                  </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 0.2rem', fontSize: '0.95rem', color: '#0f172a' }}>Análise pela Equipe Administrativa</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      O status mudará para <span style={{ background: '#fef3c7', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>Aprovação Pendente</span>. A equipe revisará as informações em até poucas horas.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>
-                    3
-                  </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 0.2rem', fontSize: '0.95rem', color: '#0f172a' }}>Resultado & Notificação</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      <strong>Se Aprovado:</strong> O evento fica imediatamente publicado e aberto para vendas.<br />
-                      <strong>Se Rejeitado:</strong> O administrador enviará o motivo. Você receberá uma notificação interativa e poderá corrigir e reenviar.
-                    </p>
-                  </div>
-                </div>
+              <div style={{ background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '1.1rem' }}>
+                <ol style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.88rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <li>Você clica em <strong>“Solicitar Publicação”</strong> no card do evento.</li>
+                  <li>A equipe de análise revisa os dados cadastrais e ingressos.</li>
+                  <li>Após a aprovação, o botão <strong>“Publicar”</strong> é liberado no seu painel para você colocar o evento no ar no momento desejado.</li>
+                </ol>
               </div>
             </div>
           )}
 
           {/* TAB 4: SOLICITAR EXCLUSÃO */}
           {activeTab === 'exclusao' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div
-                  style={{
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '1.5rem',
-                  }}
-                >
-                  🗑️
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.4rem', color: '#0f172a' }}>
-                    Por que e como solicitar a Exclusão de um Evento?
-                  </h3>
-                  <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
-                    A exclusão de eventos no MyPass360 é um processo seguro que exige solicitação com justificativa administrativa.
-                  </p>
-                </div>
-              </div>
-
-              {/* Warning Banner */}
-              <div style={{ padding: '1.1rem', borderRadius: '12px', background: '#fff1f2', border: '1px solid #fecdd3' }}>
-                <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.95rem', color: '#9f1239', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>⚠️</span> Proteção aos Compradores
-                </h4>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#be123c' }}>
-                  Eventos não podem ser excluídos diretamente de forma instantânea para evitar o cancelamento inadvertido de pedidos já pagos por clientes e garantir a prestação de suporte ou reembolso quando aplicável.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.4rem', color: '#0f172a' }}>
+                  Regras de Exclusão de Eventos
+                </h3>
+                <p style={{ color: '#475569', fontSize: '0.9rem', margin: 0 }}>
+                  Para eventos que já foram aprovados ou que possuem ingressos emitidos, a exclusão exige análise da equipe.
                 </p>
               </div>
 
-              {/* Steps */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
-                  <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.95rem', color: '#0f172a' }}>1. Preencher Justificativa</h4>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                    Ao clicar no ícone de lixeira no card do evento, informe detalhadamente o motivo do cancelamento/exclusão.
-                  </p>
-                </div>
-
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
-                  <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.95rem', color: '#0f172a' }}>2. Análise pelo Admin</h4>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                    A equipe verifica se existem ingressos vendidos, solicitações financeiras pendentes ou necessidade de aviso prévio aos inscritos.
-                  </p>
-                </div>
-
-                <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
-                  <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.95rem', color: '#0f172a' }}>3. Resposta & Diálogo</h4>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                    Se a exclusão for reprovada, você receberá uma notificação interativa com a mensagem do admin e um modal para responder diretamente.
-                  </p>
-                </div>
+              <div style={{ background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '1.1rem', fontSize: '0.88rem', color: '#334155' }}>
+                Clique em <strong>“Solicitar Exclusão”</strong> e informe o motivo do cancelamento. Caso haja compradores atrelados, nossa equipe orientará sobre o procedimento de segurança.
               </div>
             </div>
           )}
 
           {/* TAB 5: VALIDAÇÃO & CHECK-IN */}
           {activeTab === 'checkin' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div
-                  style={{
-                    background: '#f0fdf4',
-                    color: '#16a34a',
-                    padding: '0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '1.5rem',
-                  }}
-                >
-                  📱
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.4rem', color: '#0f172a' }}>
-                    Guia Detalhado de Validação e Check-in na Portaria
-                  </h3>
-                  <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
-                    Aprenda a abrir o terminal de leitura, compartilhar o código com a equipe de recepção e validar ingressos direto do celular.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.4rem' }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f8fafc', background: '#0f172a', padding: '0.2rem 0.65rem', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Operação de Campo & Portaria
+                </span>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0.4rem 0 0.25rem', color: '#0f172a' }}>
+                  Guia Detalhado de Ativação e Check-in na Entrada
+                </h3>
+                <p style={{ color: '#475569', fontSize: '0.88rem', margin: 0, lineHeight: 1.45 }}>
+                  Siga os 6 passos abaixo para preparar seus terminais de recepção, liberar a equipe de operadores e fazer a leitura de ingressos em tempo real.
+                </p>
+              </div>
+
+              {/* 6 Passos Detalhados de Operação da Portaria */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {/* Passo 1 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0f172a', color: '#ffffff', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      1
+                    </div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                      Ativar a Portaria do Evento
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', paddingLeft: '2.4rem', lineHeight: 1.5 }}>
+                    No seu painel em <strong>“Meus Eventos”</strong>, acesse as opções do card do evento desejado e ative a chave <strong>“Portaria Aberta / Ativa”</strong>. Isso libera o servidor de checagem ao vivo.
                   </p>
                 </div>
-              </div>
 
-              {/* SECTION 1: CÓDIGO DE LIBERAÇÃO DA PORTARIA */}
-              <div
-                style={{
-                  padding: '1.25rem',
-                  borderRadius: '14px',
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  color: '#1e3a8a',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
-                  <span style={{ fontSize: '1.3rem' }}>🔑</span>
-                  <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e40af', fontWeight: 700 }}>
-                    O que é o Código de Liberação da Portaria?
-                  </h4>
-                </div>
-                <p style={{ margin: '0 0 0.8rem', fontSize: '0.9rem', color: '#1e3a8a', lineHeight: 1.5 }}>
-                  É um <strong>PIN de acesso seguro</strong> gerado automaticamente para cada evento. Ele permite que seus recepcionistas, seguranças ou colaboradores operem o leitor de check-in nos próprios celulares <strong>sem precisar saber a sua senha de acesso da conta principal</strong>!
-                </p>
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #dbeafe' }}>
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#3b82f6', textTransform: 'uppercase', fontWeight: 700 }}>Onde encontrar o código</div>
-                    <div style={{ fontSize: '0.88rem', color: '#1e293b', marginTop: '0.2rem' }}>No card do evento publicado em <strong>Meus Eventos</strong>.</div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#3b82f6', textTransform: 'uppercase', fontWeight: 700 }}>Link direto para a equipe</div>
-                    <div style={{ fontSize: '0.88rem', color: '#1e293b', marginTop: '0.2rem' }}>Copie o link com <code style={{ background: '#eff6ff', color: '#1d4ed8', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>?code=SEU_CODIGO</code> e envie no WhatsApp da recepção!</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: COMO ABRIR A PÁGINA DO CHECK-IN */}
-              <div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>🌐</span> 3 Formas de Abrir o Terminal de Check-in
-                </h4>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.85rem' }}>
-                  <div style={{ padding: '1.1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#4f46e5', marginBottom: '0.3rem' }}>Opção A: Botão no Painel</div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      Acesse <strong>Meus Eventos</strong> e no card do evento desejado clique em <strong>&quot;Check-in / Terminal&quot;</strong>.
-                    </p>
-                  </div>
-
-                  <div style={{ padding: '1.1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0284c7', marginBottom: '0.3rem' }}>Opção B: URL Direta no Navegador</div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      Abra o navegador no celular e digite o endereço <code style={{ background: '#e0f2fe', color: '#0369a1', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>/checkin</code> para abrir a tela de login por código.
-                    </p>
-                  </div>
-
-                  <div style={{ padding: '1.1rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#16a34a', marginBottom: '0.3rem' }}>Opção C: Link Compartilhado</div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-                      Envie o link do evento preenchido com a chave de liberação diretamente aos atendentes da portaria.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 3: PASSO A PASSO NO CELULAR */}
-              <div style={{ padding: '1.25rem', borderRadius: '14px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <h4 style={{ margin: '0 0 0.8rem', fontSize: '1rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>📲</span> Passo a Passo de Uso pelo Celular
-                </h4>
-
-                <ol style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.88rem', color: '#14532d' }}>
-                  <li>
-                    <strong>Abrir no Navegador do Celular:</strong> Use o Google Chrome (Android/iOS) ou Safari (iPhone).
-                  </li>
-                  <li>
-                    <strong>Digitar o Código da Portaria:</strong> Insira o código PIN do evento e clique em <em>&quot;Entrar no Terminal&quot;</em>. A sessão ficará salva no celular durante todo o evento.
-                  </li>
-                  <li>
-                    <strong>Conceder Permissão de Câmera:</strong> Quando o navegador perguntar <em>&quot;Deseja permitir o acesso à câmera?&quot;</em>, toque em <strong>Permitir</strong>.
-                  </li>
-                  <li>
-                    <strong>Apontar para o QR Code:</strong> Posicione a câmera traseira do smartphone em frente ao QR Code do ingresso (seja impresso em papel ou na tela do celular do cliente).
-                  </li>
-                  <li>
-                    <strong>Verificar a Resposta na Tela:</strong>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
-                      <span style={{ background: '#dcfce7', color: '#15803d', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem' }}>
-                        🟩 VERDE = Ingresso Válido (Vibração + Dados do Cliente)
-                      </span>
-                      <span style={{ background: '#fee2e2', color: '#991b1b', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem' }}>
-                        🟥 VERMELHO = Já Lido ou Inválido
-                      </span>
+                {/* Passo 2 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0f172a', color: '#ffffff', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      2
                     </div>
-                  </li>
-                  <li>
-                    <strong>Participante sem bateria / Sem celular:</strong> Clique na opção <strong>&quot;Buscar por Nome ou CPF&quot;</strong> na parte inferior da câmera para realizar a baixa manual rápida.
-                  </li>
-                </ol>
-              </div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                      Criar o Código de Acesso do Operador (PIN)
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', paddingLeft: '2.4rem', lineHeight: 1.5 }}>
+                    Crie um <strong>Código de 6 dígitos</strong> (ex: <code>739201</code>) na aba de configurações da Portaria. Esse código servirá como senha temporária para os recepcionistas, protegendo seus dados financeiros administrativos.
+                  </p>
+                </div>
 
-              {/* Status Indicator Demo */}
-              <div style={{ padding: '1.25rem', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a' }}>
-                <h4 style={{ margin: '0 0 0.6rem', fontSize: '0.95rem', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>📊</span> Monitoramento de Entrada em Tempo Real
-                </h4>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
-                  Mesmo com múltiplos celulares lendo ingressos simultaneamente na portaria, o sistema sincroniza a entrada ao vivo, impedindo que um mesmo ingresso seja reutilizado em portas diferentes!
-                </p>
+                {/* Passo 3 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0f172a', color: '#ffffff', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      3
+                    </div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                      Gerar e Copiar o Link da Portaria
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', paddingLeft: '2.4rem', lineHeight: 1.5 }}>
+                    Clique no botão <strong>“Gerar Link da Portaria”</strong> e copie o endereço de acesso. Compartilhe esse link diretamente via WhatsApp ou e-mail com a equipe encarregada da recepção.
+                  </p>
+                </div>
+
+                {/* Passo 4 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0f172a', color: '#ffffff', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      4
+                    </div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                      Abrir o Link em Qualquer Dispositivo
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', paddingLeft: '2.4rem', lineHeight: 1.5 }}>
+                    O recepcionista abre a URL no navegador de qualquer <strong>Smartphone (Android/iOS), Tablet ou Computador</strong> na entrada do evento. Não requer download de aplicativo na loja.
+                  </p>
+                </div>
+
+                {/* Passo 5 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#0f172a', color: '#ffffff', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      5
+                    </div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                      Inserir o Código do Operador na Tela de Login
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', paddingLeft: '2.4rem', lineHeight: 1.5 }}>
+                    Na tela de acesso da portaria, o operador insere o <strong>Código de 6 dígitos</strong> criado no Passo 2. Ao confirmar, o leitor de ingressos é ativado imediatamente no dispositivo.
+                  </p>
+                </div>
+
+                {/* Passo 6 */}
+                <div style={{ background: 'linear-gradient(135deg, #070a13 0%, #0f172a 100%)', border: '1px solid #1e293b', borderRadius: '12px', padding: '1.1rem 1.25rem', color: '#ffffff' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#ffffff', color: '#070a13', fontWeight: 900, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      6
+                    </div>
+                    <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#ffffff' }}>
+                      Fazer a Leitura do QR Code ou Busca por Nome / CPF
+                    </h4>
+                  </div>
+                  <div style={{ paddingLeft: '2.4rem', fontSize: '0.88rem', color: '#cbd5e1', lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div>
+                      <strong>Leitura de QR Code:</strong> Aponte a câmera do dispositivo para o código no celular ou papel impresso do participante. O sistema responde instantaneamente com feedback sonoro e tela verde <em>(Válido)</em> ou vermelha <em>(Já Utilizado/Inválido)</em>.
+                    </div>
+                    <div>
+                      <strong>Busca por Nome / CPF:</strong> Se o participante estiver sem bateria ou celular, o operador digita o <strong>Nome Completo</strong> ou <strong>CPF</strong> no campo de busca para validar a entrada com apenas 1 toque.
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
+
+          {/* TAB 6: FINANCEIRO & REPASSES */}
+          {activeTab === 'financeiro' && (
+            <OrganizerFinancialGuide onOpenBankAccountModal={() => setIsBankModalOpen(true)} />
           )}
         </div>
 
@@ -719,7 +435,7 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
           style={{
             padding: '1rem 1.75rem',
             borderTop: '1px solid #e2e8f0',
-            backgroundColor: '#f8fafc',
+            backgroundColor: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -730,21 +446,21 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
             onClick={handlePrev}
             disabled={currentIndex === 0}
             style={{
-              padding: '0.6rem 1.2rem',
-              borderRadius: '8px',
+              padding: '0.55rem 1.1rem',
+              borderRadius: '6px',
               border: '1px solid #cbd5e1',
               backgroundColor: currentIndex === 0 ? '#f1f5f9' : '#ffffff',
               color: currentIndex === 0 ? '#94a3b8' : '#334155',
               fontWeight: 600,
-              fontSize: '0.88rem',
+              fontSize: '0.85rem',
               cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
+              transition: 'all 0.15s',
             }}
           >
             ← Passo Anterior
           </button>
 
-          <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>
+          <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
             Passo {currentIndex + 1} de {tabs.length}
           </div>
 
@@ -752,16 +468,15 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
             <button
               onClick={handleNext}
               style={{
-                padding: '0.6rem 1.25rem',
-                borderRadius: '8px',
+                padding: '0.55rem 1.15rem',
+                borderRadius: '6px',
                 border: 'none',
                 backgroundColor: '#4f46e5',
                 color: '#ffffff',
                 fontWeight: 600,
-                fontSize: '0.88rem',
+                fontSize: '0.85rem',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)',
-                transition: 'all 0.2s',
+                transition: 'all 0.15s',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4338ca')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#4f46e5')}
@@ -772,25 +487,30 @@ export function OrganizerManualModal({ isOpen, onClose, initialTab = 'criacao' }
             <button
               onClick={onClose}
               style={{
-                padding: '0.6rem 1.25rem',
-                borderRadius: '8px',
+                padding: '0.55rem 1.15rem',
+                borderRadius: '6px',
                 border: 'none',
-                backgroundColor: '#16a34a',
+                backgroundColor: '#059669',
                 color: '#ffffff',
                 fontWeight: 600,
-                fontSize: '0.88rem',
+                fontSize: '0.85rem',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
-                transition: 'all 0.2s',
+                transition: 'all 0.15s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#15803d')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#16a34a')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#047857')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#059669')}
             >
-              Entendido! Fechar Manual ✓
+              Concluir e Fechar ✓
             </button>
           )}
         </div>
       </div>
+
+      {/* Modal da Conta Bancária */}
+      <BankAccountSetupModal
+        isOpen={isBankModalOpen}
+        onClose={() => setIsBankModalOpen(false)}
+      />
     </div>
   )
 }

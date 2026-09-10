@@ -26,6 +26,7 @@ import { DeleteRequestModal } from './DeleteRequestModal'
 import { AdminMessageDialogModal } from './AdminMessageDialogModal'
 import { DeletionRejectedModal } from './DeletionRejectedModal'
 import { ShareEventModal } from './ShareEventModal'
+import { BankAccountSetupModal } from './BankAccountSetupModal'
 import { EventDetailsModal } from '@/features/admin/components/EventDetailsModal'
 
 interface MyEventCardProps {
@@ -188,6 +189,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showAdminDialogModal, setShowAdminDialogModal] = useState(false)
   const [showDeletionRejectedModal, setShowDeletionRejectedModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showBankAccountModal, setShowBankAccountModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -808,6 +810,21 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <span>Ver mensagens</span>
                   </button>
 
+                  {/* 4.8 Financeiro & Repasse (Cadastrar Conta Bancária) */}
+                  <button
+                    type="button"
+                    className="my-event-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setShowBankAccountModal(true)
+                    }}
+                    title="Cadastrar ou alterar conta bancária para recebimento do repasse"
+                    style={{ color: '#059669', fontWeight: 600 }}
+                  >
+                    <span style={{ display: 'flex', color: '#059669' }}>💰</span>
+                    <span>Financeiro & Repasses</span>
+                  </button>
+
                   {/* 5. Agendar publicação — apenas quando aprovado e não publicado */}
                   {displayStatus === 'approved' && (
                     <button
@@ -936,6 +953,13 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         event={event}
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
+      />
+
+      {/* Modal de Conta Bancária / Financeiro */}
+      <BankAccountSetupModal
+        isOpen={showBankAccountModal}
+        onClose={() => setShowBankAccountModal(false)}
+        eventId={event.id}
       />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

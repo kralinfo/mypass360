@@ -7,6 +7,7 @@ import { AdminUsersSection } from '@/features/admin/components/AdminUsersSection
 import { AdminPublicationsTabContainer } from '@/features/admin/components/AdminPublicationsTabContainer'
 import { AdminDeletionsTabContainer } from '@/features/admin/components/AdminDeletionsTabContainer'
 import { AdminMessagesSection } from '@/features/admin/components/AdminMessagesSection'
+import { AdminFinancialSection } from '@/features/admin/components/AdminFinancialSection'
 import { ReminderModal } from '@/features/admin/components/ReminderModal'
 import type { AdminSection } from '@/features/admin/admin.types'
 import { getAdminSection } from '@/features/admin/admin.utils'
@@ -54,6 +55,11 @@ const sectionContent: Record<AdminSection, { eyebrow: string; title: string; des
     eyebrow: 'MENSAGENS',
     title: 'Central de mensagens e diálogo',
     description: 'Comunicação direta em tempo real com os organizadores de eventos.',
+  },
+  financeiro: {
+    eyebrow: 'FINANCEIRO & REPASSES',
+    title: 'Gestão de repasses financeiros',
+    description: 'Consulta de vendas brutas, retenção de taxas e contas bancárias cadastradas pelos organizadores para transferência.',
   },
 }
 
@@ -116,6 +122,8 @@ export function AdminPageContent() {
         return <AdminDeletionsTabContainer key={refreshKey} />
       case 'mensagens':
         return <AdminMessagesSection dashboard={dashboard} refreshKey={refreshKey} onRefresh={handleRefreshAll} />
+      case 'financeiro':
+        return <AdminFinancialSection dashboard={dashboard} />
       default:
         return (
           <AdminOverviewSection
