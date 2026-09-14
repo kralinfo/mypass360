@@ -18,6 +18,8 @@ export async function fetchPublishedEvents(): Promise<Event[]> {
     .from('events')
     .select('*')
     .eq('status', 'published')
+    .or('visibility.eq.PUBLIC,visibility.is.null')
+    .neq('deletion_status', 'pending')
     .or(`published_at.is.null,published_at.lte.${now}`)
     .order('date', { ascending: true })
 

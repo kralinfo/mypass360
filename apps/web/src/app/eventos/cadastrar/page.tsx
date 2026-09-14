@@ -32,6 +32,7 @@ function CadastrarEventoForm() {
     price: '',
     eventType: 'PAID' as 'PAID' | 'FREE',
     visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',
+    enableFreePassword: false,
     accessPassword: '',
     ticketLayout: '' as '' | 'ticket' | 'formal_pdf',
     participantIdType: '' as '' | 'none' | 'name',
@@ -99,6 +100,7 @@ function CadastrarEventoForm() {
           price: String(event.price),
           eventType: (event.event_type ?? 'PAID') as 'PAID' | 'FREE',
           visibility: (event.visibility ?? 'PUBLIC') as 'PUBLIC' | 'PRIVATE',
+          enableFreePassword: Boolean(event.has_password),
           accessPassword: '',
           ticketLayout: (event.ticket_layout ?? '') as '' | 'ticket' | 'formal_pdf',
           participantIdType: (event.participant_id_type === 'name_cpf' ? '' : (event.participant_id_type ?? '')) as '' | 'none' | 'name',
@@ -215,6 +217,20 @@ function CadastrarEventoForm() {
       const token = session.access_token
       const dateTime = `${formData.date}T${formData.time}:00`
 
+      const isPasswordRequired =
+        formData.visibility === 'PRIVATE' ||
+        (formData.visibility === 'PUBLIC' && formData.eventType === 'FREE' && formData.enableFreePassword)
+
+      if (isPasswordRequired && !isEditMode && !formData.accessPassword.trim()) {
+        setError('Defina uma senha de acesso para o evento.')
+        setLoading(false)
+        return
+      }
+
+      const accessPasswordPayload = isPasswordRequired
+        ? (formData.accessPassword.trim() || (isEditMode ? undefined : null))
+        : null
+
       const payload = {
         title: formData.title,
         slug: formData.slug,
@@ -227,7 +243,7 @@ function CadastrarEventoForm() {
         price: formData.eventType === 'FREE' ? 0 : (formData.price ? parseFloat(formData.price) : 0),
         event_type: formData.eventType,
         visibility: formData.visibility,
-        access_password: formData.eventType === 'FREE' ? (formData.accessPassword.trim() || null) : null,
+        access_password: accessPasswordPayload,
         ticket_layout: formData.ticketLayout,
         participant_id_type: formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType,
         ticket_types: formData.eventType === 'FREE'
@@ -623,10 +639,15 @@ function CadastrarEventoForm() {
             </div>
           </div>
 
-          {formData.eventType === 'FREE' && (
-            <div style={{ background: '#f0fdf4', padding: '1rem', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-              <label htmlFor="accessPassword" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#166534' }}>
-                🔒 Senha de Acesso *
+          {formData.visibility === 'PRIVATE' ? (
+            <div style={{
+              background: '#f5f3ff',
+              padding: '1rem',
+              borderRadius: '10px',
+              border: '1px solid #c4b5fd',
+            }}>
+              <label htmlFor="accessPassword" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#5b21b6' }}>
+                🔒 Senha de Acesso do Evento Privado *
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -635,12 +656,12 @@ function CadastrarEventoForm() {
                   name="accessPassword"
                   value={formData.accessPassword}
                   onChange={handleChange}
-                  required
-                  placeholder={isEditMode ? 'Digite para alterar a senha atual' : 'Crie uma senha para o evento'}
+                  required={!isEditMode}
+                  placeholder={isEditMode ? 'Digite para alterar a senha atual (ou deixe em branco para manter)' : 'Crie uma senha de acesso para o evento'}
                   style={{
                     width: '100%',
                     padding: '0.6rem 2.75rem 0.6rem 0.75rem',
-                    border: '1px solid #86efac',
+                    border: '1px solid #a78bfa',
                     borderRadius: '8px',
                     fontSize: '0.95rem',
                     boxSizing: 'border-box',
@@ -678,11 +699,126 @@ function CadastrarEventoForm() {
                   )}
                 </button>
               </div>
-              <small style={{ color: '#15803d', fontSize: '0.82rem', marginTop: '0.35rem', display: 'block' }}>
-                Os participantes precisarão digitar essa senha para confirmar presença.
+              <small style={{ color: '#6d28d9', fontSize: '0.82rem', marginTop: '0.35rem', display: 'block' }}>
+                Os participantes precisarão digitar essa senha para visualizar e adquirir ingressos no evento privado.
               </small>
             </div>
-          )}
+          ) : formData.eventType === 'FREE' ? (
+            <div style={{
+              background: '#f0fdf4',
+              padding: '1rem',
+              borderRadius: '10px',
+              border: '1px solid #bbf7d0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.9rem', fontWeight: '600', color: '#166534' }}>
+                  🔒 Proteção da Inscrição Gratuita
+                </label>
+                <span style={{ fontSize: '0.82rem', color: '#15803d' }}>
+                  Escolha se o evento gratuito será aberto a qualquer visitante ou exigirá senha para confirmação.
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, enableFreePassword: false }))}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: !formData.enableFreePassword ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                    background: !formData.enableFreePassword ? '#dcfce7' : '#ffffff',
+                    color: !formData.enableFreePassword ? '#15803d' : '#475569',
+                    fontWeight: !formData.enableFreePassword ? 700 : 500,
+                    cursor: 'pointer',
+                    fontSize: '0.88rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  🌐 Sem Senha (Aberto a todos)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, enableFreePassword: true }))}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: formData.enableFreePassword ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                    background: formData.enableFreePassword ? '#dcfce7' : '#ffffff',
+                    color: formData.enableFreePassword ? '#15803d' : '#475569',
+                    fontWeight: formData.enableFreePassword ? 700 : 500,
+                    cursor: 'pointer',
+                    fontSize: '0.88rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  🔐 Com Senha (Restrito)
+                </button>
+              </div>
+
+              {formData.enableFreePassword && (
+                <div>
+                  <label htmlFor="accessPassword" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.88rem', fontWeight: '600', color: '#166534' }}>
+                    Senha de Acesso ao Evento Gratuito *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="accessPassword"
+                      name="accessPassword"
+                      value={formData.accessPassword}
+                      onChange={handleChange}
+                      required={!isEditMode}
+                      placeholder={isEditMode ? 'Digite para alterar a senha atual (ou deixe em branco para manter)' : 'Crie a senha de acesso'}
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 2.75rem 0.6rem 0.75rem',
+                        border: '1px solid #86efac',
+                        borderRadius: '8px',
+                        fontSize: '0.95rem',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      style={{
+                        position: 'absolute',
+                        right: '0.6rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        color: '#6b7280',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      aria-label={showPassword ? 'Ocultar senha' : 'Ver senha'}
+                    >
+                      {showPassword ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                          <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: formData.eventType === 'FREE' ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
             <div>

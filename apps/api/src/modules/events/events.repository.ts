@@ -31,7 +31,7 @@ export class EventsRepository {
       .from(this.table)
       .select('*')
       .eq('status', 'published')
-      .eq('visibility', 'PUBLIC')
+      .or('visibility.eq.PUBLIC,visibility.is.null')
       .neq('deletion_status', 'pending')
       .or(`published_at.is.null,published_at.lte.${now}`)
       .order('date', { ascending: true })
@@ -129,7 +129,7 @@ export class EventsRepository {
     const eventType = dto.event_type ?? 'PAID'
     let accessPasswordHash: string | null = null
 
-    if (eventType === 'FREE' && dto.access_password && dto.access_password.trim() !== '') {
+    if (dto.access_password && typeof dto.access_password === 'string' && dto.access_password.trim() !== '') {
       accessPasswordHash = bcrypt.hashSync(dto.access_password.trim(), 10)
     }
 

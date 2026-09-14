@@ -9,6 +9,9 @@ import { fetchCheckoutData, type CheckoutTicketType } from '@/features/checkout/
 import { useCart } from '@/features/cart/cart-context'
 import { BackButton } from '@/components/BackButton'
 import { FreeRegistrationModal } from '@/features/events/components/FreeRegistrationModal'
+import { createClient } from '@/lib/supabase/client'
+import { validateAccessPassword } from '@/features/events/services/free-registration.service'
+import { FeeRefundDisclaimer } from '@/features/checkout/components/FeeRefundDisclaimer'
 
 interface EventDetailPageProps {
   params: Promise<{ slug: string }>
@@ -24,6 +27,11 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false)
+  // Password gate for PRIVATE PAID events
+  const [paidPasswordVerified, setPaidPasswordVerified] = useState(false)
+  const [paidPasswordInput, setPaidPasswordInput] = useState('')
+  const [paidPasswordError, setPaidPasswordError] = useState<string | null>(null)
+  const [paidPasswordLoading, setPaidPasswordLoading] = useState(false)
   const router = useRouter()
   const { addToCart } = useCart()
 
@@ -191,6 +199,36 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
     setSuccessMessage(`Adicionados ${itemsToAdd.reduce((sum, item) => sum + item.quantity, 0)} ingressos ao carrinho.`)
     return true
+  }
+
+  async function handleValidatePaidPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!event || !paidPasswordInput.trim()) return
+
+    setPaidPasswordLoading(true)
+    setPaidPasswordError(null)
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push(`/login?next=/eventos/${event.slug}`)
+        return
+      }
+      const result = await validateAccessPassword(event.id, session.access_token, {
+        access_password: paidPasswordInput.trim(),
+      })
+      if (result.valid) {
+        setPaidPasswordVerified(true)
+        setPaidPasswordError(null)
+      } else {
+        setPaidPasswordError(result.message || 'Senha de acesso incorreta.')
+      }
+    } catch {
+      setPaidPasswordError('Erro ao verificar senha. Tente novamente.')
+    } finally {
+      setPaidPasswordLoading(false)
+    }
   }
 
   function handleBuyAll() {
@@ -553,7 +591,77 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
               pointerEvents: event.deletion_status === 'pending' ? 'none' : 'auto',
             }}
           >
-            <div>
+            {/* Password gate for PRIVATE PAID events with password */}
+            {event.visibility === 'PRIVATE' && event.has_password && !paidPasswordVerified ? (
+              <form
+                onSubmit={(e) => void handleValidatePaidPassword(e)}
+                style={{
+                  background: 'linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%)',
+                  border: '1.5px solid #c4b5fd',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                }}
+              >
+                <span style={{ fontSize: '2rem' }}>🔐</span>
+                <div>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#4c1d95', margin: '0 0 0.3rem' }}>
+                    Evento Privado — Acesso Restrito
+                  </h2>
+                  <p style={{ color: '#6d28d9', fontSize: '0.88rem', margin: 0, lineHeight: 1.5 }}>
+                    Para visualizar e comprar ingressos, insira a senha de acesso fornecida pelo organizador.
+                  </p>
+                </div>
+                {paidPasswordError && (
+                  <div style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#fee2e2', color: '#991b1b', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+                    ⚠️ {paidPasswordError}
+                  </div>
+                )}
+                <div style={{ width: '100%', display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="password"
+                    id="paid_event_password"
+                    value={paidPasswordInput}
+                    onChange={(e) => setPaidPasswordInput(e.target.value)}
+                    placeholder="Senha de acesso"
+                    required
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: '0.7rem 1rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid #c4b5fd',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                      background: '#fff',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={paidPasswordLoading || !paidPasswordInput.trim()}
+                    style={{
+                      padding: '0.7rem 1.25rem',
+                      borderRadius: '10px',
+                      background: paidPasswordLoading ? '#94a3b8' : '#6d28d9',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      border: 'none',
+                      cursor: paidPasswordLoading ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {paidPasswordLoading ? 'Verificando...' : 'Acessar'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div>
               <h2 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: 700, marginBottom: '0.15rem' }}>Tipos de Ingresso</h2>
               <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
                 Toque no ingresso para expandir as opções de compra.
@@ -732,6 +840,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
 
 
+                    <FeeRefundDisclaimer variant="compact" style={{ marginTop: '0.75rem' }} />
+                  </>
+                )}
               </>
             )}
           </section>

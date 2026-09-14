@@ -20,7 +20,7 @@ export default function EventsPage() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Todos')
 
-  const publishedEvents = events.filter((e) => e.status === 'published')
+  const publishedEvents = events.filter((e) => e.status === 'published' && e.visibility !== 'PRIVATE')
 
   // "Mais Vendidos": eventos com maior número de ingressos vendidos
   const hotEvents = [...publishedEvents]
