@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BackButton } from '@/components/BackButton'
 import { createEvent, updateEvent, fetchEventById } from '@/features/events/services/my-events.service'
 import { EventCoverUploader } from '@/features/events/components/EventCoverUploader'
+import { LocationAutocompleteInput } from '@/components/LocationAutocompleteInput'
 
 function CadastrarEventoForm() {
   const router = useRouter()
@@ -28,6 +29,11 @@ function CadastrarEventoForm() {
     date: '',
     time: '',
     location: '',
+    city: '',
+    state: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
+    placeId: null as string | null,
     capacity: '',
     price: '',
     eventType: 'PAID' as 'PAID' | 'FREE',
@@ -96,6 +102,11 @@ function CadastrarEventoForm() {
           date: dateStr,
           time: timeStr,
           location: event.location,
+          city: event.city ?? '',
+          state: event.state ?? '',
+          latitude: event.latitude ?? null,
+          longitude: event.longitude ?? null,
+          placeId: event.place_id ?? null,
           capacity: String(event.capacity),
           price: String(event.price),
           eventType: (event.event_type ?? 'PAID') as 'PAID' | 'FREE',
@@ -239,6 +250,11 @@ function CadastrarEventoForm() {
         genre: formData.genre || null,
         date: dateTime,
         location: formData.location,
+        city: formData.city.trim() || null,
+        state: formData.state.trim() || null,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        place_id: formData.placeId,
         capacity: parseInt(formData.capacity, 10),
         price: formData.eventType === 'FREE' ? 0 : (formData.price ? parseFloat(formData.price) : 0),
         event_type: formData.eventType,
@@ -567,28 +583,24 @@ function CadastrarEventoForm() {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="location" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
-              Local *
-            </label>
-            <input
-              type="text"
-              id="location"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              required
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '0.95rem',
-                boxSizing: 'border-box',
-              }}
-              placeholder="Ex: São Paulo, SP — Allianz Parque"
-            />
-          </div>
+          <LocationAutocompleteInput
+            value={formData.location}
+            cityValue={formData.city}
+            stateValue={formData.state}
+            onChange={(locationVal) => setFormData((prev) => ({ ...prev, location: locationVal }))}
+            onLocationSelect={(selectedLoc) =>
+              setFormData((prev) => ({
+                ...prev,
+                location: selectedLoc.formattedAddress || prev.location,
+                city: selectedLoc.city ?? prev.city,
+                state: selectedLoc.state ?? prev.state,
+                latitude: selectedLoc.latitude,
+                longitude: selectedLoc.longitude,
+                placeId: selectedLoc.placeId,
+              }))
+            }
+            required
+          />
 
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>

@@ -142,6 +142,11 @@ export class EventsRepository {
         description: dto.description,
         date: dto.date,
         location: dto.location,
+        city: dto.city ?? null,
+        state: dto.state ?? null,
+        latitude: dto.latitude ?? null,
+        longitude: dto.longitude ?? null,
+        place_id: dto.place_id ?? null,
         organizer_id: userId, // sempre do JWT, nunca do body
         capacity: dto.capacity,
         price: eventType === 'FREE' ? 0 : (dto.price ?? 0),

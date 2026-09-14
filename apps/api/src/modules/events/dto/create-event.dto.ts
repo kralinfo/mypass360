@@ -48,6 +48,26 @@ export class CreateEventDto {
   @IsString()
   location!: string
 
+  @IsString()
+  @IsOptional()
+  city?: string | null
+
+  @IsString()
+  @IsOptional()
+  state?: string | null
+
+  @IsNumber()
+  @IsOptional()
+  latitude?: number | null
+
+  @IsNumber()
+  @IsOptional()
+  longitude?: number | null
+
+  @IsString()
+  @IsOptional()
+  place_id?: string | null
+
   @IsNumber()
   @Min(1)
   capacity!: number

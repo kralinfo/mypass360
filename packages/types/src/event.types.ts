@@ -52,6 +52,11 @@ export interface Event {
   description: string
   date: string
   location: string
+  city?: string | null
+  state?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  place_id?: string | null
   organizer_id: string
   capacity: number
   price: number
