@@ -729,6 +729,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                     Comprar Tudo
                   </button>
                 </div>
+
+
+
               </>
             )}
           </section>

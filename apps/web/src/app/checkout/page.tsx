@@ -22,7 +22,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   return (
     <main style={{ padding: '2rem 1rem', maxWidth: '900px', margin: '0 auto' }}>
       <BackButton href={backHref} style={{ marginBottom: '1rem' }} />
-      <h1 style={{ marginBottom: '1rem' }}>Finalizar compra</h1>
+      <h1 style={{ marginBottom: '1rem' }}>Confirmar pedido</h1>
       <CheckoutForm eventId={eventId} from={from} slug={slug} />
     </main>
   )

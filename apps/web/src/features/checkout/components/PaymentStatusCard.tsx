@@ -14,6 +14,7 @@ import {
   syncPaymentStatus,
 } from '../services/payment.service'
 import { useCart } from '@/features/cart/cart-context'
+import { FeeRefundDisclaimer } from './FeeRefundDisclaimer'
 
 interface PaymentStatusCardProps {
   paymentId?: string
@@ -333,6 +334,9 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
             Assim que o pagamento for aprovado, a aba do Mercado Pago fecha sozinha e seu ingresso aparece aqui.
           </p>
 
+          {/* Aviso de Transparência de Taxas e Reembolso */}
+          <FeeRefundDisclaimer variant="card" />
+
           {error && <p style={{ color: '#dc2626', fontWeight: 600, margin: 0 }}>{error}</p>}
 
           <button
@@ -408,14 +412,17 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       {isApproved && <SuccessBanner />}
 
       {isPending && (
-        <CouponConfirmationBox
-          orderId={orderId}
-          manualCode={manualCode}
-          setManualCode={setManualCode}
-          isManualConfirming={isManualConfirming}
-          manualError={manualError}
-          onConfirm={handleManualConfirm}
-        />
+        <>
+          <CouponConfirmationBox
+            orderId={orderId}
+            manualCode={manualCode}
+            setManualCode={setManualCode}
+            isManualConfirming={isManualConfirming}
+            manualError={manualError}
+            onConfirm={handleManualConfirm}
+          />
+          <FeeRefundDisclaimer variant="card" style={{ marginTop: '0.5rem' }} />
+        </>
       )}
 
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -431,7 +438,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
               fontSize: '0.875rem',
             }}
           >
-            Voltar ao checkout
+            Voltar para confirmar pedido
           </Link>
         )}
         <Link

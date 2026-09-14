@@ -21,12 +21,16 @@ export default async function CheckoutPaymentPage({ searchParams }: CheckoutPaym
     )
   }
 
-  const backHref = from === 'event' && slug ? `/eventos/${slug}` : '/carrinho'
+  const backHref = eventId
+    ? `/checkout?eventId=${eventId}${from ? `&from=${from}` : ''}${slug ? `&slug=${slug}` : ''}`
+    : from === 'event' && slug
+      ? `/eventos/${slug}`
+      : '/carrinho'
 
   return (
     <main style={{ padding: '2rem 1rem', maxWidth: '900px', margin: '0 auto' }}>
       <BackButton href={backHref} style={{ marginBottom: '1rem' }} />
-      <h1 style={{ marginBottom: '1rem' }}>Pagamento via PIX</h1>
+      <h1 style={{ marginBottom: '1rem' }}>Finalizar pagamento</h1>
       <PaymentStatusCard
         paymentId={paymentId}
         orderId={orderId}
