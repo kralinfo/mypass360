@@ -45,9 +45,14 @@ export class EventsService {
   }
 
   /** Atualiza evento — valida propriedade antes de alterar. */
-  async update(id: string, userId: string, dto: UpdateEventDto) {
-    await this.assertOwnership(id, userId)
-    return this.eventsRepository.update(id, userId, dto)
+  async update(id: string, user: AuthenticatedUser | string, dto: UpdateEventDto) {
+    const userId = typeof user === 'string' ? user : user.id
+    const userRole = typeof user !== 'string' ? (user.user_metadata?.role as string) : undefined
+    const userEmail = typeof user !== 'string' ? user.email : ''
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userEmail === 'admin@mypass360.com'
+
+    await this.assertOwnership(id, user)
+    return this.eventsRepository.update(id, userId, dto, isAdmin)
   }
 
   /** Remove evento — rascunhos nunca publicados ou eventos com exclusão aprovada pelo admin. */

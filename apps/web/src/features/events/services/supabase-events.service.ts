@@ -16,7 +16,7 @@ export async function fetchPublishedEvents(): Promise<Event[]> {
 
   const { data, error } = await supabase
     .from('events')
-    .select('*')
+    .select('*, ticket_types(*)')
     .eq('status', 'published')
     .or('visibility.eq.PUBLIC,visibility.is.null')
     .neq('deletion_status', 'pending')
@@ -37,7 +37,7 @@ export async function fetchPublishedEventBySlug(slug: string): Promise<Event | n
 
   const { data, error } = await supabase
     .from('events')
-    .select('*')
+    .select('*, ticket_types(*)')
     .eq('slug', slug)
     .eq('status', 'published')
     .or(`published_at.is.null,published_at.lte.${now}`)

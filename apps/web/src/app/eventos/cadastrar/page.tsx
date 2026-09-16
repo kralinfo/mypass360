@@ -17,6 +17,7 @@ function CadastrarEventoForm() {
   const [loading, setLoading] = useState(false)
   const [loadingEvent, setLoadingEvent] = useState(isEditMode)
   const [isReadOnly, setIsReadOnly] = useState(false)
+  const [isEventTypeLocked, setIsEventTypeLocked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -43,8 +44,7 @@ function CadastrarEventoForm() {
     ticketLayout: '' as '' | 'ticket' | 'formal_pdf',
     participantIdType: '' as '' | 'none' | 'name',
     ticketTypes: [
-      { name: 'Inteira', price: '', quantity: '0', description: '' },
-      { name: 'Meia-entrada', price: '', quantity: '0', description: '' },
+      { name: 'Inteira', price: '', quantity: '', description: '' },
     ],
   })
 
@@ -81,17 +81,18 @@ function CadastrarEventoForm() {
               description: tt.description ?? '',
             }))
           : [
-              { name: 'Inteira', price: String(event.price), quantity: '0', description: '' },
-              {
-                name: 'Meia-entrada',
-                price: String(event.price / 2),
-                quantity: '0',
-                description: '',
-              },
+              { name: 'Inteira', price: event.price ? String(event.price) : '', quantity: '', description: '' },
             ]
 
         const isCancelledOrDeleted = event.deletion_status === 'approved' || event.status === 'cancelled'
         setIsReadOnly(isCancelledOrDeleted)
+
+        // Bloquear tipo de evento e ingressos após publicação/aprovação
+        const isPublishedOrApproved =
+          event.status === 'published' ||
+          event.approval_status === 'approved' ||
+          event.approval_status === 'pending'
+        setIsEventTypeLocked(isPublishedOrApproved)
 
         setFormData({
           title: event.title,
@@ -127,6 +128,35 @@ function CadastrarEventoForm() {
     void loadEvent()
   }, [editId, router])
 
+  // Recalcular Preço Médio e Capacidade Total com base nos Tipos de Ingresso (para eventos pagos)
+  useEffect(() => {
+    if (formData.eventType !== 'PAID') return
+
+    const totalCapacity = formData.ticketTypes.reduce(
+      (acc, item) => acc + (parseInt(item.quantity, 10) || 0),
+      0
+    )
+    const totalRevenue = formData.ticketTypes.reduce(
+      (acc, item) => acc + ((parseFloat(item.price) || 0) * (parseInt(item.quantity, 10) || 0)),
+      0
+    )
+    const avgPrice = totalCapacity > 0 ? totalRevenue / totalCapacity : 0
+
+    const newCapStr = String(totalCapacity)
+    const newPriceStr = avgPrice > 0 ? avgPrice.toFixed(2) : '0'
+
+    setFormData((prev) => {
+      if (prev.capacity === newCapStr && prev.price === newPriceStr) {
+        return prev
+      }
+      return {
+        ...prev,
+        capacity: newCapStr,
+        price: newPriceStr,
+      }
+    })
+  }, [formData.ticketTypes, formData.eventType])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
 
@@ -141,28 +171,6 @@ function CadastrarEventoForm() {
         .trim()
 
       setFormData((prev) => ({ ...prev, title: value, slug }))
-      return
-    }
-
-    if (name === 'price') {
-      const parsedPrice = Number(value)
-      setFormData((prev) => ({
-        ...prev,
-        price: value,
-        ticketTypes: prev.ticketTypes.map((ticketType) => {
-          const lowerName = ticketType.name.toLowerCase()
-          if (lowerName.includes('inteira')) {
-            return { ...ticketType, price: value }
-          }
-          if (lowerName.includes('meia')) {
-            return {
-              ...ticketType,
-              price: Number.isFinite(parsedPrice) ? (parsedPrice / 2).toFixed(2) : ticketType.price,
-            }
-          }
-          return ticketType
-        }),
-      }))
       return
     }
 
@@ -213,6 +221,30 @@ function CadastrarEventoForm() {
       return
     }
 
+    // Validação dos tipos de ingresso para eventos pagos
+    if (formData.eventType === 'PAID') {
+      if (!formData.ticketTypes || formData.ticketTypes.length === 0) {
+        setError('Adicione pelo menos um tipo de ingresso.')
+        setLoading(false)
+        return
+      }
+
+      for (let i = 0; i < formData.ticketTypes.length; i++) {
+        const tt = formData.ticketTypes[i]
+        const nameValid = tt.name && tt.name.trim().length > 0
+        const priceNum = parseFloat(tt.price)
+        const priceValid = tt.price !== '' && !isNaN(priceNum) && priceNum >= 0
+        const qtyNum = parseInt(tt.quantity, 10)
+        const qtyValid = tt.quantity !== '' && !isNaN(qtyNum) && qtyNum > 0
+
+        if (!nameValid || !priceValid || !qtyValid) {
+          setError(`Preencha todos os campos obrigatórios do tipo de ingresso #${i + 1} (Nome, Preço e Quantidade).`)
+          setLoading(false)
+          return
+        }
+      }
+    }
+
     try {
       const supabase = createClient()
       const {
@@ -242,7 +274,11 @@ function CadastrarEventoForm() {
         ? (formData.accessPassword.trim() || (isEditMode ? undefined : null))
         : null
 
-      const payload = {
+      const capacityNum = parseInt(formData.capacity, 10)
+      const priceNum = formData.eventType === 'FREE' ? 0 : (formData.price ? parseFloat(formData.price) : 0)
+
+      // Payload base — campos editáveis em qualquer modo
+      const basePayload: Record<string, unknown> = {
         title: formData.title,
         slug: formData.slug,
         description: formData.description,
@@ -255,13 +291,11 @@ function CadastrarEventoForm() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         place_id: formData.placeId,
-        capacity: parseInt(formData.capacity, 10),
-        price: formData.eventType === 'FREE' ? 0 : (formData.price ? parseFloat(formData.price) : 0),
+        capacity: isNaN(capacityNum) ? 0 : capacityNum,
+        price: isNaN(priceNum) ? 0 : priceNum,
         event_type: formData.eventType,
         visibility: formData.visibility,
         access_password: accessPasswordPayload,
-        ticket_layout: formData.ticketLayout,
-        participant_id_type: formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType,
         ticket_types: formData.eventType === 'FREE'
           ? []
           : formData.ticketTypes
@@ -273,6 +307,24 @@ function CadastrarEventoForm() {
                 description: ticketType.description?.trim() || null,
               })),
       }
+
+      // ticket_layout e participant_id_type são imutáveis após a criação;
+      // só os incluímos ao criar ou se o valor for válido (não vazio)
+      if (!isEditMode) {
+        basePayload.ticket_layout = formData.ticketLayout
+        basePayload.participant_id_type = formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType
+      } else {
+        // Em modo edição, apenas incluir se o valor for válido (não vazio)
+        if (formData.ticketLayout) {
+          basePayload.ticket_layout = formData.ticketLayout
+        }
+        const pidType = formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType
+        if (pidType) {
+          basePayload.participant_id_type = pidType
+        }
+      }
+
+      const payload = basePayload
 
       if (isEditMode && editId) {
         await updateEvent(editId, token, payload)
@@ -426,23 +478,38 @@ function CadastrarEventoForm() {
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
               Visibilidade do Evento *
             </label>
+
+            {isEventTypeLocked && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.65rem 0.9rem', marginBottom: '0.75rem',
+                background: '#fffbeb', border: '1px solid #fde68a',
+                borderRadius: '8px', fontSize: '0.83rem', color: '#92400e',
+              }}>
+                <span>🔒</span>
+                <span>A visibilidade não pode ser alterada após publicação ou aprovação.</span>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <button
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, visibility: 'PUBLIC' }))}
+                disabled={isEventTypeLocked}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, visibility: 'PUBLIC' }))}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '10px',
                   border: formData.visibility === 'PUBLIC' ? '2px solid #2563eb' : '1px solid #cbd5e1',
                   background: formData.visibility === 'PUBLIC' ? '#eff6ff' : '#ffffff',
-                  color: formData.visibility === 'PUBLIC' ? '#1d4ed8' : '#475569',
+                  color: formData.visibility === 'PUBLIC' ? '#1d4ed8' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
                   fontWeight: formData.visibility === 'PUBLIC' ? 700 : 500,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'flex-start',
                   gap: '0.2rem',
-                  cursor: 'pointer',
+                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
                   textAlign: 'left',
+                  opacity: isEventTypeLocked && formData.visibility !== 'PUBLIC' ? 0.5 : 1,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
@@ -455,20 +522,22 @@ function CadastrarEventoForm() {
 
               <button
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, visibility: 'PRIVATE' }))}
+                disabled={isEventTypeLocked}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, visibility: 'PRIVATE' }))}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '10px',
                   border: formData.visibility === 'PRIVATE' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
                   background: formData.visibility === 'PRIVATE' ? '#f5f3ff' : '#ffffff',
-                  color: formData.visibility === 'PRIVATE' ? '#6d28d9' : '#475569',
+                  color: formData.visibility === 'PRIVATE' ? '#6d28d9' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
                   fontWeight: formData.visibility === 'PRIVATE' ? 700 : 500,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'flex-start',
                   gap: '0.2rem',
-                  cursor: 'pointer',
+                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
                   textAlign: 'left',
+                  opacity: isEventTypeLocked && formData.visibility !== 'PRIVATE' ? 0.5 : 1,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
@@ -602,27 +671,43 @@ function CadastrarEventoForm() {
             required
           />
 
+          {/* ── Tipo de Evento ── */}
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
               Tipo de Evento *
             </label>
+
+            {isEventTypeLocked && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.65rem 0.9rem', marginBottom: '0.75rem',
+                background: '#fffbeb', border: '1px solid #fde68a',
+                borderRadius: '8px', fontSize: '0.83rem', color: '#92400e',
+              }}>
+                <span>🔒</span>
+                <span>O tipo de evento não pode ser alterado após publicação ou aprovação.</span>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <button
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, eventType: 'PAID' }))}
+                disabled={isEventTypeLocked}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, eventType: 'PAID' }))}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '10px',
                   border: formData.eventType === 'PAID' ? '2px solid #0284c7' : '1px solid #cbd5e1',
                   background: formData.eventType === 'PAID' ? '#f0f9ff' : '#ffffff',
-                  color: formData.eventType === 'PAID' ? '#0369a1' : '#475569',
+                  color: formData.eventType === 'PAID' ? '#0369a1' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
                   fontWeight: formData.eventType === 'PAID' ? 700 : 500,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
-                  cursor: 'pointer',
+                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
                   fontSize: '0.95rem',
+                  opacity: isEventTypeLocked && formData.eventType !== 'PAID' ? 0.5 : 1,
                 }}
               >
                 <span>💳</span> Evento Pago
@@ -630,20 +715,22 @@ function CadastrarEventoForm() {
 
               <button
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, eventType: 'FREE', price: '0' }))}
+                disabled={isEventTypeLocked}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, eventType: 'FREE', price: '0' }))}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '10px',
                   border: formData.eventType === 'FREE' ? '2px solid #16a34a' : '1px solid #cbd5e1',
                   background: formData.eventType === 'FREE' ? '#f0fdf4' : '#ffffff',
-                  color: formData.eventType === 'FREE' ? '#15803d' : '#475569',
+                  color: formData.eventType === 'FREE' ? '#15803d' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
                   fontWeight: formData.eventType === 'FREE' ? 700 : 500,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
-                  cursor: 'pointer',
+                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
                   fontSize: '0.95rem',
+                  opacity: isEventTypeLocked && formData.eventType !== 'FREE' ? 0.5 : 1,
                 }}
               >
                 <span>🎟️</span> Evento Gratuito (RSVP)
@@ -835,7 +922,7 @@ function CadastrarEventoForm() {
           <div style={{ display: 'grid', gridTemplateColumns: formData.eventType === 'FREE' ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
             <div>
               <label htmlFor="capacity" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
-                {formData.eventType === 'FREE' ? 'Limite de Vagas / Capacidade *' : 'Capacidade *'}
+                {formData.eventType === 'FREE' ? 'Limite de Vagas / Capacidade *' : 'Capacidade Total *'}
               </label>
               <input
                 type="number"
@@ -844,6 +931,8 @@ function CadastrarEventoForm() {
                 value={formData.capacity}
                 onChange={handleChange}
                 required
+                readOnly={formData.eventType === 'PAID'}
+                disabled={formData.eventType === 'PAID'}
                 min="1"
                 style={{
                   width: '100%',
@@ -852,24 +941,32 @@ function CadastrarEventoForm() {
                   borderRadius: '8px',
                   fontSize: '0.95rem',
                   boxSizing: 'border-box',
+                  backgroundColor: formData.eventType === 'PAID' ? '#f1f5f9' : '#ffffff',
+                  cursor: formData.eventType === 'PAID' ? 'not-allowed' : 'text',
+                  color: formData.eventType === 'PAID' ? '#475569' : '#0f172a',
+                  fontWeight: formData.eventType === 'PAID' ? '600' : 'normal',
                 }}
                 placeholder="1000"
               />
+              {formData.eventType === 'PAID' && (
+                <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
+                  Calculado automaticamente pela soma das quantidades dos ingressos
+                </span>
+              )}
             </div>
 
             {formData.eventType === 'PAID' && (
               <div>
                 <label htmlFor="price" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
-                  Preço (R$)
+                  Preço Médio (R$)
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   id="price"
                   name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
+                  value={formData.price ? `R$ ${Number(formData.price).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00'}
+                  readOnly
+                  disabled
                   style={{
                     width: '100%',
                     padding: '0.6rem 0.75rem',
@@ -877,9 +974,15 @@ function CadastrarEventoForm() {
                     borderRadius: '8px',
                     fontSize: '0.95rem',
                     boxSizing: 'border-box',
+                    backgroundColor: '#f1f5f9',
+                    cursor: 'not-allowed',
+                    color: '#475569',
+                    fontWeight: '600',
                   }}
-                  placeholder="150.00"
                 />
+                <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
+                  Média ponderada dos ingressos dividida pela capacidade
+                </span>
               </div>
             )}
           </div>
@@ -892,7 +995,13 @@ function CadastrarEventoForm() {
                 <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.95rem' }}>
                   Adicione os ingressos disponíveis para o evento. Inclua meia entrada se houver.
                 </p>
+                {isEventTypeLocked && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.4rem', fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '2px 8px' }}>
+                    🔒 Não editável após publicação
+                  </span>
+                )}
               </div>
+              {!isEventTypeLocked && (
               <button
                 type="button"
                 onClick={addTicketType}
@@ -908,6 +1017,7 @@ function CadastrarEventoForm() {
               >
                 + Novo tipo
               </button>
+              )}
             </div>
 
             {formData.ticketTypes.map((ticketType, index) => (
@@ -921,10 +1031,12 @@ function CadastrarEventoForm() {
                   borderRadius: '10px',
                   background: '#fff',
                   border: '1px solid #e2e8f0',
+                  opacity: isEventTypeLocked ? 0.7 : 1,
                 }}
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center' }}>
                   <label style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Tipo de ingresso</label>
+                  {!isEventTypeLocked && (
                   <button
                     type="button"
                     onClick={() => removeTicketType(index)}
@@ -940,69 +1052,105 @@ function CadastrarEventoForm() {
                   >
                     Remover
                   </button>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <input
-                    type="text"
-                    value={ticketType.name}
-                    onChange={(event) => handleTicketTypeChange(index, 'name', event.target.value)}
-                    placeholder="Nome do tipo"
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                      Nome do tipo <span style={{ color: '#ef4444' }}>*</span>
+                      {isEventTypeLocked && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.35rem' }}>(fixo)</span>}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      readOnly={isEventTypeLocked}
+                      value={ticketType.name}
+                      onChange={(event) => !isEventTypeLocked && handleTicketTypeChange(index, 'name', event.target.value)}
+                      placeholder="Ex: Inteira, VIP"
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.75rem',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        boxSizing: 'border-box',
+                        backgroundColor: isEventTypeLocked ? '#f1f5f9' : '#fff',
+                        cursor: isEventTypeLocked ? 'not-allowed' : 'text',
+                        color: isEventTypeLocked ? '#64748b' : '#0f172a',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                      Preço (R$) <span style={{ color: '#ef4444' }}>*</span>
+                      {isEventTypeLocked && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.35rem' }}>(fixo)</span>}
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      readOnly={isEventTypeLocked}
+                      value={ticketType.price}
+                      onChange={(event) => !isEventTypeLocked && handleTicketTypeChange(index, 'price', event.target.value)}
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.75rem',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        boxSizing: 'border-box',
+                        backgroundColor: isEventTypeLocked ? '#f1f5f9' : '#fff',
+                        cursor: isEventTypeLocked ? 'not-allowed' : 'text',
+                        color: isEventTypeLocked ? '#64748b' : '#0f172a',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                      Quantidade <span style={{ color: '#ef4444' }}>*</span>
+                      {isEventTypeLocked && <span style={{ color: '#16a34a', fontWeight: 400, marginLeft: '0.35rem' }}>(editável)</span>}
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={ticketType.quantity}
+                      onChange={(event) => handleTicketTypeChange(index, 'quantity', event.target.value)}
+                      min="1"
+                      placeholder="0"
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.75rem',
+                        border: isEventTypeLocked ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        boxSizing: 'border-box',
+                        backgroundColor: isEventTypeLocked ? '#f0fdf4' : '#fff',
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569', marginTop: '0.25rem' }}>
+                    Descrição (opcional)
+                  </label>
+                  <textarea
+                    value={ticketType.description || ''}
+                    onChange={(event) => handleTicketTypeChange(index, 'description', event.target.value)}
+                    placeholder="Ex: Acesso livre ao setor principal..."
+                    rows={2}
                     style={{
                       width: '100%',
                       padding: '0.6rem 0.75rem',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
                       fontSize: '0.9rem',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <input
-                    type="number"
-                    value={ticketType.price}
-                    onChange={(event) => handleTicketTypeChange(index, 'price', event.target.value)}
-                    min="0"
-                    step="0.01"
-                    placeholder="Preço"
-                    style={{
-                      width: '100%',
-                      padding: '0.6rem 0.75rem',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.9rem',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <input
-                    type="number"
-                    value={ticketType.quantity}
-                    onChange={(event) => handleTicketTypeChange(index, 'quantity', event.target.value)}
-                    min="0"
-                    placeholder="Qtd"
-                    style={{
-                      width: '100%',
-                      padding: '0.6rem 0.75rem',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.9rem',
+                      resize: 'vertical',
                       boxSizing: 'border-box',
                     }}
                   />
                 </div>
-                <textarea
-                  value={ticketType.description || ''}
-                  onChange={(event) => handleTicketTypeChange(index, 'description', event.target.value)}
-                  placeholder="Descrição opcional"
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.75rem',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    resize: 'vertical',
-                    boxSizing: 'border-box',
-                  }}
-                />
               </div>
             ))}
           </section>

@@ -483,7 +483,9 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                 </span>
               </div>
               <p style={{ margin: '3px 0 0', color: '#64748b', fontSize: '0.8rem', lineHeight: 1.3 }}>
-                📍 {event.location} • 📅 {formatDate(event.date)}
+                👤 Criador: <strong style={{ color: '#334155' }}>{(('organizerName' in event && event.organizerName) || ('organizerEmail' in event && event.organizerEmail) || ('organizer_id' in event ? event.organizer_id : ''))}</strong>
+                {('organizerEmail' in event && event.organizerEmail) ? ` (${event.organizerEmail})` : ''}
+                {' • '}📍 {event.location} • 📅 {formatDate(event.date)}
               </p>
             </div>
 

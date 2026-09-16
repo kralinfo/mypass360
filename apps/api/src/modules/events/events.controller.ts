@@ -69,7 +69,7 @@ export class EventsController {
     @Body() dto: UpdateEventDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.eventsService.update(id, user.id, dto)
+    return this.eventsService.update(id, user, dto)
   }
 
   /** DELETE /events/:id — remover evento (protegido, apenas o proprietário) */

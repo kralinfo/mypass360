@@ -27,7 +27,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false)
-  // Password gate for PRIVATE PAID events
+  // Password gate for events with password
   const [paidPasswordVerified, setPaidPasswordVerified] = useState(false)
   const [paidPasswordInput, setPaidPasswordInput] = useState('')
   const [paidPasswordError, setPaidPasswordError] = useState<string | null>(null)
@@ -92,38 +92,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
       })
     )
   }
-
-  if (isLoading) {
-    return (
-      <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-        <p>Carregando...</p>
-      </main>
-    )
-  }
-
-  if (error || !event) {
-    return (
-      <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-        <h1>Erro</h1>
-        <p style={{ color: '#dc2626' }}>{error || 'Evento não encontrado'}</p>
-        <Link href="/eventos">Voltar para eventos</Link>
-      </main>
-    )
-  }
-
-  const formattedDate = new Date(event.date).toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  const formattedPrice =
-    event.price === 0
-      ? 'Gratuito'
-      : event.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   function setTicketQuantity(ticketTypeId: string, quantity: number, available: number) {
     setQuantities((current) => ({
@@ -272,6 +240,164 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     setSuccessMessage(null)
     router.push(`/checkout?eventId=${event.id}&from=event&slug=${event.slug}`)
   }
+
+  if (isLoading) {
+    return (
+      <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+        <p>Carregando...</p>
+      </main>
+    )
+  }
+
+  if (error || !event) {
+    return (
+      <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+        <h1>Erro</h1>
+        <p style={{ color: '#dc2626' }}>{error || 'Evento não encontrado'}</p>
+        <Link href="/eventos">Voltar para eventos</Link>
+      </main>
+    )
+  }
+
+  const requiresPassword = Boolean(event.has_password)
+
+  // 🔒 Gate de senha: se o evento exige senha e ainda não foi verificado, oculta TODAS as informações do evento
+  if (requiresPassword && !paidPasswordVerified) {
+    return (
+      <main style={{ position: 'relative', maxWidth: '540px', margin: '3rem auto 2rem', padding: '0 1rem' }}>
+        <BackButton href="/eventos" style={{ marginBottom: '1.5rem' }} />
+
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            borderRadius: '24px',
+            padding: '2.5rem 2rem',
+            color: '#fff',
+            textAlign: 'center',
+            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1.25rem',
+          }}
+        >
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2rem',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+            }}
+          >
+            🔐
+          </div>
+
+          <div>
+            <span
+              style={{
+                display: 'inline-block',
+                background: 'rgba(168, 85, 247, 0.2)',
+                color: '#d8b4fe',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '20px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '0.6rem',
+              }}
+            >
+              Evento Privado · Acesso Restrito
+            </span>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 0.5rem', color: '#fff' }}>
+              Digite a senha para acessar
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
+              Este evento é protegido por senha. Insira a senha fornecida pelo organizador para desbloquear e visualizar os detalhes do evento e ingressos.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => void handleValidatePaidPassword(e)}
+            style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}
+          >
+            {paidPasswordError && (
+              <div
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '12px',
+                  color: '#fca5a5',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  textAlign: 'left',
+                }}
+              >
+                ⚠️ {paidPasswordError}
+              </div>
+            )}
+
+            <input
+              type="password"
+              value={paidPasswordInput}
+              onChange={(e) => setPaidPasswordInput(e.target.value)}
+              placeholder="Digite a senha de acesso"
+              required
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '0.85rem 1.1rem',
+                borderRadius: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                background: 'rgba(255, 255, 255, 0.07)',
+                color: '#fff',
+                fontSize: '1rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            <button
+              type="submit"
+              disabled={paidPasswordLoading || !paidPasswordInput.trim()}
+              style={{
+                width: '100%',
+                padding: '0.9rem 1.5rem',
+                borderRadius: '14px',
+                background: paidPasswordLoading ? '#64748b' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '1rem',
+                border: 'none',
+                cursor: paidPasswordLoading ? 'not-allowed' : 'pointer',
+                boxShadow: '0 10px 20px -5px rgba(124, 58, 237, 0.4)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {paidPasswordLoading ? 'Verificando...' : 'Desbloquear Evento →'}
+            </button>
+          </form>
+        </div>
+      </main>
+    )
+  }
+
+  const formattedDate = new Date(event.date).toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 
   return (
     <>
@@ -564,24 +690,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
               <p style={{ color: '#166534', fontSize: '0.95rem', margin: 0, maxWidth: '480px', lineHeight: 1.5 }}>
                 Garanta sua vaga sem custos. Ao confirmar sua presença, seu ingresso com QR Code individual será gerado instantaneamente.
               </p>
-
-              {event.has_password && (
-                <span
-                  style={{
-                    display: 'inline-block',
-                    marginTop: '0.75rem',
-                    background: '#fef3c7',
-                    color: '#92400e',
-                    border: '1px solid #fcd34d',
-                    padding: '0.3rem 0.75rem',
-                    borderRadius: '8px',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                  }}
-                >
-                  🔒 Este evento exige senha de acesso do convidado
-                </span>
-              )}
             </div>
 
             <button
@@ -617,77 +725,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
               pointerEvents: event.deletion_status === 'pending' ? 'none' : 'auto',
             }}
           >
-            {/* Password gate for PRIVATE PAID events with password */}
-            {event.visibility === 'PRIVATE' && event.has_password && !paidPasswordVerified ? (
-              <form
-                onSubmit={(e) => void handleValidatePaidPassword(e)}
-                style={{
-                  background: 'linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%)',
-                  border: '1.5px solid #c4b5fd',
-                  borderRadius: '12px',
-                  padding: '1.5rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                }}
-              >
-                <span style={{ fontSize: '2rem' }}>🔐</span>
-                <div>
-                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#4c1d95', margin: '0 0 0.3rem' }}>
-                    Evento Privado — Acesso Restrito
-                  </h2>
-                  <p style={{ color: '#6d28d9', fontSize: '0.88rem', margin: 0, lineHeight: 1.5 }}>
-                    Para visualizar e comprar ingressos, insira a senha de acesso fornecida pelo organizador.
-                  </p>
-                </div>
-                {paidPasswordError && (
-                  <div style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#fee2e2', color: '#991b1b', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
-                    ⚠️ {paidPasswordError}
-                  </div>
-                )}
-                <div style={{ width: '100%', display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="password"
-                    id="paid_event_password"
-                    value={paidPasswordInput}
-                    onChange={(e) => setPaidPasswordInput(e.target.value)}
-                    placeholder="Senha de acesso"
-                    required
-                    autoFocus
-                    style={{
-                      flex: 1,
-                      padding: '0.7rem 1rem',
-                      borderRadius: '10px',
-                      border: '1.5px solid #c4b5fd',
-                      fontSize: '0.95rem',
-                      outline: 'none',
-                      background: '#fff',
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={paidPasswordLoading || !paidPasswordInput.trim()}
-                    style={{
-                      padding: '0.7rem 1.25rem',
-                      borderRadius: '10px',
-                      background: paidPasswordLoading ? '#94a3b8' : '#6d28d9',
-                      color: '#fff',
-                      fontWeight: 700,
-                      fontSize: '0.9rem',
-                      border: 'none',
-                      cursor: paidPasswordLoading ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {paidPasswordLoading ? 'Verificando...' : 'Acessar'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <>
-                <div>
+            <div>
               <h2 style={{ fontSize: '1.15rem', color: '#0f172a', fontWeight: 700, marginBottom: '0.15rem' }}>Tipos de Ingresso</h2>
               <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
                 Toque no ingresso para expandir as opções de compra.
@@ -750,38 +788,19 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                           )}
 
                           <div className="ticket-actions-group">
-                            {/* Seleção de quantidade */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff', overflow: 'hidden' }}>
                               <button
                                 type="button"
                                 onClick={() => setTicketQuantity(ticketType.id, quantity - 1, available)}
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '8px',
-                                  border: '1px solid #cbd5e1',
-                                  background: '#fff',
-                                  cursor: 'pointer',
-                                  fontWeight: 'bold',
-                                }}
+                                style={{ width: 32, height: 32, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', color: '#475569' }}
                               >
                                 -
                               </button>
-                              <span style={{ minWidth: '24px', textAlign: 'center', fontWeight: 'bold' }}>
-                                {quantity}
-                              </span>
+                              <span style={{ padding: '0 0.5rem', minWidth: 24, textAlign: 'center', fontSize: '0.9rem', fontWeight: 600 }}>{quantity}</span>
                               <button
                                 type="button"
                                 onClick={() => setTicketQuantity(ticketType.id, quantity + 1, available)}
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '8px',
-                                  border: '1px solid #cbd5e1',
-                                  background: '#fff',
-                                  cursor: 'pointer',
-                                  fontWeight: 'bold',
-                                }}
+                                style={{ width: 32, height: 32, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', color: '#475569' }}
                               >
                                 +
                               </button>
@@ -789,38 +808,48 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
 
                             <button
                               type="button"
-                              onClick={() => handleAddToCart(ticketType)}
                               className="ticket-action-btn"
+                              onClick={() => handleAddToCart(ticketType)}
+                              disabled={quantity <= 0 || available <= 0}
                               style={{
-                                padding: '0.5rem 0.75rem',
+                                padding: '0.5rem 0.85rem',
                                 borderRadius: '8px',
                                 border: '1px solid #0f172a',
                                 background: '#fff',
                                 color: '#0f172a',
+                                fontWeight: 700,
                                 fontSize: '0.82rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
+                                cursor: quantity <= 0 || available <= 0 ? 'not-allowed' : 'pointer',
+                                opacity: quantity <= 0 || available <= 0 ? 0.5 : 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
                               }}
                             >
-                              Adicionar ao Carrinho
+                              🛒 Adicionar
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => handleBuyNow(ticketType)}
                               className="ticket-action-btn"
+                              onClick={() => handleBuyNow(ticketType)}
+                              disabled={quantity <= 0 || available <= 0}
                               style={{
-                                padding: '0.5rem 0.75rem',
+                                padding: '0.5rem 0.85rem',
                                 borderRadius: '8px',
                                 border: 'none',
                                 background: '#0f172a',
                                 color: '#fff',
+                                fontWeight: 700,
                                 fontSize: '0.82rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
+                                cursor: quantity <= 0 || available <= 0 ? 'not-allowed' : 'pointer',
+                                opacity: quantity <= 0 || available <= 0 ? 0.5 : 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
                               }}
                             >
-                              Comprar Agora
+                              ⚡ Comprar Agora
                             </button>
                           </div>
                         </div>
@@ -829,56 +858,66 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                   )
                 })}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
+                {/* Botões de Ação Global no Rodapé da Lista */}
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
                   <button
                     type="button"
                     onClick={handleAddAllToCart}
                     style={{
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
+                      border: '1.5px solid #0f172a',
                       background: '#fff',
                       color: '#0f172a',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
                       cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: '0.88rem',
                     }}
                   >
-                    Adicionar Tudo ao Carrinho
+                    🛒 Adicionar Ingressos Selecionados
                   </button>
                   <button
                     type="button"
                     onClick={handleBuyAll}
                     style={{
-                      padding: '0.75rem',
-                      borderRadius: '8px',
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
                       border: 'none',
-                      background: '#0f172a',
+                      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                       color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
                       cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: '0.88rem',
+                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
                     }}
                   >
-                    Comprar Tudo
+                    ⚡ Ir para o Pagamento
                   </button>
                 </div>
-
-
-
-                    <FeeRefundDisclaimer variant="compact" style={{ marginTop: '0.75rem' }} />
-                  </>
-                )}
               </>
             )}
           </section>
         )}
 
-        <FreeRegistrationModal
-          event={event}
-          isOpen={isFreeModalOpen}
-          onClose={() => setIsFreeModalOpen(false)}
-        />
+        <FeeRefundDisclaimer style={{ marginTop: '1.5rem' }} />
+
+        {isFreeModalOpen && event && (
+          <FreeRegistrationModal
+            event={event}
+            isOpen={isFreeModalOpen}
+            passwordVerified={paidPasswordVerified}
+            onClose={() => setIsFreeModalOpen(false)}
+            onSuccess={() => {
+              setIsFreeModalOpen(false)
+              setSuccessMessage('Presença confirmada com sucesso! Redirecionando para seus ingressos...')
+              setTimeout(() => {
+                router.push('/meus-ingressos')
+              }, 1500)
+            }}
+          />
+        )}
       </main>
     </>
   )

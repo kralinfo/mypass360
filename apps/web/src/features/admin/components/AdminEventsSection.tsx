@@ -7,6 +7,7 @@ import { AdminPanelCard } from './AdminPanelCard'
 import { AttendeesModal } from './AttendeesModal'
 import { EventDetailsModal } from './EventDetailsModal'
 import { AdminDeleteConfirmModal } from './AdminDeleteConfirmModal'
+import { AdminEditEventModal } from './AdminEditEventModal'
 import { eventStatusOptions, eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
 
 type AdminEventsSectionProps = {
@@ -51,10 +52,15 @@ const IconDots = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /><circle cx="5" cy="12" r="1.5" /></svg>
 )
 
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+)
+
 export function AdminEventsSection({ dashboard, isLoading, runningAction, onChangeStatus, onDelete, onSendReminders, onRefresh }: AdminEventsSectionProps) {
   const [detailsEvent, setDetailsEvent] = useState<AdminEventItem | null>(null)
   const [attendeesEvent, setAttendeesEvent] = useState<AdminEventItem | null>(null)
   const [eventToDelete, setEventToDelete] = useState<AdminEventItem | null>(null)
+  const [editEvent, setEditEvent] = useState<AdminEventItem | null>(null)
   const [openMenuEventId, setOpenMenuEventId] = useState<string | null>(null)
 
   // Fechar o menu de ações ao clicar fora
@@ -81,6 +87,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
               <thead>
                 <tr>
                   <th style={TH}>Evento</th>
+                  <th style={TH}>Criador</th>
                   <th style={TH}>Data / Local</th>
                   <th style={TH}>Status</th>
                   <th style={{ ...TH, textAlign: 'center' }}>Pedidos</th>
@@ -115,6 +122,20 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                             {event.title}
                           </strong>
                         </div>
+                      </td>
+
+                      <td style={TD}>
+                        <span style={{ display: 'block', color: '#0f172a', fontWeight: 600, fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
+                          {event.organizerName || 'Organizador'}
+                        </span>
+                        {event.organizerEmail && (
+                          <span style={{
+                            display: 'block', color: '#64748b', fontSize: '0.76rem', marginTop: '2px',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px',
+                          }}>
+                            {event.organizerEmail}
+                          </span>
+                        )}
                       </td>
 
                       <td style={TD}>
@@ -215,6 +236,34 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                                 gap: '2px',
                               }}
                             >
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditEvent(event)
+                                  setOpenMenuEventId(null)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  width: '100%',
+                                  padding: '7px 10px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  borderRadius: '6px',
+                                  color: '#4338ca',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = '#eef2ff' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                              >
+                                <IconEdit />
+                                Editar Evento
+                              </button>
 
                               <button
                                 type="button"
@@ -378,6 +427,17 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
           event={detailsEvent}
           onClose={() => setDetailsEvent(null)}
           onUpdated={onRefresh}
+        />
+      )}
+
+      {editEvent && (
+        <AdminEditEventModal
+          event={editEvent}
+          onClose={() => setEditEvent(null)}
+          onSaved={() => {
+            setEditEvent(null)
+            onRefresh?.()
+          }}
         />
       )}
     </>

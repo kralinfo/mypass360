@@ -13,12 +13,23 @@ export function EventCard({ event, hot }: EventCardProps) {
     year: 'numeric',
   })
 
-  const formattedPrice =
-    event.price === 0
-      ? 'Gratuito'
-      : event.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const getMinPrice = (ev: Event) => {
+    if (ev.event_type === 'FREE') return 0
+    if (ev.ticket_types && ev.ticket_types.length > 0) {
+      const validPrices = ev.ticket_types.map((tt) => Number(tt.price)).filter((p) => typeof p === 'number' && !isNaN(p))
+      if (validPrices.length > 0) {
+        return Math.min(...validPrices)
+      }
+    }
+    return ev.price ?? 0
+  }
 
-  const isGratuito = event.price === 0
+  const minPrice = getMinPrice(event)
+  const isGratuito = event.event_type === 'FREE' || minPrice === 0
+
+  const formattedPrice = isGratuito
+    ? 'Gratuito'
+    : `A partir de ${minPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
 
   const getEventImage = (ev: Event) => {
     if (ev.image_url) return ev.image_url

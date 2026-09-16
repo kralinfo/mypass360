@@ -52,6 +52,9 @@ function PublishedEventsTable({ events }: { events: AdminEventItem[] }) {
           <div key={event.id} style={makeRowStyle(COLS)}>
             <div>
               <strong style={{ display: 'block', color: '#0f172a', fontSize: '0.93rem' }}>{event.title}</strong>
+              <span style={{ display: 'block', color: '#64748b', fontSize: '0.78rem', marginTop: '2px' }}>
+                👤 {event.organizerName || 'Organizador'} {event.organizerEmail ? `(${event.organizerEmail})` : ''}
+              </span>
             </div>
             <div style={{ color: '#334155', fontSize: '0.88rem', lineHeight: 1.45 }}>
               <div>{formatDate(event.date)}</div>

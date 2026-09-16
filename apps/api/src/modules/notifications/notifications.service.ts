@@ -184,6 +184,29 @@ export class NotificationsService {
   }
 
   /**
+   * Notifica o organizador que o admin editou o evento, com a mensagem do que foi alterado.
+   */
+  async notifyEventEditedByAdmin(
+    event: { id: string; title: string; organizerId: string },
+    adminMessage: string
+  ) {
+    try {
+      await this.notificationsRepository.create({
+        userId: event.organizerId,
+        type: 'admin_message',
+        title: `Seu evento foi atualizado pela Administração ✏️`,
+        message: `O administrador realizou alterações no evento "${event.title}". ${adminMessage}`,
+        entityType: 'event',
+        entityId: event.id,
+        actionUrl: `/meus-eventos?event_id=${event.id}`,
+        metadata: { eventTitle: event.title, adminMessage },
+      })
+    } catch (err) {
+      console.error('[NotificationsService] Erro ao notificar edição pelo admin:', err)
+    }
+  }
+
+  /**
    * Envia uma mensagem personalizada da administração para o organizador.
    */
   async sendAdminMessage(

@@ -29,7 +29,7 @@ export class EventsRepository {
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
-      .select('*')
+      .select('*, ticket_types(*)')
       .eq('status', 'published')
       .or('visibility.eq.PUBLIC,visibility.is.null')
       .neq('deletion_status', 'pending')
@@ -142,11 +142,6 @@ export class EventsRepository {
         description: dto.description,
         date: dto.date,
         location: dto.location,
-        city: dto.city ?? null,
-        state: dto.state ?? null,
-        latitude: dto.latitude ?? null,
-        longitude: dto.longitude ?? null,
-        place_id: dto.place_id ?? null,
         organizer_id: userId, // sempre do JWT, nunca do body
         capacity: dto.capacity,
         price: eventType === 'FREE' ? 0 : (dto.price ?? 0),
@@ -188,15 +183,29 @@ export class EventsRepository {
   }
 
   /**
-   * Atualiza evento — valida que pertence ao userId antes de alterar.
+   * Atualiza evento — valida que pertence ao userId antes de alterar (ou bypass se for Admin).
    */
-  async update(id: string, userId: string, dto: UpdateEventDto) {
+  async update(id: string, userId: string, dto: UpdateEventDto, isAdmin: boolean = false) {
     // Remover campos que o usuário não deve poder alterar diretamente ou que não pertencem à tabela
-    const { status: _s, ticket_types: _tt, access_password, ...safeDto } = dto as any
+    const {
+      status: _s,
+      ticket_types: _tt,
+      access_password,
+      city: _city,
+      state: _state,
+      latitude: _lat,
+      longitude: _lng,
+      place_id: _pid,
+      ...safeDto
+    } = dto as any
 
     const updatePayload: Record<string, any> = {
       ...safeDto,
       updated_at: new Date().toISOString(),
+    }
+
+    if (isAdmin && (dto as any).status !== undefined) {
+      updatePayload.status = (dto as any).status
     }
 
     if (dto.event_type !== undefined) {
@@ -219,16 +228,19 @@ export class EventsRepository {
     }
 
     // Log para diagnóstico
-    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'fields:', Object.keys(updatePayload))
+    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'isAdmin:', isAdmin, 'fields:', Object.keys(updatePayload))
 
-    const { data, error } = await this.supabase
+    let query = this.supabase
       .getClient()
       .from(this.table)
       .update(updatePayload)
       .eq('id', id)
-      .eq('organizer_id', userId)
-      .select()
-      .single()
+
+    if (!isAdmin) {
+      query = query.eq('organizer_id', userId)
+    }
+
+    const { data, error } = await query.select().single()
 
     if (error) {
       console.error('[EventsRepository.update] Supabase error:', error.message, error.details)
@@ -303,6 +315,7 @@ export class EventsRepository {
           .getClient()
           .from('ticket_types')
           .update({
+            name: item.name,
             price: item.price,
             quantity: item.quantity,
             description: item.description,

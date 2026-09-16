@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
 import { AdminRepository } from './admin.repository'
+import { EventsRepository } from '@/modules/events/events.repository'
 import { NotificationsService } from '@/modules/notifications/notifications.service'
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly adminRepository: AdminRepository,
+    private readonly eventsRepository: EventsRepository,
     private readonly notificationsService: NotificationsService
   ) {}
 
@@ -23,6 +25,43 @@ export class AdminService {
 
   updateEventStatus(eventId: string, status: 'draft' | 'published' | 'cancelled' | 'finished') {
     return this.adminRepository.updateEventStatus(eventId, status)
+  }
+
+  /**
+   * Atualiza qualquer campo de um evento como administrador.
+   * Se adminMessage for fornecida, notifica o organizador com o que foi alterado.
+   */
+  async updateEventByAdmin(
+    eventId: string,
+    adminId: string,
+    dto: Record<string, unknown>,
+    adminMessage?: string
+  ) {
+    // Busca o evento antes de atualizar para ter o organizer_id
+    const existing = await this.eventsRepository.findById(eventId)
+    if (!existing) throw new NotFoundException('Evento não encontrado.')
+
+    // Atualiza o evento com bypass de ownership (isAdmin = true)
+    let updated: any
+    try {
+      updated = await this.eventsRepository.update(eventId, adminId, dto as any, true)
+    } catch (err: any) {
+      throw new BadRequestException(err?.message || 'Erro ao atualizar evento.')
+    }
+
+    // Notifica o organizador se uma mensagem foi informada
+    if (adminMessage && adminMessage.trim() && existing.organizer_id) {
+      void this.notificationsService.notifyEventEditedByAdmin(
+        {
+          id: eventId,
+          title: existing.title,
+          organizerId: existing.organizer_id,
+        },
+        adminMessage.trim()
+      )
+    }
+
+    return updated
   }
 
   async deleteEvent(eventId: string, reason?: string) {
