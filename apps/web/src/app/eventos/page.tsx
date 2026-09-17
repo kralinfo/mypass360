@@ -15,24 +15,13 @@ const SearchIcon = () => (
 
 const CATEGORIES = ['Todos', 'Música', 'Festival', 'Esportes', 'Teatro', 'Gastronomia', 'Cultura', 'Tech']
 
-/**
- * Tenta extrair o nome da cidade de um texto de localização livre.
- * Suporta formatos como:
- *  - "Allianz Parque, São Paulo, SP"
- *  - "Av. Paulista, 1000 — São Paulo"
- *  - "Local, Cidade - UF"
- */
 function extractCityFromLocation(location: string): string | null {
   if (!location) return null
-
-  // Padrão: "Cidade, UF" no final
   const statePattern = /([A-Za-zÀ-ÿ\s]+)\s*[,\-–—]\s*([A-Z]{2})\s*$/
   const stateMatch = location.match(statePattern)
   if (stateMatch) return stateMatch[1].trim()
 
-  // Padrão: vários segmentos separados por vírgula — pega o penúltimo ou último significativo
   const parts = location.split(/[,\-–—]/).map((p) => p.trim()).filter(Boolean)
-  // Ignora segmentos que parecem números de rua ou CEP
   const cityLike = parts.reverse().find((p) => p.length > 3 && !/^\d/.test(p))
   return cityLike ?? null
 }
@@ -42,10 +31,11 @@ export default function EventsPage() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Todos')
   const [selectedCity, setSelectedCity] = useState('Todas as cidades')
+  const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'paid' | 'free'>('all')
 
+  const now = Date.now()
   const publishedEvents = events.filter((e) => e.status === 'published' && e.visibility !== 'PRIVATE')
 
-  // Resolve a cidade de cada evento: campo city > extração do location
   function resolveEventCity(ev: (typeof publishedEvents)[0]): string | null {
     if (ev.city) return ev.state ? `${ev.city} - ${ev.state}` : ev.city
     const extracted = extractCityFromLocation(ev.location)
@@ -60,15 +50,14 @@ export default function EventsPage() {
     )
   ).sort()
 
-  // Contagem de eventos por cidade
   const cityCount: Record<string, number> = {}
   for (const ev of publishedEvents) {
     const city = resolveEventCity(ev)
     if (city) cityCount[city] = (cityCount[city] ?? 0) + 1
   }
 
-  // "Mais Vendidos": eventos com maior número de ingressos vendidos
   const hotEvents = [...publishedEvents]
+    .filter((e) => new Date(e.date).getTime() >= now)
     .sort((a, b) => (Number((b as unknown as { sold?: number }).sold ?? 0) - Number((a as unknown as { sold?: number }).sold ?? 0)))
     .slice(0, Math.min(4, publishedEvents.length))
 
@@ -81,9 +70,7 @@ export default function EventsPage() {
       ev.location.toLowerCase().includes(search.toLowerCase()) ||
       (ev.city && ev.city.toLowerCase().includes(search.toLowerCase()))
 
-    const matchesCategory =
-      activeCategory === 'Todos' ||
-      ev.genre === activeCategory
+    const matchesCategory = activeCategory === 'Todos' || ev.genre === activeCategory
 
     const resolvedCity = resolveEventCity(ev)
     const matchesCity =
@@ -91,10 +78,16 @@ export default function EventsPage() {
       (resolvedCity !== null && resolvedCity === selectedCity) ||
       ev.location.toLowerCase().includes(selectedCity.split(' - ')[0].toLowerCase())
 
-    return matchesSearch && matchesCategory && matchesCity
+    const isFree = ev.event_type === 'FREE' || ev.price === 0
+    const matchesEventType =
+      eventTypeFilter === 'all' ||
+      (eventTypeFilter === 'free' && isFree) ||
+      (eventTypeFilter === 'paid' && !isFree)
+
+    return matchesSearch && matchesCategory && matchesCity && matchesEventType
   })
 
-  const heroEvents = publishedEvents.slice(0, 8)
+  const heroEvents = publishedEvents.filter((e) => new Date(e.date).getTime() >= now).slice(0, 8)
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f8fb', fontFamily: 'inherit' }}>
@@ -136,9 +129,9 @@ export default function EventsPage() {
         padding: '0.9rem 1.5rem',
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {/* Search bar + City Selector */}
-          <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '750px', width: '100%', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <div style={{ position: 'relative', flex: '1 1 300px' }}>
+          {/* Search bar + City Selector + Event Type Filter */}
+          <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '850px', width: '100%', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: '1 1 280px' }}>
               <span style={{
                 position: 'absolute',
                 left: '14px',
@@ -214,6 +207,31 @@ export default function EventsPage() {
                 ▼
               </span>
             </div>
+
+            {/* Aba Todos / Gratuitos / Pagos */}
+            <div style={{ display: 'flex', gap: '0.25rem', background: '#e2e8f0', padding: '3px', borderRadius: '50px' }}>
+              {(['all', 'paid', 'free'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setEventTypeFilter(type)}
+                  style={{
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '50px',
+                    border: 'none',
+                    background: eventTypeFilter === type ? '#0f172a' : 'transparent',
+                    color: eventTypeFilter === type ? '#fff' : '#475569',
+                    fontWeight: eventTypeFilter === type ? 700 : 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {type === 'all' ? 'Todos' : type === 'paid' ? '💳 Pagos' : '🎟️ Gratuitos'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Categories pills */}
@@ -247,9 +265,8 @@ export default function EventsPage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
 
         {/* ── MAIS VENDIDOS 🔥 ── */}
-        {!isLoading && !search && selectedCity === 'Todas as cidades' && activeCategory === 'Todos' && hotEvents.length > 0 && (
+        {!isLoading && !search && selectedCity === 'Todas as cidades' && activeCategory === 'Todos' && eventTypeFilter === 'all' && hotEvents.length > 0 && (
           <div style={{ marginBottom: '2.5rem' }}>
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
               <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>🔥</span>
               <div>
@@ -262,7 +279,6 @@ export default function EventsPage() {
               </div>
             </div>
 
-            {/* Hot cards — scroll horizontal em mobile, grid em desktop */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -273,7 +289,6 @@ export default function EventsPage() {
               ))}
             </div>
 
-            {/* Divisória */}
             <div style={{
               height: '1px',
               background: 'linear-gradient(90deg, transparent, #e2e8f0, transparent)',
@@ -292,6 +307,10 @@ export default function EventsPage() {
                 ? `Eventos em ${selectedCity.split(' - ')[0]}`
                 : activeCategory !== 'Todos'
                 ? `Eventos de ${activeCategory}`
+                : eventTypeFilter === 'paid'
+                ? 'Eventos Pagos'
+                : eventTypeFilter === 'free'
+                ? 'Eventos Gratuitos'
                 : 'Próximos Eventos'}
             </h2>
             <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
@@ -359,7 +378,7 @@ export default function EventsPage() {
               Nenhum evento encontrado
             </h3>
             <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
-              {search ? 'Tente buscar por outro termo.' : 'Nenhum evento publicado no momento.'}
+              {search ? 'Tente buscar por outro termo.' : 'Nenhum evento encontrado nesta categoria.'}
             </p>
           </div>
         )}

@@ -46,10 +46,12 @@ export function EventCard({ event, hot }: EventCardProps) {
     return testImages[charSum % testImages.length]
   }
 
+  const isPast = event.status === 'finished' || new Date(event.date).getTime() < Date.now()
+
   return (
     <Link
       href={`/eventos/${event.slug}`}
-      style={{ textDecoration: 'none', display: 'block' }}
+      style={{ textDecoration: 'none', display: 'block', opacity: isPast ? 0.82 : 1 }}
     >
       <article
         style={{
@@ -60,6 +62,7 @@ export function EventCard({ event, hot }: EventCardProps) {
           cursor: 'pointer',
           border: '1px solid #f0f0f4',
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          filter: isPast ? 'grayscale(0.25)' : 'none',
         }}
         onMouseOver={(e) => {
           const el = e.currentTarget
@@ -96,8 +99,28 @@ export function EventCard({ event, hot }: EventCardProps) {
             onMouseOut={(e) => { e.currentTarget.style.transform = 'none' }}
           />
 
-          {/* Hot badge */}
-          {hot && (
+          {/* Badge de status ou destaque */}
+          {isPast ? (
+            <span style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              color: '#cbd5e1',
+              padding: '3px 9px',
+              borderRadius: '20px',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              letterSpacing: '0.02em',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}>
+              📜 Encerrado
+            </span>
+          ) : hot ? (
             <span style={{
               position: 'absolute',
               top: '10px',
@@ -116,7 +139,7 @@ export function EventCard({ event, hot }: EventCardProps) {
             }}>
               🔥 Mais vendido
             </span>
-          )}
+          ) : null}
 
           {/* Price badge */}
           <span style={{
