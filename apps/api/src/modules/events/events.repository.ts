@@ -146,6 +146,8 @@ export class EventsRepository {
         capacity: dto.capacity,
         price: eventType === 'FREE' ? 0 : (dto.price ?? 0),
         status: dto.status ?? 'draft',
+        approval_status: dto.status === 'pending' ? 'pending' : 'none',
+        approval_requested_at: dto.status === 'pending' ? new Date().toISOString() : null,
         event_type: eventType,
         visibility: dto.visibility ?? 'PUBLIC',
         access_password_hash: accessPasswordHash,

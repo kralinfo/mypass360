@@ -99,6 +99,11 @@ export default function EventsPage() {
     return matchesSearch && matchesCategory && matchesCity && matchesEventType
   })
 
+  const customGenres = Array.from(
+    new Set(publishedEvents.map((e) => e.genre).filter((g): g is string => Boolean(g)))
+  )
+  const categoriesList = Array.from(new Set(['Todos', ...CATEGORIES.filter((c) => c !== 'Todos'), ...customGenres]))
+
   const heroEvents = publishedEvents.filter((e) => new Date(e.date).getTime() >= now).slice(0, 8)
 
   return (
@@ -248,7 +253,7 @@ export default function EventsPage() {
 
           {/* Categories pills */}
           <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
-            {CATEGORIES.map((cat) => (
+            {categoriesList.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}

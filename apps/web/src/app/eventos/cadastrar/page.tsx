@@ -4,9 +4,31 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BackButton } from '@/components/BackButton'
-import { createEvent, updateEvent, fetchEventById } from '@/features/events/services/my-events.service'
+import { createEvent, updateEvent, fetchEventById, requestEventApproval } from '@/features/events/services/my-events.service'
 import { EventCoverUploader } from '@/features/events/components/EventCoverUploader'
 import { LocationAutocompleteInput } from '@/components/LocationAutocompleteInput'
+
+const PREDEFINED_CATEGORIES = [
+  'Música',
+  'Festival',
+  'Teatro',
+  'Gastronomia',
+  'Cultura',
+  'Esportes',
+  'Bem-estar',
+  'Tech',
+  'Negócios',
+  'Educação',
+  'Conferência',
+  'Workshop',
+  'Meetup',
+  'Aniversário',
+  'Casamento',
+  'Reunião',
+  'Confraternização',
+  'Formatura',
+  'Outro',
+]
 
 function CadastrarEventoForm() {
   const router = useRouter()
@@ -20,6 +42,9 @@ function CadastrarEventoForm() {
   const [isEventTypeLocked, setIsEventTypeLocked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [submitMode, setSubmitMode] = useState<'draft' | 'request_approval'>('draft')
+  const [isCustomCategory, setIsCustomCategory] = useState(false)
+  const [customCategoryText, setCustomCategoryText] = useState('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -94,12 +119,19 @@ function CadastrarEventoForm() {
           event.approval_status === 'pending'
         setIsEventTypeLocked(isPublishedOrApproved)
 
+        const loadedGenre = event.genre ?? ''
+        const isCustomGenre = Boolean(loadedGenre && !PREDEFINED_CATEGORIES.includes(loadedGenre))
+        if (isCustomGenre) {
+          setIsCustomCategory(true)
+          setCustomCategoryText(loadedGenre)
+        }
+
         setFormData({
           title: event.title,
           slug: event.slug,
           description: event.description ?? '',
           imageUrl: event.image_url ?? '',
-          genre: event.genre ?? '',
+          genre: loadedGenre,
           date: dateStr,
           time: timeStr,
           location: event.location,
@@ -328,8 +360,16 @@ function CadastrarEventoForm() {
 
       if (isEditMode && editId) {
         await updateEvent(editId, token, payload)
+        if (submitMode === 'request_approval') {
+          try {
+            await requestEventApproval(editId, token)
+          } catch {
+            // Se já estivesse em análise ou não necessitar, prossegue
+          }
+        }
       } else {
-        await createEvent(token, { ...payload, status: 'draft' })
+        const targetStatus = submitMode === 'request_approval' ? 'pending' : 'draft'
+        await createEvent(token, { ...payload, status: targetStatus })
       }
 
       router.push('/meus-eventos')
@@ -558,9 +598,17 @@ function CadastrarEventoForm() {
             <select
               id="genre"
               name="genre"
-              value={formData.genre}
-              onChange={handleChange}
-              required
+              value={isCustomCategory ? '__NEW__' : formData.genre}
+              onChange={(e) => {
+                if (e.target.value === '__NEW__') {
+                  setIsCustomCategory(true)
+                  setFormData((prev) => ({ ...prev, genre: customCategoryText }))
+                } else {
+                  setIsCustomCategory(false)
+                  handleChange(e)
+                }
+              }}
+              required={!isCustomCategory}
               style={{
                 width: '100%',
                 padding: '0.6rem 0.75rem',
@@ -596,14 +644,42 @@ function CadastrarEventoForm() {
               </optgroup>
               {/* Eventos privados / sociais */}
               <optgroup label="Social & Comemorativo">
-                <option value="Aniversário">Aniversário 🎂</option>
-                <option value="Casamento">Casamento 💍</option>
+                <option value="Aniversário">Aniversário</option>
+                <option value="Casamento">Casamento</option>
                 <option value="Reunião">Reunião</option>
                 <option value="Confraternização">Confraternização</option>
                 <option value="Formatura">Formatura</option>
                 <option value="Outro">Outro</option>
               </optgroup>
+              <option value="__NEW__">+ Criar nova categoria...</option>
             </select>
+
+            {isCustomCategory && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder="Digite o nome da nova categoria..."
+                  value={customCategoryText}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setCustomCategoryText(val)
+                    setFormData((prev) => ({ ...prev, genre: val }))
+                  }}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 0.75rem',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -1268,48 +1344,76 @@ function CadastrarEventoForm() {
           </section>
           </fieldset>
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.85rem', marginTop: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {isReadOnly ? (
               <button
                 type="button"
                 disabled
                 style={{
-                  padding: '0.875rem 2rem',
+                  padding: '0.8rem 1.75rem',
                   background: '#94a3b8',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
                   cursor: 'not-allowed',
                   opacity: 0.7,
                 }}
               >
-                Evento Indisponível para Edição 🚫
+                Evento Indisponível para Edição
               </button>
             ) : (
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  padding: '0.875rem 2rem',
-                  background: '#6366f1',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {loading
-                  ? isEditMode
-                    ? 'Salvando...'
-                    : 'Cadastrando...'
-                  : isEditMode
-                    ? 'Salvar Alterações'
-                    : 'Cadastrar Evento'}
-              </button>
+              <>
+                {/* Opção 1: Salvar e Solicitar Publicação (Ação Principal) */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  onClick={() => setSubmitMode('request_approval')}
+                  style={{
+                    padding: '0.8rem 1.75rem',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: '1px solid #0f172a',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.12)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1e293b' }}
+                  onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#0f172a' }}
+                >
+                  {loading && submitMode === 'request_approval'
+                    ? 'Solicitando Publicação...'
+                    : 'Salvar e Solicitar Publicação'}
+                </button>
+
+                {/* Opção 2: Salvar como Rascunho (Ação Secundária) */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  onClick={() => setSubmitMode('draft')}
+                  style={{
+                    padding: '0.8rem 1.75rem',
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#f8fafc' }}
+                  onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#ffffff' }}
+                >
+                  {loading && submitMode === 'draft'
+                    ? (isEditMode ? 'Salvando...' : 'Salvando Rascunho...')
+                    : (isEditMode ? 'Salvar Rascunho' : 'Salvar como Rascunho')}
+                </button>
+              </>
             )}
 
             <button
@@ -1317,13 +1421,12 @@ function CadastrarEventoForm() {
               onClick={() => router.push(isEditMode ? '/meus-eventos' : '/eventos')}
               disabled={loading}
               style={{
-                padding: '0.875rem 2rem',
-                background: '#fff',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: '600',
+                padding: '0.8rem 1.5rem',
+                background: 'transparent',
+                color: '#64748b',
+                border: 'none',
+                fontSize: '0.95rem',
+                fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >

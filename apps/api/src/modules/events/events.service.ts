@@ -40,8 +40,15 @@ export class EventsService {
   }
 
   /** Cria evento — organizer_id preenchido com userId autenticado. */
-  create(dto: CreateEventDto, userId: string) {
-    return this.eventsRepository.create(dto, userId)
+  async create(dto: CreateEventDto, userId: string) {
+    const event = await this.eventsRepository.create(dto, userId)
+    if (event && (dto.status === 'pending' || event.approval_status === 'pending')) {
+      void this.notificationsService.notifyApprovalRequested({
+        id: event.id,
+        title: event.title,
+      })
+    }
+    return event
   }
 
   /** Atualiza evento — valida propriedade antes de alterar. */
