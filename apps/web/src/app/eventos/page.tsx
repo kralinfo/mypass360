@@ -34,7 +34,19 @@ export default function EventsPage() {
   const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'paid' | 'free'>('all')
 
   const now = Date.now()
-  const publishedEvents = events.filter((e) => e.status === 'published' && e.visibility !== 'PRIVATE')
+  const publishedEvents = events.filter((e) => {
+    if (e.status !== 'published' || e.visibility === 'PRIVATE') return false
+    if (e.date) {
+      const d = new Date(e.date)
+      if (!isNaN(d.getTime())) {
+        if (e.date.length === 10 && !e.date.includes('T')) {
+          d.setHours(23, 59, 59, 999)
+        }
+        if (d.getTime() < now) return false
+      }
+    }
+    return true
+  })
 
   function resolveEventCity(ev: (typeof publishedEvents)[0]): string | null {
     if (ev.city) return ev.state ? `${ev.city} - ${ev.state}` : ev.city
