@@ -190,6 +190,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showDeletionRejectedModal, setShowDeletionRejectedModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showBankAccountModal, setShowBankAccountModal] = useState(false)
+  const [showDirectPublishModal, setShowDirectPublishModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -405,7 +406,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         }
       `}</style>
 
-      <article className="my-event-card">
+      <article id={`event-card-${event.id}`} className="my-event-card">
         {/* ── 1. IMAGEM / BANNER ── */}
         <div
           style={{
@@ -740,7 +741,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                       className="my-event-dropdown-item"
                       onClick={() => {
                         setMenuOpen(false)
-                        void handlePublish()
+                        setShowDirectPublishModal(true)
                       }}
                       disabled={loading === 'publish'}
                       title="Publicar evento agora"
@@ -961,6 +962,161 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         onClose={() => setShowBankAccountModal(false)}
         eventId={event.id}
       />
+
+      {showDirectPublishModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '520px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            border: '1px solid #e2e8f0',
+            padding: '1.75rem',
+            boxSizing: 'border-box',
+          }}>
+            <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                Confirmar publicação
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                Revise os dados abaixo antes de publicar seu evento
+              </p>
+            </div>
+
+            <div style={{
+              background: '#fffbe8',
+              border: '1px solid #fde68a',
+              borderRadius: '10px',
+              padding: '0.8rem 0.95rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.82rem',
+              color: '#713f12',
+              lineHeight: 1.45,
+            }}>
+              <strong>Atenção:</strong> Após a publicação, <strong>dados como preços, ingressos, capacidade, modelo e modalidade não poderão mais ser alterados</strong>.
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              padding: '1rem 1.1rem',
+              marginBottom: '1.5rem',
+              display: 'grid',
+              gap: '0.7rem',
+            }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Título do Evento</span>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{event.title}</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Data</span>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>{formattedDate}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Categoria</span>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>{event.genre || 'Geral'}</div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Local</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>{event.location}</div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Ingressos ({event.event_type === 'FREE' ? 'Gratuito' : 'Pago'})
+                </span>
+                {event.event_type === 'FREE' ? (
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#059669', marginTop: '3px' }}>
+                    Entradas Gratuitas (Capacidade: {event.capacity} uni.)
+                  </div>
+                ) : event.ticket_types && event.ticket_types.length > 0 ? (
+                  <div style={{ marginTop: '5px', display: 'grid', gap: '4px' }}>
+                    {event.ticket_types.map((t, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px',
+                        padding: '5px 9px', fontSize: '0.82rem',
+                      }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{t.name}</span>
+                        <span style={{ fontWeight: 700, color: '#334155' }}>
+                          R$ {Number(t.price).toFixed(2)} &bull; {t.quantity} uni.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '3px' }}>
+                    R$ {Number(event.price).toFixed(2)} &bull; {event.capacity} uni.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDirectPublishModal(false)
+                  router.push(`/eventos/cadastrar?edit=${event.id}`)
+                }}
+                disabled={loading === 'publish'}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Revisar Dados
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDirectPublishModal(false)
+                  void handlePublish()
+                }}
+                disabled={loading === 'publish'}
+                style={{
+                  padding: '0.75rem 1.4rem',
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  cursor: loading === 'publish' ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                }}
+              >
+                {loading === 'publish' ? 'Publicando...' : 'Confirmar e Publicar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>

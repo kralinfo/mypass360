@@ -120,6 +120,15 @@ export function useNotifications() {
     }
   }, [userId])
 
+  // 4. Polling de fallback a cada 30s — garante recebimento mesmo sem Realtime
+  useEffect(() => {
+    if (!token) return
+    const interval = setInterval(() => {
+      void loadNotifications()
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [token, loadNotifications])
+
   // 4. Ações
   const markAsRead = useCallback(
     async (id: string) => {

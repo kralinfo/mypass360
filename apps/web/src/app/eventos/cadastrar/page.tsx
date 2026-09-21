@@ -43,6 +43,7 @@ function CadastrarEventoForm() {
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [submitMode, setSubmitMode] = useState<'draft' | 'request_approval'>('draft')
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [isCustomCategory, setIsCustomCategory] = useState(false)
   const [customCategoryText, setCustomCategoryText] = useState('')
 
@@ -235,47 +236,9 @@ function CadastrarEventoForm() {
     }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const executeSave = async (targetMode: 'draft' | 'request_approval') => {
     setLoading(true)
     setError(null)
-
-    // Validação: modelo de ingresso obrigatório
-    if (!formData.ticketLayout) {
-      setError('Selecione o modelo de ingresso (Ticket ou PDF Formal).')
-      setLoading(false)
-      return
-    }
-
-    if (formData.ticketLayout === 'ticket' && !formData.participantIdType) {
-      setError('Selecione o tipo de identificação do participante (Sem nome ou Com nome).')
-      setLoading(false)
-      return
-    }
-
-    // Validação dos tipos de ingresso para eventos pagos
-    if (formData.eventType === 'PAID') {
-      if (!formData.ticketTypes || formData.ticketTypes.length === 0) {
-        setError('Adicione pelo menos um tipo de ingresso.')
-        setLoading(false)
-        return
-      }
-
-      for (let i = 0; i < formData.ticketTypes.length; i++) {
-        const tt = formData.ticketTypes[i]
-        const nameValid = tt.name && tt.name.trim().length > 0
-        const priceNum = parseFloat(tt.price)
-        const priceValid = tt.price !== '' && !isNaN(priceNum) && priceNum >= 0
-        const qtyNum = parseInt(tt.quantity, 10)
-        const qtyValid = tt.quantity !== '' && !isNaN(qtyNum) && qtyNum > 0
-
-        if (!nameValid || !priceValid || !qtyValid) {
-          setError(`Preencha todos os campos obrigatórios do tipo de ingresso #${i + 1} (Nome, Preço e Quantidade).`)
-          setLoading(false)
-          return
-        }
-      }
-    }
 
     try {
       const supabase = createClient()
@@ -340,13 +303,11 @@ function CadastrarEventoForm() {
               })),
       }
 
-      // ticket_layout e participant_id_type são imutáveis após a criação;
-      // só os incluímos ao criar ou se o valor for válido (não vazio)
+      // ticket_layout e participant_id_type são imutáveis após a criação
       if (!isEditMode) {
         basePayload.ticket_layout = formData.ticketLayout
         basePayload.participant_id_type = formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType
       } else {
-        // Em modo edição, apenas incluir se o valor for válido (não vazio)
         if (formData.ticketLayout) {
           basePayload.ticket_layout = formData.ticketLayout
         }
@@ -360,7 +321,7 @@ function CadastrarEventoForm() {
 
       if (isEditMode && editId) {
         await updateEvent(editId, token, payload)
-        if (submitMode === 'request_approval') {
+        if (targetMode === 'request_approval') {
           try {
             await requestEventApproval(editId, token)
           } catch {
@@ -368,8 +329,8 @@ function CadastrarEventoForm() {
           }
         }
       } else {
-        const targetStatus = submitMode === 'request_approval' ? 'pending' : 'draft'
-        await createEvent(token, { ...payload, status: targetStatus })
+        const statusToSet = targetMode === 'request_approval' ? 'pending' : 'draft'
+        await createEvent(token, { ...payload, status: statusToSet })
       }
 
       router.push('/meus-eventos')
@@ -377,6 +338,64 @@ function CadastrarEventoForm() {
       setError(err instanceof Error ? err.message : 'Erro ao salvar evento')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const validateForm = (): boolean => {
+    setError(null)
+    if (!formData.title.trim()) {
+      setError('Preencha o título do evento.')
+      return false
+    }
+    if (!formData.date || !formData.time) {
+      setError('Informe a data e o horário do evento.')
+      return false
+    }
+    if (!formData.location.trim()) {
+      setError('Informe o local/endereço do evento.')
+      return false
+    }
+    if (!formData.ticketLayout) {
+      setError('Selecione o modelo de ingresso (Ticket ou PDF Formal).')
+      return false
+    }
+    if (formData.ticketLayout === 'ticket' && !formData.participantIdType) {
+      setError('Selecione o tipo de identificação do participante (Sem nome ou Com nome).')
+      return false
+    }
+    if (formData.eventType === 'PAID') {
+      const activeTickets = formData.ticketTypes.filter((t) => t.name.trim().length > 0)
+      if (!activeTickets || activeTickets.length === 0) {
+        setError('Adicione pelo menos um tipo de ingresso pago.')
+        return false
+      }
+      for (let i = 0; i < activeTickets.length; i++) {
+        const tt = activeTickets[i]
+        const priceNum = parseFloat(tt.price)
+        const qtyNum = parseInt(tt.quantity, 10)
+        if (!tt.name.trim() || isNaN(priceNum) || priceNum < 0 || isNaN(qtyNum) || qtyNum <= 0) {
+          setError(`Preencha corretamente os campos do ingresso #${i + 1} (${tt.name || 'Sem nome'}).`)
+          return false
+        }
+      }
+    } else {
+      const capNum = parseInt(formData.capacity, 10)
+      if (isNaN(capNum) || capNum <= 0) {
+        setError('Informe a capacidade máxima de ingressos para o evento gratuito.')
+        return false
+      }
+    }
+    return true
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!validateForm()) return
+
+    if (submitMode === 'request_approval') {
+      setShowConfirmModal(true)
+    } else {
+      void executeSave('draft')
     }
   }
 
@@ -1434,6 +1453,174 @@ function CadastrarEventoForm() {
             </button>
           </div>
         </form>
+
+        {/* ── MODAL DE CONFIRMAÇÃO DE REVISÃO E PUBLICAÇÃO ── */}
+        {showConfirmModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '560px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e2e8f0',
+              padding: '1.75rem',
+              boxSizing: 'border-box',
+            }}>
+              {/* Header */}
+              <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+                <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  Confirmar solicitação de publicação
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                  Revise os dados antes de enviar para aprovação
+                </p>
+              </div>
+
+              {/* Caixa de Alerta */}
+              <div style={{
+                background: '#fffbe8',
+                border: '1px solid #fde68a',
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
+                marginBottom: '1.25rem',
+                fontSize: '0.84rem',
+                color: '#713f12',
+                lineHeight: 1.45,
+              }}>
+                <strong>Importante:</strong> Após a aprovação e publicação, <strong>dados como valores dos ingressos, quantidade, capacidade, modelo e modalidade não poderão mais ser alterados</strong>.
+              </div>
+
+              {/* Resumo do Evento */}
+              <div style={{
+                background: '#f8fafc',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                padding: '1rem 1.1rem',
+                marginBottom: '1.5rem',
+                display: 'grid',
+                gap: '0.75rem',
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Título do Evento</span>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{formData.title}</div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Data e Horário</span>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
+                      {formData.date} às {formData.time}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Categoria / Visibilidade</span>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
+                      {formData.genre || 'Geral'} &bull; {formData.visibility === 'PUBLIC' ? 'Público' : 'Privado'}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Local / Endereço</span>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
+                    {formData.location} {formData.city ? `(${formData.city}${formData.state ? ` - ${formData.state}` : ''})` : ''}
+                  </div>
+                </div>
+
+                {/* Detalhes de Ingressos */}
+                <div>
+                  <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Ingressos e Valores ({formData.eventType === 'FREE' ? 'Evento Gratuito' : 'Evento Pago'})
+                  </span>
+                  {formData.eventType === 'FREE' ? (
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#059669', marginTop: '4px' }}>
+                      Entradas Gratuitas (Capacidade: {formData.capacity} ingressos)
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '6px', display: 'grid', gap: '5px' }}>
+                      {formData.ticketTypes
+                        .filter((t) => t.name.trim().length > 0)
+                        .map((ticket, index) => (
+                          <div key={index} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '0.84rem',
+                          }}>
+                            <span style={{ fontWeight: 600, color: '#0f172a' }}>{ticket.name}</span>
+                            <span style={{ color: '#334155', fontWeight: 700 }}>
+                              R$ {parseFloat(ticket.price || '0').toFixed(2)} &bull; {ticket.quantity} uni.
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Revisar Informações
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false)
+                    void executeSave('request_approval')
+                  }}
+                  disabled={loading}
+                  style={{
+                    padding: '0.75rem 1.4rem',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.15)',
+                  }}
+                >
+                  {loading ? 'Enviando...' : 'Confirmar e Solicitar Publicação'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

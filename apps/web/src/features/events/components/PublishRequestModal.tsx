@@ -142,7 +142,21 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
               </div>
             </div>
 
-            {/* Aviso */}
+            {/* Aviso de Edição e Segurança */}
+            <div style={{
+              background: '#fffbe8',
+              border: '1px solid #fde047',
+              borderRadius: '10px',
+              padding: '0.75rem 0.9rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.8rem',
+              color: '#713f12',
+              lineHeight: 1.45,
+            }}>
+              ⚠️ <strong>Importante:</strong> Confira todos os dados do seu evento (local, data, ingressos e valores). Por segurança dos compradores, <strong>estes dados não poderão ser editados após a aprovação e publicação</strong>.
+            </div>
+
+            {/* Aviso de Status */}
             <div style={{
               background: '#fffbeb',
               border: '1px solid #fde68a',
@@ -153,7 +167,7 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
               color: '#92400e',
               lineHeight: 1.5,
             }}>
-              ⚠️ Após enviar a solicitação, o evento ficará em modo <strong>&quot;Aguardando aprovação&quot;</strong> e não poderá ser publicado até a decisão do administrador.
+              Após enviar a solicitação, o evento ficará em modo <strong>&quot;Aguardando aprovação&quot;</strong> e não poderá ser publicado até a decisão do administrador.
             </div>
 
             {/* Erro */}

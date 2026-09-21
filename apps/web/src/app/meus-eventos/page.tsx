@@ -63,6 +63,23 @@ function MeusEventosContent() {
     }
   }, [urlAdminMessage, urlEventId, urlDeletionRejected])
 
+  useEffect(() => {
+    if (urlEventId && events.length > 0) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`event-card-${urlEventId}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.style.transition = 'all 0.4s ease'
+          el.style.boxShadow = '0 0 0 4px #6366f1, 0 20px 25px -5px rgba(99, 102, 241, 0.25)'
+          setTimeout(() => {
+            el.style.boxShadow = ''
+          }, 3500)
+        }
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [urlEventId, events])
+
   async function handleSendReply(replyMessage: string) {
     if (!activeEventId) return
     const supabase = createClient()
