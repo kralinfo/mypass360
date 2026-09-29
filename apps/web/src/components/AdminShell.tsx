@@ -12,6 +12,7 @@ const adminMenuItems = [
   { href: '/admin?sec=painel', secao: 'painel', label: 'Painel geral', icon: '⌂' },
   { href: '/admin?sec=indicadores', secao: 'indicadores', label: 'Indicadores', icon: '▫' },
   { href: '/admin?sec=eventos', secao: 'eventos', label: 'Eventos', icon: '▩' },
+  { href: '/admin?sec=financeiro', secao: 'financeiro', label: 'Financeiro', icon: '💰' },
   { href: '/admin?sec=usuarios', secao: 'usuarios', label: 'Usuários', icon: '▪' },
   { href: '/admin?sec=aprovacoes', secao: 'aprovacoes', label: 'Publicações', icon: '🚀' },
   { href: '/admin?sec=exclusoes', secao: 'exclusoes', label: 'Exclusões', icon: '🗑️' },
@@ -24,6 +25,8 @@ function getTituloDaPagina(secao: string): string {
       return 'Indicadores administrativos'
     case 'eventos':
       return 'Gestão de eventos'
+    case 'financeiro':
+      return 'Gestão financeira e repasses'
     case 'usuarios':
       return 'Gestão de usuários'
     case 'aprovacoes':
@@ -44,6 +47,8 @@ function getDescricaoDaPagina(secao: string): string {
       return 'Resumo executivo e métricas operacionais do sistema.'
     case 'eventos':
       return 'Acompanhamento e operação da agenda de eventos.'
+    case 'financeiro':
+      return 'Consulta de vendas brutas, taxas da plataforma e dados bancários dos organizadores para repasse.'
     case 'usuarios':
       return 'Controle administrativo de contas autenticadas.'
     case 'aprovacoes':

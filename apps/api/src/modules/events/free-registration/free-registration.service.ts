@@ -34,10 +34,6 @@ export class FreeRegistrationService {
       throw new NotFoundException('Evento não encontrado')
     }
 
-    if (event.event_type !== 'FREE') {
-      throw new BadRequestException('Este evento não é um evento gratuito com confirmação de presença.')
-    }
-
     if (!event.access_password_hash) {
       return { valid: true }
     }

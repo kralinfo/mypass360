@@ -7,7 +7,8 @@ import { AdminPanelCard } from './AdminPanelCard'
 import { AttendeesModal } from './AttendeesModal'
 import { EventDetailsModal } from './EventDetailsModal'
 import { AdminDeleteConfirmModal } from './AdminDeleteConfirmModal'
-import { eventStatusOptions, eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
+import { AdminEditEventModal } from './AdminEditEventModal'
+import { eventStatusOptions, eventStatusLabels, getEventStatusLabel, formatCurrency, formatDate, statusColor } from '../admin.utils'
 
 type AdminEventsSectionProps = {
   dashboard: AdminDashboardData | null
@@ -51,11 +52,22 @@ const IconDots = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /><circle cx="5" cy="12" r="1.5" /></svg>
 )
 
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+)
+
 export function AdminEventsSection({ dashboard, isLoading, runningAction, onChangeStatus, onDelete, onSendReminders, onRefresh }: AdminEventsSectionProps) {
   const [detailsEvent, setDetailsEvent] = useState<AdminEventItem | null>(null)
   const [attendeesEvent, setAttendeesEvent] = useState<AdminEventItem | null>(null)
   const [eventToDelete, setEventToDelete] = useState<AdminEventItem | null>(null)
+  const [editEvent, setEditEvent] = useState<AdminEventItem | null>(null)
   const [openMenuEventId, setOpenMenuEventId] = useState<string | null>(null)
+
+  // Filtros e Ordenação Admin
+  const [search, setSearch] = useState('')
+  const [periodTab, setPeriodTab] = useState<'all' | 'upcoming' | 'past'>('all')
+  const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'paid' | 'free'>('all')
+  const [sortBy, setSortBy] = useState<'date-asc' | 'date-desc' | 'revenue-desc' | 'orders-desc' | 'title-asc'>('date-asc')
 
   // Fechar o menu de ações ao clicar fora
   useEffect(() => {
@@ -69,18 +81,203 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
     return () => document.removeEventListener('click', handleGlobalClick)
   }, [])
 
+  const now = Date.now()
+  const allEvents = dashboard?.events ?? []
+
+  const filteredEvents = allEvents.filter((ev) => {
+    const evTime = ev.date ? new Date(ev.date).getTime() : 0
+    const isPast = ev.status === 'finished' || (evTime > 0 && evTime < now)
+
+    if (periodTab === 'upcoming' && isPast) return false
+    if (periodTab === 'past' && !isPast) return false
+
+    const isFree = (ev as any).event_type === 'FREE' || ev.price === 0
+    if (eventTypeFilter === 'free' && !isFree) return false
+    if (eventTypeFilter === 'paid' && isFree) return false
+
+    if (search.trim()) {
+      const q = search.toLowerCase().trim()
+      const titleMatch = ev.title?.toLowerCase().includes(q)
+      const locationMatch = ev.location?.toLowerCase().includes(q)
+      const creatorMatch =
+        (ev as any).organizer_name?.toLowerCase().includes(q) ||
+        (ev as any).organizer_email?.toLowerCase().includes(q) ||
+        (ev as any).organizer?.email?.toLowerCase().includes(q) ||
+        (ev as any).organizer?.full_name?.toLowerCase().includes(q)
+      if (!titleMatch && !locationMatch && !creatorMatch) return false
+    }
+
+    return true
+  })
+
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
+    const aTime = a.date ? new Date(a.date).getTime() : 0
+    const bTime = b.date ? new Date(b.date).getTime() : 0
+    const aRev = (a as any).totalRevenue ?? (a as any).revenue ?? 0
+    const bRev = (b as any).totalRevenue ?? (b as any).revenue ?? 0
+    const aOrders = a.totalOrders ?? 0
+    const bOrders = b.totalOrders ?? 0
+
+    switch (sortBy) {
+      case 'date-asc':
+        return aTime - bTime
+      case 'date-desc':
+        return bTime - aTime
+      case 'revenue-desc':
+        return bRev - aRev
+      case 'orders-desc':
+        return bOrders - aOrders
+      case 'title-asc':
+        return (a.title ?? '').localeCompare(b.title ?? '')
+      default:
+        return 0
+    }
+  })
+
   return (
     <>
       <AdminPanelCard title="Operação de eventos" subtitle="Clique em qualquer evento para gerenciar detalhes, acessos de portaria e check-ins.">
         {isLoading && !dashboard ? <p style={{ color: '#64748b' }}>Carregando eventos...</p> : null}
         {dashboard?.events.length === 0 ? <p style={{ color: '#64748b' }}>Nenhum evento encontrado.</p> : null}
 
+        {/* Painel de Controles Admin: Filtros, Período, Tipo e Ordenação */}
+        {dashboard?.events && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            {/* Linha 1: Abas de Período + Filtro Pago/Gratuito */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.35rem', background: '#f1f5f9', padding: '3px', borderRadius: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPeriodTab('all')}
+                  style={{
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: periodTab === 'all' ? '#1e293b' : 'transparent',
+                    color: periodTab === 'all' ? '#fff' : '#64748b',
+                    fontWeight: periodTab === 'all' ? 700 : 500,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  🌐 Todos ({allEvents.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodTab('upcoming')}
+                  style={{
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: periodTab === 'upcoming' ? '#1e293b' : 'transparent',
+                    color: periodTab === 'upcoming' ? '#fff' : '#64748b',
+                    fontWeight: periodTab === 'upcoming' ? 700 : 500,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  📅 Próximos / Ativos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodTab('past')}
+                  style={{
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: periodTab === 'past' ? '#1e293b' : 'transparent',
+                    color: periodTab === 'past' ? '#fff' : '#64748b',
+                    fontWeight: periodTab === 'past' ? 700 : 500,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  📜 Encerrados / Passados
+                </button>
+              </div>
+
+              {/* Toggle Pago vs Gratuito */}
+              <div style={{ display: 'flex', gap: '0.3rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '3px', borderRadius: '9px' }}>
+                {(['all', 'paid', 'free'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setEventTypeFilter(t)}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '7px',
+                      border: 'none',
+                      background: eventTypeFilter === t ? '#6366f1' : 'transparent',
+                      color: eventTypeFilter === t ? '#fff' : '#64748b',
+                      fontWeight: eventTypeFilter === t ? 700 : 500,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t === 'all' ? 'Todos' : t === 'paid' ? '💳 Pagos' : '🎟️ Gratuitos'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Linha 2: Busca por texto + Seletor de Ordenação */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Buscar por evento, local ou criador..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  flex: '1 1 240px',
+                  padding: '0.55rem 0.85rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  background: '#fff',
+                  color: '#0f172a',
+                }}
+              />
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                style={{
+                  flex: '0 0 auto',
+                  padding: '0.55rem 0.85rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  color: '#334155',
+                  background: '#fff',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="date-asc">📅 Data: Próximos primeiro</option>
+                <option value="date-desc">📅 Data: Mais distantes</option>
+                <option value="revenue-desc">💰 Maior Receita</option>
+                <option value="orders-desc">🛒 Mais Pedidos</option>
+                <option value="title-asc">🔤 Título (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         {dashboard?.events.length ? (
           <div style={{ overflowX: 'visible' }}>
+            {sortedEvents.length === 0 ? (
+              <p style={{ color: '#64748b', padding: '1rem 0' }}>Nenhum evento corresponde aos filtros selecionados.</p>
+            ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={TH}>Evento</th>
+                  <th style={TH}>Criador</th>
                   <th style={TH}>Data / Local</th>
                   <th style={TH}>Status</th>
                   <th style={{ ...TH, textAlign: 'center' }}>Pedidos</th>
@@ -90,7 +287,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                 </tr>
               </thead>
               <tbody>
-                {dashboard.events.map((event, index) => {
+                {sortedEvents.map((event, index) => {
                   const isActionLoading = runningAction?.includes(event.id)
                   const pendingCount = event.totalOrders - event.paidOrders
                   const isMenuOpen = openMenuEventId === event.id
@@ -118,6 +315,20 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                       </td>
 
                       <td style={TD}>
+                        <span style={{ display: 'block', color: '#0f172a', fontWeight: 600, fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
+                          {event.organizerName || 'Organizador'}
+                        </span>
+                        {event.organizerEmail && (
+                          <span style={{
+                            display: 'block', color: '#64748b', fontSize: '0.76rem', marginTop: '2px',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px',
+                          }}>
+                            {event.organizerEmail}
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={TD}>
                         <span style={{ display: 'block', color: '#334155', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
                           {formatDate(event.date)}
                         </span>
@@ -135,7 +346,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                           background: `${statusColor(event.status)}1a`, color: statusColor(event.status),
                           fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', whiteSpace: 'nowrap',
                         }}>
-                          {eventStatusLabels[event.status]}
+                          {getEventStatusLabel(event.status)}
                         </span>
                       </td>
 
@@ -215,6 +426,34 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                                 gap: '2px',
                               }}
                             >
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditEvent(event)
+                                  setOpenMenuEventId(null)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  width: '100%',
+                                  padding: '7px 10px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  borderRadius: '6px',
+                                  color: '#4338ca',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = '#eef2ff' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                              >
+                                <IconEdit />
+                                Editar Evento
+                              </button>
 
                               <button
                                 type="button"
@@ -350,6 +589,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                 })}
               </tbody>
             </table>
+            )}
           </div>
         ) : null}
 
@@ -378,6 +618,17 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
           event={detailsEvent}
           onClose={() => setDetailsEvent(null)}
           onUpdated={onRefresh}
+        />
+      )}
+
+      {editEvent && (
+        <AdminEditEventModal
+          event={editEvent}
+          onClose={() => setEditEvent(null)}
+          onSaved={() => {
+            setEditEvent(null)
+            onRefresh?.()
+          }}
         />
       )}
     </>

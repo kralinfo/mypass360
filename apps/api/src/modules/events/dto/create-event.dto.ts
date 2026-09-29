@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator'
 
@@ -22,14 +23,16 @@ export class CreateEventTicketTypeDto {
   @Min(0)
   quantity!: number
 
+  @ValidateIf((_, v) => v != null)
   @IsString()
   @IsOptional()
-  description?: string
+  description?: string | null
 
+  @ValidateIf((_, v) => v != null)
   @IsNumber()
   @Min(0)
   @IsOptional()
-  sold?: number
+  sold?: number | null
 }
 
 export class CreateEventDto {
@@ -47,6 +50,31 @@ export class CreateEventDto {
 
   @IsString()
   location!: string
+
+  @ValidateIf((_, v) => v != null)
+  @IsString()
+  @IsOptional()
+  city?: string | null
+
+  @ValidateIf((_, v) => v != null)
+  @IsString()
+  @IsOptional()
+  state?: string | null
+
+  @ValidateIf((_, v) => v != null)
+  @IsNumber()
+  @IsOptional()
+  latitude?: number | null
+
+  @ValidateIf((_, v) => v != null)
+  @IsNumber()
+  @IsOptional()
+  longitude?: number | null
+
+  @ValidateIf((_, v) => v != null)
+  @IsString()
+  @IsOptional()
+  place_id?: string | null
 
   @IsNumber()
   @Min(1)
@@ -77,10 +105,12 @@ export class CreateEventDto {
   @IsIn(['none', 'name', 'name_cpf'])
   participant_id_type?: string
 
+  @ValidateIf((_, v) => v != null)
   @IsString()
   @IsOptional()
   image_url?: string | null
 
+  @ValidateIf((_, v) => v != null)
   @IsString()
   @IsOptional()
   genre?: string | null
@@ -93,6 +123,7 @@ export class CreateEventDto {
   @IsIn(['PUBLIC', 'PRIVATE'])
   visibility?: string
 
+  @ValidateIf((_, v) => v != null)
   @IsString()
   @IsOptional()
   access_password?: string | null

@@ -1,14 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AdminApprovalsSection } from './AdminApprovalsSection'
 import { PublicationHistorySection } from './PublicationHistorySection'
+import { useRealtimeSyncHandler } from '@/features/notifications/useRealtimeSyncHandler'
 
-export function AdminPublicationsTabContainer({ refreshKey }: { refreshKey?: number }) {
+export function AdminPublicationsTabContainer({ refreshKey: externalRefreshKey }: { refreshKey?: number }) {
   const searchParams = useSearchParams()
   const initialTab = searchParams.get('sub') === 'history' || searchParams.get('tab') === 'history' ? 'history' : 'approvals'
   const [activeTab, setActiveTab] = useState<'approvals' | 'history'>(initialTab)
+  const [localRefreshKey, setLocalRefreshKey] = useState(0)
+  const refreshKey = (externalRefreshKey ?? 0) + localRefreshKey
+
+  const triggerRefresh = useCallback(() => setLocalRefreshKey((k) => k + 1), [])
+  const triggerRefreshRef = useRef(triggerRefresh)
+  triggerRefreshRef.current = triggerRefresh
+
+  /**
+   * Quando uma solicitação de publicação nova chegar via Realtime,
+   * força o re-mount das seções de aprovações através do localRefreshKey.
+   */
+  useRealtimeSyncHandler('admin_publications', 'AdminPublicationsTabContainer', () => {
+    triggerRefreshRef.current()
+  })
 
   useEffect(() => {
     const tabParam = searchParams.get('sub') || searchParams.get('tab')

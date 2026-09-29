@@ -27,6 +27,26 @@ export class NotificationsService {
   }
 
   /**
+   * Notifica todos os administradores que o organizador CANCELOU a solicitação de publicação.
+   */
+  async notifyApprovalCancelled(event: { id: string; title: string; note?: string }) {
+    try {
+      const noteText = event.note ? ` Observação: "${event.note}".` : ''
+      await this.notificationsRepository.createForAdmins({
+        type: 'event_approval_requested',
+        title: 'Solicitação de publicação cancelada',
+        message: `O organizador cancelou a solicitação de publicação do evento "${event.title}".${noteText}`,
+        entityType: 'event',
+        entityId: event.id,
+        actionUrl: `/admin?sec=aprovacoes&event_id=${event.id}`,
+        metadata: { eventTitle: event.title, note: event.note },
+      })
+    } catch (err) {
+      console.error('[NotificationsService] Erro ao notificar cancelamento de solicitação:', err)
+    }
+  }
+
+  /**
    * Notifica o organizador que seu evento foi APROVADO.
    * Direciona para /meus-eventos
    */
@@ -180,6 +200,29 @@ export class NotificationsService {
       })
     } catch (err) {
       console.error('[NotificationsService] Erro ao notificar exclusão de evento pelo admin:', err)
+    }
+  }
+
+  /**
+   * Notifica o organizador que o admin editou o evento, com a mensagem do que foi alterado.
+   */
+  async notifyEventEditedByAdmin(
+    event: { id: string; title: string; organizerId: string },
+    adminMessage: string
+  ) {
+    try {
+      await this.notificationsRepository.create({
+        userId: event.organizerId,
+        type: 'admin_message',
+        title: `Seu evento foi atualizado pela Administração ✏️`,
+        message: `O administrador realizou alterações no evento "${event.title}". ${adminMessage}`,
+        entityType: 'event',
+        entityId: event.id,
+        actionUrl: `/meus-eventos?event_id=${event.id}`,
+        metadata: { eventTitle: event.title, adminMessage },
+      })
+    } catch (err) {
+      console.error('[NotificationsService] Erro ao notificar edição pelo admin:', err)
     }
   }
 

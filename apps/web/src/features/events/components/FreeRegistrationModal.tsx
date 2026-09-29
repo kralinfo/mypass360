@@ -12,6 +12,7 @@ interface FreeRegistrationModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (ticket: Ticket) => void
+  passwordVerified?: boolean
 }
 
 export function FreeRegistrationModal({
@@ -19,11 +20,12 @@ export function FreeRegistrationModal({
   isOpen,
   onClose,
   onSuccess,
+  passwordVerified = false,
 }: FreeRegistrationModalProps) {
   const router = useRouter()
 
   const [step, setStep] = useState<'password' | 'form' | 'success'>(
-    event.has_password ? 'password' : 'form'
+    event.has_password && !passwordVerified ? 'password' : 'form'
   )
 
   const [accessPassword, setAccessPassword] = useState('')
@@ -39,7 +41,7 @@ export function FreeRegistrationModal({
   // Resetar estado completo sempre que o modal for aberto/fechado
   useEffect(() => {
     if (isOpen) {
-      setStep(event.has_password ? 'password' : 'form')
+      setStep(event.has_password && !passwordVerified ? 'password' : 'form')
       setAccessPassword('')
       setRegistrationToken(undefined)
       setParticipantName('')

@@ -115,12 +115,14 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
     return testImages[charSum % testImages.length]
   }
 
-  const centerEvent = events[current]
+  // Garante que o índice atual nunca ultrapasse os limites se a lista de eventos mudar em tempo real
+  const safeCurrent = total > 0 ? Math.min(current, Math.max(0, total - 1)) : 0
+  const centerEvent = events[safeCurrent]
+
+  if (total === 0 || !centerEvent) return null
 
   return (
     <div style={{ position: 'relative', width: '100%', background: '#ffffff', overflow: 'hidden', padding: '1.25rem 0' }}>
-      
-      {/* ── STAGE DO CARROSSEL ── */}
       <div
         style={{
           position: 'relative',
@@ -190,9 +192,28 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
                           {new Date(ev.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()}
                         </span>
                         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>•</span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: ev.price === 0 ? '#4ade80' : '#fbbf24' }}>
-                          {ev.price === 0 ? 'Gratuito' : ev.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
+                        {(() => {
+                          const getMinPrice = () => {
+                            if (ev.event_type === 'FREE') return 0
+                            if (ev.ticket_types && ev.ticket_types.length > 0) {
+                              const validPrices = ev.ticket_types
+                                .map((tt) => Number(tt.price))
+                                .filter((p) => typeof p === 'number' && !isNaN(p))
+                              if (validPrices.length > 0) {
+                                return Math.min(...validPrices)
+                              }
+                            }
+                            return ev.price ?? 0
+                          }
+                          const minPrice = getMinPrice()
+                          return (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: minPrice === 0 ? '#4ade80' : '#fbbf24' }}>
+                              {minPrice === 0
+                                ? 'Gratuito'
+                                : `A partir de ${minPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                            </span>
+                          )
+                        })()}
                       </div>
                     </div>
                   </div>

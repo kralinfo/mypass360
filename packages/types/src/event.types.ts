@@ -1,4 +1,4 @@
-export type EventStatus = 'draft' | 'published' | 'cancelled' | 'finished'
+export type EventStatus = 'draft' | 'pending' | 'published' | 'cancelled' | 'finished'
 
 /**
  * Estado de aprovação do evento para publicação.
@@ -52,6 +52,11 @@ export interface Event {
   description: string
   date: string
   location: string
+  city?: string | null
+  state?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  place_id?: string | null
   organizer_id: string
   capacity: number
   price: number
@@ -174,7 +179,8 @@ export function getEventDisplayStatus(event: Event): EventDisplayStatus {
  */
 export function canRequestApproval(event: Event): boolean {
   if (event.deletion_status === 'approved' || event.deletion_status === 'pending') return false
-  if (event.status !== 'draft') return false
+  const status = event.status ?? 'draft'
+  if (status !== 'draft' && status !== 'pending') return false
   const approval = event.approval_status ?? 'none'
   return approval === 'none' || approval === 'rejected'
 }

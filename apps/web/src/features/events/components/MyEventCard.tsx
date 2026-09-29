@@ -18,14 +18,17 @@ import {
   deleteEvent,
   requestEventApproval,
   requestEventDeletion,
+  cancelEventApproval,
 } from '../services/my-events.service'
 import { ScheduleModal } from './ScheduleModal'
 import { DeleteConfirmModal } from './DeleteConfirmModal'
 import { PublishRequestModal } from './PublishRequestModal'
+import { CancelApprovalModal } from './CancelApprovalModal'
 import { DeleteRequestModal } from './DeleteRequestModal'
 import { AdminMessageDialogModal } from './AdminMessageDialogModal'
 import { DeletionRejectedModal } from './DeletionRejectedModal'
 import { ShareEventModal } from './ShareEventModal'
+import { BankAccountSetupModal } from './BankAccountSetupModal'
 import { EventDetailsModal } from '@/features/admin/components/EventDetailsModal'
 
 interface MyEventCardProps {
@@ -188,6 +191,89 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showAdminDialogModal, setShowAdminDialogModal] = useState(false)
   const [showDeletionRejectedModal, setShowDeletionRejectedModal] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showBankAccountModal, setShowBankAccountModal] = useState(false)
+  const [showDirectPublishModal, setShowDirectPublishModal] = useState(false)
+  const [showCancelApprovalModal, setShowCancelApprovalModal] = useState(false)
+
+  const closeAllModals = () => {
+    setShowScheduleModal(false)
+    setShowDeleteModal(false)
+    setShowManageModal(false)
+    setShowPublishRequestModal(false)
+    setShowDeleteRequestModal(false)
+    setShowAdminDialogModal(false)
+    setShowDeletionRejectedModal(false)
+    setShowShareModal(false)
+    setShowBankAccountModal(false)
+    setShowDirectPublishModal(false)
+    setShowCancelApprovalModal(false)
+  }
+
+  const openPublishRequestModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowPublishRequestModal(true)
+  }
+
+  const openDeleteRequestModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDeleteRequestModal(true)
+  }
+
+  const openDeleteModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDeleteModal(true)
+  }
+
+  const openCancelApprovalModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowCancelApprovalModal(true)
+  }
+
+  const openDirectPublishModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDirectPublishModal(true)
+  }
+
+  const openScheduleModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowScheduleModal(true)
+  }
+
+  const openManageModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowManageModal(true)
+  }
+
+  const openShareModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowShareModal(true)
+  }
+
+  const openAdminDialogModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowAdminDialogModal(true)
+  }
+
+  const openDeletionRejectedModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDeletionRejectedModal(true)
+  }
+
+  const openBankAccountModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowBankAccountModal(true)
+  }
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -278,6 +364,14 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
     onStatusChange()
   }
 
+
+  async function handleCancelApproval(note?: string) {
+    const token = await getToken()
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+    await cancelEventApproval(event.id, token, note)
+    onStatusChange()
+  }
+
   async function handleRequestApproval() {
     const token = await getToken()
     if (!token) throw new Error('Sessão expirada. Faça login novamente.')
@@ -344,6 +438,48 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           background: #f1f5f9;
           border-color: #94a3b8;
         }
+        .my-event-btn-request {
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.5rem 0.75rem;
+          height: 36px;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          color: #1e293b;
+          font-size: 0.83rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .my-event-btn-request:hover {
+          background: #eff6ff;
+          border-color: #818cf8;
+          color: #4f46e5;
+        }
+        .my-event-btn-publish {
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.5rem 0.75rem;
+          height: 36px;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          color: #1e293b;
+          font-size: 0.83rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .my-event-btn-publish:hover {
+          background: #f0fdf4;
+          border-color: #34d399;
+          color: #059669;
+        }
         .my-event-btn-menu {
           display: inline-flex;
           align-items: center;
@@ -403,7 +539,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         }
       `}</style>
 
-      <article className="my-event-card">
+      <article id={`event-card-${event.id}`} className="my-event-card">
         {/* ── 1. IMAGEM / BANNER ── */}
         <div
           style={{
@@ -583,7 +719,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           {/* Aviso: Exclusão em Análise (Clicável para ver diálogo) */}
           {displayStatus === 'deletion_pending' && (
             <div
-              onClick={() => setShowAdminDialogModal(true)}
+              onClick={openAdminDialogModal}
               style={{
                 background: '#fef2f2', border: '1px solid #fca5a5',
                 borderRadius: '8px', padding: '0.5rem 0.75rem',
@@ -607,7 +743,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           {/* Aviso: Exclusão Reprovada pelo Admin (Clicável para ver detalhes) */}
           {(event.deletion_status === 'rejected' || event.deletion_rejection_reason) && (
             <div
-              onClick={() => setShowDeletionRejectedModal(true)}
+              onClick={openDeletionRejectedModal}
               style={{
                 background: '#fef2f2', border: '1px solid #fca5a5',
                 borderRadius: '8px', padding: '0.5rem 0.75rem',
@@ -704,10 +840,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowPublishRequestModal(true)
-                      }}
+                      onClick={openPublishRequestModal}
                       style={{ color: '#4f46e5' }}
                       title="Solicitar aprovação de publicação"
                     >
@@ -718,17 +851,28 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     </button>
                   )}
 
-                  {/* Informativo: aguardando aprovação */}
+                  {/* Informativo: aguardando aprovação & Opção para cancelar */}
                   {displayStatus === 'pending_approval' && (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      disabled
-                      title="Aguardando análise do administrador"
-                    >
-                      <span style={{ display: 'flex', color: '#8b5cf6' }}>⏳</span>
-                      <span style={{ color: '#6d28d9' }}>Aguardando aprovação</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="my-event-dropdown-item"
+                        disabled
+                        title="Aguardando análise do administrador"
+                      >
+                        <span style={{ display: 'flex', color: '#8b5cf6' }}>⏳</span>
+                        <span style={{ color: '#6d28d9' }}>Aguardando aprovação</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="my-event-dropdown-item danger"
+                        onClick={openCancelApprovalModal}
+                        title="Cancelar a solicitação de publicação enviada ao administrador"
+                      >
+                        <span style={{ display: 'flex', color: '#dc2626' }}>✖</span>
+                        <span>Cancelar solicitação</span>
+                      </button>
+                    </>
                   )}
 
                   {/* 2. Publicar — apenas quando aprovado */}
@@ -736,10 +880,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        void handlePublish()
-                      }}
+                      onClick={openDirectPublishModal}
                       disabled={loading === 'publish'}
                       title="Publicar evento agora"
                       style={{ color: '#059669' }}
@@ -770,10 +911,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowManageModal(true)
-                    }}
+                    onClick={openManageModal}
                   >
                     <span style={{ display: 'flex', color: '#6366f1' }}><GearIcon /></span>
                     <span>Gerenciar</span>
@@ -783,10 +921,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowShareModal(true)
-                    }}
+                    onClick={openShareModal}
                     title="Copiar e compartilhar o link do evento"
                   >
                     <span style={{ display: 'flex', color: '#0ea5e9' }}>🔗</span>
@@ -797,10 +932,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowAdminDialogModal(true)
-                    }}
+                    onClick={openAdminDialogModal}
                     title="Ver mensagens e diálogo com a administração"
                     style={{ color: '#4f46e5' }}
                   >
@@ -808,15 +940,24 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <span>Ver mensagens</span>
                   </button>
 
+                  {/* 4.8 Financeiro & Repasse (Cadastrar Conta Bancária) */}
+                  <button
+                    type="button"
+                    className="my-event-dropdown-item"
+                    onClick={openBankAccountModal}
+                    title="Cadastrar ou alterar conta bancária para recebimento do repasse"
+                    style={{ color: '#059669', fontWeight: 600 }}
+                  >
+                    <span style={{ display: 'flex', color: '#059669' }}>💰</span>
+                    <span>Financeiro & Repasses</span>
+                  </button>
+
                   {/* 5. Agendar publicação — apenas quando aprovado e não publicado */}
                   {displayStatus === 'approved' && (
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowScheduleModal(true)
-                      }}
+                      onClick={openScheduleModal}
                     >
                       <span style={{ display: 'flex', color: '#0ea5e9' }}><CalendarIcon /></span>
                       <span>Agendar publicação</span>
@@ -831,10 +972,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item danger"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowDeleteRequestModal(true)
-                      }}
+                      onClick={openDeleteRequestModal}
                       disabled={displayStatus === 'deletion_pending'}
                       title="Solicitar exclusão deste evento publicado ao administrador"
                     >
@@ -847,10 +985,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item danger"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowDeleteModal(true)
-                      }}
+                      onClick={openDeleteModal}
                       title="Excluir rascunho permanentemente"
                     >
                       <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
@@ -863,6 +998,16 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           </div>
         </div>
       </article>
+
+      
+      {/* Modal de Cancelamento de Solicitação de Publicação */}
+      {showCancelApprovalModal && (
+        <CancelApprovalModal
+          eventTitle={event.title}
+          onConfirm={handleCancelApproval}
+          onClose={() => setShowCancelApprovalModal(false)}
+        />
+      )}
 
       {/* Modal de Solicitação de Publicação */}
       {showPublishRequestModal && (
@@ -937,6 +1082,168 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
       />
+
+      {/* Modal de Conta Bancária / Financeiro */}
+      <BankAccountSetupModal
+        isOpen={showBankAccountModal}
+        onClose={() => setShowBankAccountModal(false)}
+        eventId={event.id}
+      />
+
+      {showDirectPublishModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '520px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            border: '1px solid #e2e8f0',
+            padding: '1.75rem',
+            boxSizing: 'border-box',
+          }}>
+            <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                Confirmar publicação
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                Revise os dados abaixo antes de publicar seu evento
+              </p>
+            </div>
+
+            <div style={{
+              background: '#fffbe8',
+              border: '1px solid #fde68a',
+              borderRadius: '10px',
+              padding: '0.8rem 0.95rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.82rem',
+              color: '#713f12',
+              lineHeight: 1.45,
+            }}>
+              <strong>Atenção:</strong> Após a publicação, <strong>dados como preços, ingressos, capacidade, modelo e modalidade não poderão mais ser alterados</strong>.
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              padding: '1rem 1.1rem',
+              marginBottom: '1.5rem',
+              display: 'grid',
+              gap: '0.7rem',
+            }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Título do Evento</span>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{event.title}</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Data</span>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>{formattedDate}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Categoria</span>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>{event.genre || 'Geral'}</div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Local</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>{event.location}</div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Ingressos ({event.event_type === 'FREE' ? 'Gratuito' : 'Pago'})
+                </span>
+                {event.event_type === 'FREE' ? (
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#059669', marginTop: '3px' }}>
+                    Entradas Gratuitas (Capacidade: {event.capacity} uni.)
+                  </div>
+                ) : event.ticket_types && event.ticket_types.length > 0 ? (
+                  <div style={{ marginTop: '5px', display: 'grid', gap: '4px' }}>
+                    {event.ticket_types.map((t, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px',
+                        padding: '5px 9px', fontSize: '0.82rem',
+                      }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{t.name}</span>
+                        <span style={{ fontWeight: 700, color: '#334155' }}>
+                          R$ {Number(t.price).toFixed(2)} &bull; {t.quantity} uni.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '3px' }}>
+                    R$ {Number(event.price).toFixed(2)} &bull; {event.capacity} uni.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDirectPublishModal(false)
+                  router.push(`/eventos/cadastrar?edit=${event.id}`)
+                }}
+                disabled={loading === 'publish'}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Revisar Dados
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDirectPublishModal(false)
+                  void handlePublish()
+                }}
+                disabled={loading === 'publish'}
+                style={{
+                  padding: '0.75rem 1.4rem',
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  cursor: loading === 'publish' ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                }}
+              >
+                {loading === 'publish' ? 'Publicando...' : 'Confirmar e Publicar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>

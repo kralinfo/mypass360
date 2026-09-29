@@ -402,7 +402,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
             opacity: isSubmitting || selectedItems.length === 0 ? 0.7 : 1,
           }}
         >
-          {isSubmitting ? 'Processando...' : 'Finalizar compra'}
+          {isSubmitting ? 'Processando...' : 'Confirmar pedido'}
         </button>
       </section>
 

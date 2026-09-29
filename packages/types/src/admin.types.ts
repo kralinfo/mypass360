@@ -28,6 +28,8 @@ export interface AdminEventItem {
   location: string
   status: EventStatus
   organizerId: string
+  organizerName?: string
+  organizerEmail?: string
   capacity: number
   price: number
   createdAt: string

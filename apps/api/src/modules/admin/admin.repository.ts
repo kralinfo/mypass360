@@ -128,8 +128,17 @@ export class AdminRepository {
       ordersByEvent.set(order.event_id, current)
     }
 
+    const userMap = new Map<string, { email: string; name: string }>()
+    for (const u of authUsers) {
+      userMap.set(u.id, {
+        email: u.email ?? '',
+        name: u.user_metadata?.name ?? u.email ?? 'Organizador sem nome',
+      })
+    }
+
     const mappedEvents: AdminEventItem[] = safeEvents.map((event) => {
       const summary = ordersByEvent.get(event.id) ?? { totalOrders: 0, paidOrders: 0, revenue: 0 }
+      const organizer = userMap.get(event.organizer_id)
       return {
         id: event.id,
         title: event.title,
@@ -138,6 +147,8 @@ export class AdminRepository {
         location: event.location,
         status: event.status,
         organizerId: event.organizer_id,
+        organizerName: organizer?.name,
+        organizerEmail: organizer?.email,
         capacity: event.capacity,
         price: Number(event.price ?? 0),
         createdAt: event.created_at,

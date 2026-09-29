@@ -15,15 +15,61 @@ const SearchIcon = () => (
 
 const CATEGORIES = ['Todos', 'Música', 'Festival', 'Esportes', 'Teatro', 'Gastronomia', 'Cultura', 'Tech']
 
+function extractCityFromLocation(location: string): string | null {
+  if (!location) return null
+  const statePattern = /([A-Za-zÀ-ÿ\s]+)\s*[,\-–—]\s*([A-Z]{2})\s*$/
+  const stateMatch = location.match(statePattern)
+  if (stateMatch) return stateMatch[1].trim()
+
+  const parts = location.split(/[,\-–—]/).map((p) => p.trim()).filter(Boolean)
+  const cityLike = parts.reverse().find((p) => p.length > 3 && !/^\d/.test(p))
+  return cityLike ?? null
+}
+
 export default function EventsPage() {
   const { events, isLoading } = useSupabaseEvents()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Todos')
+  const [selectedCity, setSelectedCity] = useState('Todas as cidades')
+  const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'paid' | 'free'>('all')
 
-  const publishedEvents = events.filter((e) => e.status === 'published')
+  const now = Date.now()
+  const publishedEvents = events.filter((e) => {
+    if (e.status !== 'published' || e.visibility === 'PRIVATE') return false
+    if (e.date) {
+      const d = new Date(e.date)
+      if (!isNaN(d.getTime())) {
+        if (e.date.length === 10 && !e.date.includes('T')) {
+          d.setHours(23, 59, 59, 999)
+        }
+        if (d.getTime() < now) return false
+      }
+    }
+    return true
+  })
 
-  // "Mais Vendidos": eventos com maior número de ingressos vendidos
+  function resolveEventCity(ev: (typeof publishedEvents)[0]): string | null {
+    if (ev.city) return ev.state ? `${ev.city} - ${ev.state}` : ev.city
+    const extracted = extractCityFromLocation(ev.location)
+    return extracted || null
+  }
+
+  const availableCities = Array.from(
+    new Set(
+      publishedEvents
+        .map((e) => resolveEventCity(e))
+        .filter((c): c is string => Boolean(c))
+    )
+  ).sort()
+
+  const cityCount: Record<string, number> = {}
+  for (const ev of publishedEvents) {
+    const city = resolveEventCity(ev)
+    if (city) cityCount[city] = (cityCount[city] ?? 0) + 1
+  }
+
   const hotEvents = [...publishedEvents]
+    .filter((e) => new Date(e.date).getTime() >= now)
     .sort((a, b) => (Number((b as unknown as { sold?: number }).sold ?? 0) - Number((a as unknown as { sold?: number }).sold ?? 0)))
     .slice(0, Math.min(4, publishedEvents.length))
 
@@ -33,16 +79,32 @@ export default function EventsPage() {
     const matchesSearch =
       !search ||
       ev.title.toLowerCase().includes(search.toLowerCase()) ||
-      ev.location.toLowerCase().includes(search.toLowerCase())
-    
-    const matchesCategory =
-      activeCategory === 'Todos' ||
-      ev.genre === activeCategory
+      ev.location.toLowerCase().includes(search.toLowerCase()) ||
+      (ev.city && ev.city.toLowerCase().includes(search.toLowerCase()))
 
-    return matchesSearch && matchesCategory
+    const matchesCategory = activeCategory === 'Todos' || ev.genre === activeCategory
+
+    const resolvedCity = resolveEventCity(ev)
+    const matchesCity =
+      selectedCity === 'Todas as cidades' ||
+      (resolvedCity !== null && resolvedCity === selectedCity) ||
+      ev.location.toLowerCase().includes(selectedCity.split(' - ')[0].toLowerCase())
+
+    const isFree = ev.event_type === 'FREE' || ev.price === 0
+    const matchesEventType =
+      eventTypeFilter === 'all' ||
+      (eventTypeFilter === 'free' && isFree) ||
+      (eventTypeFilter === 'paid' && !isFree)
+
+    return matchesSearch && matchesCategory && matchesCity && matchesEventType
   })
 
-  const heroEvents = publishedEvents.slice(0, 8)
+  const customGenres = Array.from(
+    new Set(publishedEvents.map((e) => e.genre).filter((g): g is string => Boolean(g)))
+  )
+  const categoriesList = Array.from(new Set(['Todos', ...CATEGORIES.filter((c) => c !== 'Todos'), ...customGenres]))
+
+  const heroEvents = publishedEvents.filter((e) => new Date(e.date).getTime() >= now).slice(0, 8)
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f8fb', fontFamily: 'inherit' }}>
@@ -84,51 +146,114 @@ export default function EventsPage() {
         padding: '0.9rem 1.5rem',
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {/* Search bar */}
-          <div style={{ position: 'relative', maxWidth: '560px', width: '100%', margin: '0 auto' }}>
-            <span style={{
-              position: 'absolute',
-              left: '14px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#94a3b8',
-              display: 'flex',
-              pointerEvents: 'none',
-            }}>
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              placeholder="Buscar experiências..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.7rem 1rem 0.7rem 2.75rem',
-                borderRadius: '50px',
-                border: '1.5px solid #e2e8f0',
-                background: '#fff',
-                fontSize: '0.92rem',
-                color: '#0f172a',
-                outline: 'none',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                transition: 'border-color 0.2s, box-shadow 0.2s',
-                boxSizing: 'border-box',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#6366f1'
-                e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.12)'
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#e2e8f0'
-                e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'
-              }}
-            />
+          {/* Search bar + City Selector + Event Type Filter */}
+          <div style={{ display: 'flex', gap: '0.75rem', maxWidth: '850px', width: '100%', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: '1 1 280px' }}>
+              <span style={{
+                position: 'absolute',
+                left: '14px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#94a3b8',
+                display: 'flex',
+                pointerEvents: 'none',
+              }}>
+                <SearchIcon />
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar experiências, locais..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.7rem 1rem 0.7rem 2.75rem',
+                  borderRadius: '50px',
+                  border: '1.5px solid #e2e8f0',
+                  background: '#fff',
+                  fontSize: '0.92rem',
+                  color: '#0f172a',
+                  outline: 'none',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#6366f1'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.12)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0'
+                  e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'
+                }}
+              />
+            </div>
+
+            {/* City Filter Selector */}
+            <div style={{ position: 'relative', flex: '0 0 auto', minWidth: '180px' }}>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.7rem 2.2rem 0.7rem 2.2rem',
+                  borderRadius: '50px',
+                  border: selectedCity !== 'Todas as cidades' ? '1.5px solid #2563eb' : '1.5px solid #e2e8f0',
+                  background: selectedCity !== 'Todas as cidades' ? '#eff6ff' : '#fff',
+                  color: selectedCity !== 'Todas as cidades' ? '#1d4ed8' : '#334155',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="Todas as cidades">📍 Todas as Cidades</option>
+                {availableCities.map((city) => (
+                  <option key={city} value={city}>
+                    🏙️ {city}{cityCount[city] ? ` (${cityCount[city]})` : ''}
+                  </option>
+                ))}
+              </select>
+              <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: '0.9rem' }}>
+                📍
+              </span>
+              <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: '0.75rem', color: '#64748b' }}>
+                ▼
+              </span>
+            </div>
+
+            {/* Aba Todos / Gratuitos / Pagos */}
+            <div style={{ display: 'flex', gap: '0.25rem', background: '#e2e8f0', padding: '3px', borderRadius: '50px' }}>
+              {(['all', 'paid', 'free'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setEventTypeFilter(type)}
+                  style={{
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '50px',
+                    border: 'none',
+                    background: eventTypeFilter === type ? '#0f172a' : 'transparent',
+                    color: eventTypeFilter === type ? '#fff' : '#475569',
+                    fontWeight: eventTypeFilter === type ? 700 : 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {type === 'all' ? 'Todos' : type === 'paid' ? '💳 Pagos' : '🎟️ Gratuitos'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Categories pills */}
           <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '2px', scrollbarWidth: 'none' }}>
-            {CATEGORIES.map((cat) => (
+            {categoriesList.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
@@ -157,9 +282,8 @@ export default function EventsPage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
 
         {/* ── MAIS VENDIDOS 🔥 ── */}
-        {!isLoading && !search && hotEvents.length > 0 && (
+        {!isLoading && !search && selectedCity === 'Todas as cidades' && activeCategory === 'Todos' && eventTypeFilter === 'all' && hotEvents.length > 0 && (
           <div style={{ marginBottom: '2.5rem' }}>
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
               <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>🔥</span>
               <div>
@@ -172,7 +296,6 @@ export default function EventsPage() {
               </div>
             </div>
 
-            {/* Hot cards — scroll horizontal em mobile, grid em desktop */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -183,7 +306,6 @@ export default function EventsPage() {
               ))}
             </div>
 
-            {/* Divisória */}
             <div style={{
               height: '1px',
               background: 'linear-gradient(90deg, transparent, #e2e8f0, transparent)',
@@ -196,7 +318,17 @@ export default function EventsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
-              {search ? `Resultados para "${search}"` : 'Próximos Eventos'}
+              {search
+                ? `Resultados para "${search}"`
+                : selectedCity !== 'Todas as cidades'
+                ? `Eventos em ${selectedCity.split(' - ')[0]}`
+                : activeCategory !== 'Todos'
+                ? `Eventos de ${activeCategory}`
+                : eventTypeFilter === 'paid'
+                ? 'Eventos Pagos'
+                : eventTypeFilter === 'free'
+                ? 'Eventos Gratuitos'
+                : 'Próximos Eventos'}
             </h2>
             <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
               {filteredEvents.length} {filteredEvents.length === 1 ? 'evento encontrado' : 'eventos encontrados'}
@@ -263,7 +395,7 @@ export default function EventsPage() {
               Nenhum evento encontrado
             </h3>
             <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
-              {search ? 'Tente buscar por outro termo.' : 'Nenhum evento publicado no momento.'}
+              {search ? 'Tente buscar por outro termo.' : 'Nenhum evento encontrado nesta categoria.'}
             </p>
           </div>
         )}

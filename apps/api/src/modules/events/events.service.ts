@@ -40,14 +40,26 @@ export class EventsService {
   }
 
   /** Cria evento — organizer_id preenchido com userId autenticado. */
-  create(dto: CreateEventDto, userId: string) {
-    return this.eventsRepository.create(dto, userId)
+  async create(dto: CreateEventDto, userId: string) {
+    const event = await this.eventsRepository.create(dto, userId)
+    if (event && (dto.status === 'pending' || event.approval_status === 'pending')) {
+      void this.notificationsService.notifyApprovalRequested({
+        id: event.id,
+        title: event.title,
+      })
+    }
+    return event
   }
 
   /** Atualiza evento — valida propriedade antes de alterar. */
-  async update(id: string, userId: string, dto: UpdateEventDto) {
-    await this.assertOwnership(id, userId)
-    return this.eventsRepository.update(id, userId, dto)
+  async update(id: string, user: AuthenticatedUser | string, dto: UpdateEventDto) {
+    const userId = typeof user === 'string' ? user : user.id
+    const userRole = typeof user !== 'string' ? (user.user_metadata?.role as string) : undefined
+    const userEmail = typeof user !== 'string' ? user.email : ''
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userEmail === 'admin@mypass360.com'
+
+    await this.assertOwnership(id, user)
+    return this.eventsRepository.update(id, userId, dto, isAdmin)
   }
 
   /** Remove evento — rascunhos nunca publicados ou eventos com exclusão aprovada pelo admin. */
@@ -202,6 +214,32 @@ export class EventsService {
             'Este evento já foi aprovado. Utilize a opção Publicar.'
           )
         }
+      }
+      throw err
+    }
+  }
+
+  /** Cancela uma solicitação de aprovação pendente. Notifica administradores. */
+  async cancelApproval(id: string, userId: string, note?: string) {
+    await this.assertOwnership(id, userId)
+    try {
+      const event = await this.eventsRepository.cancelApproval(id, userId, note)
+
+      // Notificar admins que a solicitação foi cancelada pelo organizador
+      if (event) {
+        void this.notificationsService.notifyApprovalCancelled({
+          id: event.id,
+          title: event.title,
+          note,
+        })
+      }
+
+      return event
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith('NOT_PENDING')) {
+        throw new BadRequestException(
+          'Este evento não possui uma solicitação de publicação pendente para cancelar.'
+        )
       }
       throw err
     }

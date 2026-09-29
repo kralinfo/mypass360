@@ -34,6 +34,17 @@ export class AdminController {
     return this.adminService.updateEventStatus(id, dto.status)
   }
 
+  /** PATCH /admin/events/:id — editar qualquer campo do evento como administrador */
+  @Patch('events/:id')
+  @UseGuards(AuthGuard)
+  updateEvent(
+    @Param('id') id: string,
+    @Body() body: { data: Record<string, unknown>; adminMessage?: string },
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.adminService.updateEventByAdmin(id, admin.id, body.data, body.adminMessage)
+  }
+
   @Delete('events/:id')
   deleteEvent(@Param('id') id: string, @Body() dto: { reason?: string }) {
     return this.adminService.deleteEvent(id, dto?.reason)

@@ -69,7 +69,7 @@ export function Navbar() {
           top: 70px;
           left: 0;
           right: 0;
-          background: #0f172a;
+          background: linear-gradient(145deg, #050811 0%, #0f172a 100%);
           border-bottom: 1px solid #1e293b;
           padding: 1.5rem;
           flex-direction: column;
@@ -106,7 +106,7 @@ export function Navbar() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '1rem 1.5rem',
-          background: '#0f172a',
+          background: 'linear-gradient(145deg, #050811 0%, #0f172a 100%)',
           color: '#fff',
           zIndex: 1000,
           height: '70px',
@@ -141,14 +141,15 @@ export function Navbar() {
             <Link
               href="/eventos/cadastrar"
               style={{
-                color: '#0f172a',
-                background: '#a78bfa',
-                padding: '0.45rem 0.9rem',
+                color: '#070a13',
+                background: '#ffffff',
+                padding: '0.45rem 0.95rem',
                 borderRadius: '8px',
                 textDecoration: 'none',
-                fontWeight: '600',
+                fontWeight: '700',
                 fontSize: '0.88rem',
-                transition: 'background-color 0.2s',
+                boxShadow: '0 2px 10px rgba(255, 255, 255, 0.15)',
+                transition: 'all 0.15s ease',
               }}
             >
               + Cadastrar Evento
@@ -330,12 +331,12 @@ export function Navbar() {
             href="/eventos/cadastrar"
             onClick={() => setMenuOpen(false)}
             style={{
-              color: '#0f172a',
-              background: '#a78bfa',
+              color: '#070a13',
+              background: '#ffffff',
               padding: '0.65rem 1rem',
               borderRadius: '8px',
               textDecoration: 'none',
-              fontWeight: '600',
+              fontWeight: '700',
               fontSize: '0.95rem',
               textAlign: 'center',
               marginTop: '0.5rem',

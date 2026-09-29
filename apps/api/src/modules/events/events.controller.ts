@@ -69,7 +69,7 @@ export class EventsController {
     @Body() dto: UpdateEventDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.eventsService.update(id, user.id, dto)
+    return this.eventsService.update(id, user, dto)
   }
 
   /** DELETE /events/:id — remover evento (protegido, apenas o proprietário) */
@@ -109,6 +109,17 @@ export class EventsController {
   @UseGuards(AuthGuard)
   requestApproval(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eventsService.requestApproval(id, user.id)
+  }
+
+  /** POST /events/:id/cancel-approval — cancelar solicitação de publicação (protegido) */
+  @Post(':id/cancel-approval')
+  @UseGuards(AuthGuard)
+  cancelApproval(
+    @Param('id') id: string,
+    @Body() body: { note?: string },
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.eventsService.cancelApproval(id, user.id, body?.note)
   }
 
   /** POST /events/:id/request-deletion — solicitar exclusão de evento publicado (protegido) */

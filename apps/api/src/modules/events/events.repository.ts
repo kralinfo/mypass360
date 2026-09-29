@@ -29,9 +29,9 @@ export class EventsRepository {
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
-      .select('*')
+      .select('*, ticket_types(*)')
       .eq('status', 'published')
-      .eq('visibility', 'PUBLIC')
+      .or('visibility.eq.PUBLIC,visibility.is.null')
       .neq('deletion_status', 'pending')
       .or(`published_at.is.null,published_at.lte.${now}`)
       .order('date', { ascending: true })
@@ -129,7 +129,7 @@ export class EventsRepository {
     const eventType = dto.event_type ?? 'PAID'
     let accessPasswordHash: string | null = null
 
-    if (eventType === 'FREE' && dto.access_password && dto.access_password.trim() !== '') {
+    if (dto.access_password && typeof dto.access_password === 'string' && dto.access_password.trim() !== '') {
       accessPasswordHash = bcrypt.hashSync(dto.access_password.trim(), 10)
     }
 
@@ -145,7 +145,9 @@ export class EventsRepository {
         organizer_id: userId, // sempre do JWT, nunca do body
         capacity: dto.capacity,
         price: eventType === 'FREE' ? 0 : (dto.price ?? 0),
-        status: dto.status ?? 'draft',
+        status: (dto.status === 'pending' || !dto.status) ? 'draft' : dto.status,
+        approval_status: dto.status === 'pending' ? 'pending' : 'none',
+        approval_requested_at: dto.status === 'pending' ? new Date().toISOString() : null,
         event_type: eventType,
         visibility: dto.visibility ?? 'PUBLIC',
         access_password_hash: accessPasswordHash,
@@ -183,15 +185,29 @@ export class EventsRepository {
   }
 
   /**
-   * Atualiza evento — valida que pertence ao userId antes de alterar.
+   * Atualiza evento — valida que pertence ao userId antes de alterar (ou bypass se for Admin).
    */
-  async update(id: string, userId: string, dto: UpdateEventDto) {
+  async update(id: string, userId: string, dto: UpdateEventDto, isAdmin: boolean = false) {
     // Remover campos que o usuário não deve poder alterar diretamente ou que não pertencem à tabela
-    const { status: _s, ticket_types: _tt, access_password, ...safeDto } = dto as any
+    const {
+      status: _s,
+      ticket_types: _tt,
+      access_password,
+      city: _city,
+      state: _state,
+      latitude: _lat,
+      longitude: _lng,
+      place_id: _pid,
+      ...safeDto
+    } = dto as any
 
     const updatePayload: Record<string, any> = {
       ...safeDto,
       updated_at: new Date().toISOString(),
+    }
+
+    if (isAdmin && (dto as any).status !== undefined) {
+      updatePayload.status = (dto as any).status
     }
 
     if (dto.event_type !== undefined) {
@@ -214,16 +230,19 @@ export class EventsRepository {
     }
 
     // Log para diagnóstico
-    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'fields:', Object.keys(updatePayload))
+    console.log('[EventsRepository.update] Updating event:', id, 'userId:', userId, 'isAdmin:', isAdmin, 'fields:', Object.keys(updatePayload))
 
-    const { data, error } = await this.supabase
+    let query = this.supabase
       .getClient()
       .from(this.table)
       .update(updatePayload)
       .eq('id', id)
-      .eq('organizer_id', userId)
-      .select()
-      .single()
+
+    if (!isAdmin) {
+      query = query.eq('organizer_id', userId)
+    }
+
+    const { data, error } = await query.select().single()
 
     if (error) {
       console.error('[EventsRepository.update] Supabase error:', error.message, error.details)
@@ -298,6 +317,7 @@ export class EventsRepository {
           .getClient()
           .from('ticket_types')
           .update({
+            name: item.name,
             price: item.price,
             quantity: item.quantity,
             description: item.description,
@@ -480,6 +500,66 @@ export class EventsRepository {
     return data
   }
 
+  /**
+   * Cancela uma solicitação de aprovação pendente pelo organizador.
+   * Reverte approval_status para 'none'. Apenas permitido quando status é 'pending'.
+   */
+  async cancelApproval(id: string, userId: string, note?: string) {
+    const { data: current, error: fetchError } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('approval_status, organizer_id')
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .single()
+
+    if (fetchError || !current) {
+      throw new Error('Evento não encontrado ou sem permissão.')
+    }
+
+    if (current.approval_status !== 'pending') {
+      throw new Error('NOT_PENDING: Apenas solicitações pendentes podem ser canceladas.')
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      status: 'draft',
+      approval_status: 'none',
+      approval_requested_at: null,
+      approval_reviewed_at: null,
+      approved_by: null,
+    }
+    if (note) {
+      updatePayload.approval_cancellation_note = note
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .update(updatePayload)
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .select()
+      .single()
+
+    if (error) {
+      if (note && error.message.includes('approval_cancellation_note')) {
+        delete updatePayload.approval_cancellation_note
+        const { data: retryData, error: retryError } = await this.supabase
+          .getClient()
+          .from(this.table)
+          .update(updatePayload)
+          .eq('id', id)
+          .eq('organizer_id', userId)
+          .select()
+          .single()
+
+        if (retryError) throw new Error(retryError.message)
+        return retryData
+      }
+      throw new Error(error.message)
+    }
+    return data
+  }
 
   /**
    * Registra uma solicitação de exclusão pelo organizador.
