@@ -28,6 +28,8 @@ type FullEventData = {
   capacity?: number
   ticket_types?: Array<{ name: string; price: number; quantity: number; description?: string }>
   organizer_id?: string
+  access_password_hash?: string | null
+  has_password?: boolean
 }
 
 type AdminEditEventModalProps = {
@@ -64,6 +66,12 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
   const [adminMessage, setAdminMessage] = useState('')
   const [token, setToken] = useState<string>('')
 
+  // Gerenciamento de senha de acesso
+  const [hasPassword, setHasPassword] = useState(false)
+  const [enablePassword, setEnablePassword] = useState(false)
+  const [accessPassword, setAccessPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+
   const initialDateObj = parseDateAndTime(event.date)
 
   const [form, setForm] = useState({
@@ -99,6 +107,11 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
 
         const full: FullEventData = await res.json()
         const { dateStr, timeStr } = parseDateAndTime(full.date ?? event.date)
+
+        // Verificar se o evento tem senha (admin recebe access_password_hash diretamente)
+        const eventHasPassword = Boolean((full as any).access_password_hash) || Boolean(full.has_password)
+        setHasPassword(eventHasPassword)
+        setEnablePassword(eventHasPassword)
 
         setForm({
           title: full.title ?? '',
@@ -195,6 +208,16 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
                 description: t.description?.trim() || null,
               })),
       }
+
+      // Gerenciar senha de acesso
+      if (!enablePassword) {
+        // Admin desativou a senha — limpar
+        data.access_password = null
+      } else if (accessPassword.trim()) {
+        // Admin digitou uma nova senha — atualizar
+        data.access_password = accessPassword.trim()
+      }
+      // Se enablePassword === true E accessPassword vazio: mantém a senha atual (undefined = não enviado)
 
       const res = await fetch(`${API_URL}/admin/events/${event.id}`, {
         method: 'PATCH',
@@ -440,6 +463,91 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
                 )}
               </section>
             )}
+          {/* Seção de Senha de Acesso */}
+          <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: enablePassword ? '0.85rem' : 0 }}>
+              <div>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>🔐 Senha de Acesso</span>
+                {hasPassword && (
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '999px', padding: '1px 8px', fontWeight: 600 }}>
+                    Senha ativa
+                  </span>
+                )}
+                {!hasPassword && (
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '999px', padding: '1px 8px', fontWeight: 600 }}>
+                    Sem senha
+                  </span>
+                )}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', color: '#475569', fontWeight: 600 }}>
+                <div
+                  onClick={() => { setEnablePassword(p => !p); if (enablePassword) setAccessPassword('') }}
+                  style={{
+                    width: 36, height: 20, borderRadius: 10,
+                    background: enablePassword ? '#6366f1' : '#cbd5e1',
+                    position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute', top: 2, left: enablePassword ? 18 : 2,
+                    width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </div>
+                {enablePassword ? 'Habilitada' : 'Desabilitada'}
+              </label>
+            </div>
+
+            {enablePassword && (
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
+                  Senha de acesso
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={accessPassword}
+                    onChange={e => setAccessPassword(e.target.value)}
+                    placeholder={hasPassword ? '••••••••  (senha atual ativa)' : 'Digite a senha de acesso...'}
+                    style={{
+                      width: '100%', padding: '0.55rem 2.5rem 0.55rem 0.75rem',
+                      border: '1px solid #cbd5e1', borderRadius: '8px',
+                      fontSize: '0.9rem', boxSizing: 'border-box', background: '#fff', color: '#0f172a',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    style={{
+                      position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#94a3b8', padding: '0.2rem', display: 'flex', alignItems: 'center',
+                    }}
+                    title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  >
+                    {showPassword ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {hasPassword && (
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.76rem', color: '#94a3b8' }}>
+                    A senha é armazenada de forma criptografada e não pode ser exibida. Deixe em branco para manter a atual, ou digite uma nova para substituir.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
           </div>
         )}
 
