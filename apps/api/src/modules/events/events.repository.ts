@@ -500,6 +500,49 @@ export class EventsRepository {
     return data
   }
 
+  /**
+   * Cancela uma solicitação de aprovação pendente pelo organizador.
+   * Reverte approval_status para 'none'. Apenas permitido quando status é 'pending'.
+   */
+  async cancelApproval(id: string, userId: string, note?: string) {
+    const { data: current, error: fetchError } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .select('approval_status, organizer_id')
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .single()
+
+    if (fetchError || !current) {
+      throw new Error('Evento não encontrado ou sem permissão.')
+    }
+
+    if (current.approval_status !== 'pending') {
+      throw new Error('NOT_PENDING: Apenas solicitações pendentes podem ser canceladas.')
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      approval_status: 'none',
+      approval_requested_at: null,
+      approval_reviewed_at: null,
+      approved_by: null,
+    }
+    if (note) {
+      updatePayload.approval_cancellation_note = note
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from(this.table)
+      .update(updatePayload)
+      .eq('id', id)
+      .eq('organizer_id', userId)
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+    return data
+  }
 
   /**
    * Registra uma solicitação de exclusão pelo organizador.

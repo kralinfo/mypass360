@@ -219,6 +219,32 @@ export class EventsService {
     }
   }
 
+  /** Cancela uma solicitação de aprovação pendente. Notifica administradores. */
+  async cancelApproval(id: string, userId: string, note?: string) {
+    await this.assertOwnership(id, userId)
+    try {
+      const event = await this.eventsRepository.cancelApproval(id, userId, note)
+
+      // Notificar admins que a solicitação foi cancelada pelo organizador
+      if (event) {
+        void this.notificationsService.notifyApprovalCancelled({
+          id: event.id,
+          title: event.title,
+          note,
+        })
+      }
+
+      return event
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith('NOT_PENDING')) {
+        throw new BadRequestException(
+          'Este evento não possui uma solicitação de publicação pendente para cancelar.'
+        )
+      }
+      throw err
+    }
+  }
+
   /** Agenda a publicação para uma data futura. Exige aprovação do admin. */
   async schedulePublication(id: string, userId: string, dto: ScheduleEventDto) {
     await this.assertOwnership(id, userId)

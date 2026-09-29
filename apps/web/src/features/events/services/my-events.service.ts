@@ -36,6 +36,17 @@ export async function requestEventApproval(id: string, token: string): Promise<E
 }
 
 /**
+ * Cancela a solicitação de aprovação de publicação pendente.
+ */
+export async function cancelEventApproval(
+  id: string,
+  token: string,
+  note?: string
+): Promise<Event> {
+  return apiWithAuth(token).post<Event>(`/events/${id}/cancel-approval`, { note })
+}
+
+/**
  * Agenda a publicação do evento para uma data futura.
  * Define status = 'published' e published_at = data informada.
  *
@@ -115,4 +126,3 @@ export async function fetchEventMessages(
 ): Promise<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>> {
   return apiWithAuth(token).get<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>>(`/events/${id}/messages`)
 }
-

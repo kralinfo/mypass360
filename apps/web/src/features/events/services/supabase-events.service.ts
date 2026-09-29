@@ -11,41 +11,51 @@ function sanitizeEvent(data: Record<string, unknown>): Event {
 }
 
 export async function fetchPublishedEvents(): Promise<Event[]> {
-  const supabase = createBrowserClient()
-  const now = new Date().toISOString()
+  try {
+    const supabase = createBrowserClient()
+    const now = new Date().toISOString()
 
-  const { data, error } = await supabase
-    .from('events')
-    .select('*, ticket_types(*)')
-    .in('status', ['published', 'finished'])
-    .or('visibility.eq.PUBLIC,visibility.is.null')
-    .neq('deletion_status', 'pending')
-    .order('date', { ascending: true })
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, ticket_types(*)')
+      .in('status', ['published', 'finished'])
+      .or('visibility.eq.PUBLIC,visibility.is.null')
+      .neq('deletion_status', 'pending')
+      .order('date', { ascending: true })
 
-  if (error) {
-    console.error('Error fetching events from Supabase:', error.message)
+    if (error) {
+      console.error('Error fetching events from Supabase:', error.message)
+      return []
+    }
+
+    return (data ?? []).map((item) => sanitizeEvent(item as Record<string, unknown>))
+  } catch (err: any) {
+    console.error('Failed to fetch events from Supabase (network or configuration error):', err?.message || err)
     return []
   }
-
-  return (data ?? []).map((item) => sanitizeEvent(item as Record<string, unknown>))
 }
 
 export async function fetchPublishedEventBySlug(slug: string): Promise<Event | null> {
-  const supabase = createBrowserClient()
-  const now = new Date().toISOString()
+  try {
+    const supabase = createBrowserClient()
+    const now = new Date().toISOString()
 
-  const { data, error } = await supabase
-    .from('events')
-    .select('*, ticket_types(*)')
-    .eq('slug', slug)
-    .eq('status', 'published')
-    .or(`published_at.is.null,published_at.lte.${now}`)
-    .single()
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, ticket_types(*)')
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .or(`published_at.is.null,published_at.lte.${now}`)
+      .single()
 
-  if (error) {
-    console.error('Error fetching event by slug:', error.message)
+    if (error) {
+      console.error('Error fetching event by slug:', error.message)
+      return null
+    }
+
+    return sanitizeEvent(data as Record<string, unknown>)
+  } catch (err: any) {
+    console.error('Failed to fetch event by slug from Supabase (network or configuration error):', err?.message || err)
     return null
   }
-
-  return sanitizeEvent(data as Record<string, unknown>)
 }

@@ -18,10 +18,12 @@ import {
   deleteEvent,
   requestEventApproval,
   requestEventDeletion,
+  cancelEventApproval,
 } from '../services/my-events.service'
 import { ScheduleModal } from './ScheduleModal'
 import { DeleteConfirmModal } from './DeleteConfirmModal'
 import { PublishRequestModal } from './PublishRequestModal'
+import { CancelApprovalModal } from './CancelApprovalModal'
 import { DeleteRequestModal } from './DeleteRequestModal'
 import { AdminMessageDialogModal } from './AdminMessageDialogModal'
 import { DeletionRejectedModal } from './DeletionRejectedModal'
@@ -191,6 +193,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showShareModal, setShowShareModal] = useState(false)
   const [showBankAccountModal, setShowBankAccountModal] = useState(false)
   const [showDirectPublishModal, setShowDirectPublishModal] = useState(false)
+  const [showCancelApprovalModal, setShowCancelApprovalModal] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -278,6 +281,14 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
     const token = await getToken()
     if (!token) throw new Error('Sessão expirada. Faça login novamente.')
     await scheduleEventPublication(event.id, token, publishedAt)
+    onStatusChange()
+  }
+
+
+  async function handleCancelApproval(note?: string) {
+    const token = await getToken()
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+    await cancelEventApproval(event.id, token, note)
     onStatusChange()
   }
 
@@ -721,17 +732,31 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     </button>
                   )}
 
-                  {/* Informativo: aguardando aprovação */}
+                  {/* Informativo: aguardando aprovação & Opção para cancelar */}
                   {displayStatus === 'pending_approval' && (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item"
-                      disabled
-                      title="Aguardando análise do administrador"
-                    >
-                      <span style={{ display: 'flex', color: '#8b5cf6' }}>⏳</span>
-                      <span style={{ color: '#6d28d9' }}>Aguardando aprovação</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="my-event-dropdown-item"
+                        disabled
+                        title="Aguardando análise do administrador"
+                      >
+                        <span style={{ display: 'flex', color: '#8b5cf6' }}>⏳</span>
+                        <span style={{ color: '#6d28d9' }}>Aguardando aprovação</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="my-event-dropdown-item danger"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setShowCancelApprovalModal(true)
+                        }}
+                        title="Cancelar a solicitação de publicação enviada ao administrador"
+                      >
+                        <span style={{ display: 'flex', color: '#dc2626' }}>✖</span>
+                        <span>Cancelar solicitação</span>
+                      </button>
+                    </>
                   )}
 
                   {/* 2. Publicar — apenas quando aprovado */}
@@ -881,6 +906,16 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           </div>
         </div>
       </article>
+
+      
+      {/* Modal de Cancelamento de Solicitação de Publicação */}
+      {showCancelApprovalModal && (
+        <CancelApprovalModal
+          eventTitle={event.title}
+          onConfirm={handleCancelApproval}
+          onClose={() => setShowCancelApprovalModal(false)}
+        />
+      )}
 
       {/* Modal de Solicitação de Publicação */}
       {showPublishRequestModal && (

@@ -111,6 +111,17 @@ export class EventsController {
     return this.eventsService.requestApproval(id, user.id)
   }
 
+  /** POST /events/:id/cancel-approval — cancelar solicitação de publicação (protegido) */
+  @Post(':id/cancel-approval')
+  @UseGuards(AuthGuard)
+  cancelApproval(
+    @Param('id') id: string,
+    @Body() body: { note?: string },
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.eventsService.cancelApproval(id, user.id, body?.note)
+  }
+
   /** POST /events/:id/request-deletion — solicitar exclusão de evento publicado (protegido) */
   @Post(':id/request-deletion')
   @UseGuards(AuthGuard)
