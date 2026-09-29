@@ -1,14 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AdminDeletionSection } from './AdminDeletionSection'
 import { DeletionHistorySection } from './DeletionHistorySection'
+import { useRealtimeSyncHandler } from '@/features/notifications/useRealtimeSyncHandler'
 
-export function AdminDeletionsTabContainer({ refreshKey }: { refreshKey?: number }) {
+export function AdminDeletionsTabContainer({ refreshKey: externalRefreshKey }: { refreshKey?: number }) {
   const searchParams = useSearchParams()
   const initialTab = searchParams.get('sub') === 'history' || searchParams.get('tab') === 'history' ? 'history' : 'deletions'
   const [activeTab, setActiveTab] = useState<'deletions' | 'history'>(initialTab)
+  const [localRefreshKey, setLocalRefreshKey] = useState(0)
+  const refreshKey = (externalRefreshKey ?? 0) + localRefreshKey
+
+  const triggerRefresh = useCallback(() => setLocalRefreshKey((k) => k + 1), [])
+  const triggerRefreshRef = useRef(triggerRefresh)
+  triggerRefreshRef.current = triggerRefresh
+
+  /**
+   * Quando uma solicitação de exclusão nova chegar via Realtime,
+   * força o re-mount das seções de exclusões.
+   */
+  useRealtimeSyncHandler('admin_deletions', 'AdminDeletionsTabContainer', () => {
+    triggerRefreshRef.current()
+  })
 
   useEffect(() => {
     const tabParam = searchParams.get('sub') || searchParams.get('tab')

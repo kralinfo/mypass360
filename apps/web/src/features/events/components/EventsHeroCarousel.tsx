@@ -115,12 +115,14 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
     return testImages[charSum % testImages.length]
   }
 
-  const centerEvent = events[current]
+  // Garante que o índice atual nunca ultrapasse os limites se a lista de eventos mudar em tempo real
+  const safeCurrent = total > 0 ? Math.min(current, Math.max(0, total - 1)) : 0
+  const centerEvent = events[safeCurrent]
+
+  if (total === 0 || !centerEvent) return null
 
   return (
     <div style={{ position: 'relative', width: '100%', background: '#ffffff', overflow: 'hidden', padding: '1.25rem 0' }}>
-      
-      {/* ── STAGE DO CARROSSEL ── */}
       <div
         style={{
           position: 'relative',

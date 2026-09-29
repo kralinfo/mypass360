@@ -5,6 +5,7 @@ export const eventStatusOptions: EventStatus[] = ['draft', 'published', 'cancell
 
 export const eventStatusLabels: Record<EventStatus, string> = {
   draft: 'Rascunho',
+  pending: 'Pendente',
   published: 'Publicado',
   cancelled: 'Cancelado',
   finished: 'Encerrado',
@@ -54,16 +55,26 @@ export function formatDate(value: string | null): string {
   }).format(new Date(value))
 }
 
-export function getEventStatusLabel(status: EventStatus): string {
-  return eventStatusLabels[status]
+export function getEventStatusLabel(status: EventStatus | string | null | undefined): string {
+  if (!status) return 'Rascunho'
+  const label = eventStatusLabels[status as EventStatus]
+  if (label) return label
+  if (status === 'pending') return 'Pendente'
+  if (status === 'published') return 'Publicado'
+  if (status === 'draft') return 'Rascunho'
+  if (status === 'cancelled') return 'Cancelado'
+  if (status === 'finished') return 'Encerrado'
+  return String(status).toUpperCase()
 }
 
-export function statusColor(status: EventStatus): string {
+export function statusColor(status: EventStatus | string | null | undefined): string {
   switch (status) {
     case 'published':
       return '#16a34a'
     case 'draft':
       return '#f59e0b'
+    case 'pending':
+      return '#7c3aed'
     case 'cancelled':
       return '#dc2626'
     case 'finished':

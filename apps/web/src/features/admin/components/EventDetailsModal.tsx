@@ -488,28 +488,6 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                 {' • '}📍 {event.location} • 📅 {formatDate(event.date)}
               </p>
             </div>
-
-            <button
-              onClick={onClose}
-              title="Fechar Detalhes"
-              style={{
-                border: 'none',
-                background: '#f1f5f9',
-                borderRadius: '6px',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748b',
-                fontSize: '0.9rem',
-                fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >
-              ✕
-            </button>
           </div>
 
           <div className="ed-header-actions">
@@ -597,6 +575,30 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               <IconExternal />
               Abrir Portaria
             </a>
+
+            {/* Botão Fechar (✕) — Posicionado no último canto direito */}
+            <button
+              onClick={onClose}
+              title="Fechar Detalhes"
+              style={{
+                border: 'none',
+                background: '#f1f5f9',
+                borderRadius: '6px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                flexShrink: 0,
+                marginLeft: '0.25rem',
+              }}
+            >
+              ✕
+            </button>
           </div>
         </div>
 

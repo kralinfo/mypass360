@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { Notification } from '@mypass360/types'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -8,6 +8,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from './notifications.service'
+import { _RealtimeSyncContext } from './RealtimeSyncContext'
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -16,6 +17,11 @@ export function useNotifications() {
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [token, setToken] = useState<string | null>(null)
+
+  // Acessa o context de sincronização e mantém referência estável para uso no closure do Realtime
+  const syncCtx = useContext(_RealtimeSyncContext)
+  const syncCtxRef = useRef(syncCtx)
+  syncCtxRef.current = syncCtx
 
   // 1. Obter sessão atual
   useEffect(() => {
@@ -90,6 +96,15 @@ export function useNotifications() {
         },
         (payload) => {
           const newNotif = payload.new as Notification
+
+          // ── Sincronização de dados ────────────────────────────────────────
+          // Antes de atualizar o badge, dispara o refetch dos dados relacionados.
+          // Isso garante que quando a notificação aparecer, a UI já está atualizada.
+          // Usa syncCtxRef para evitar stale closure (o contexto pode mudar após o mount).
+          if (syncCtxRef.current && newNotif.type) {
+            syncCtxRef.current.triggerSync(newNotif.type, newNotif.entity_id ?? null)
+          }
+
           setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)])
           if (!newNotif.read) {
             setUnreadCount((prev) => prev + 1)

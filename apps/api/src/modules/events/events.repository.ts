@@ -145,7 +145,7 @@ export class EventsRepository {
         organizer_id: userId, // sempre do JWT, nunca do body
         capacity: dto.capacity,
         price: eventType === 'FREE' ? 0 : (dto.price ?? 0),
-        status: dto.status ?? 'draft',
+        status: (dto.status === 'pending' || !dto.status) ? 'draft' : dto.status,
         approval_status: dto.status === 'pending' ? 'pending' : 'none',
         approval_requested_at: dto.status === 'pending' ? new Date().toISOString() : null,
         event_type: eventType,
@@ -522,6 +522,7 @@ export class EventsRepository {
     }
 
     const updatePayload: Record<string, unknown> = {
+      status: 'draft',
       approval_status: 'none',
       approval_requested_at: null,
       approval_reviewed_at: null,
@@ -540,7 +541,23 @@ export class EventsRepository {
       .select()
       .single()
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      if (note && error.message.includes('approval_cancellation_note')) {
+        delete updatePayload.approval_cancellation_note
+        const { data: retryData, error: retryError } = await this.supabase
+          .getClient()
+          .from(this.table)
+          .update(updatePayload)
+          .eq('id', id)
+          .eq('organizer_id', userId)
+          .select()
+          .single()
+
+        if (retryError) throw new Error(retryError.message)
+        return retryData
+      }
+      throw new Error(error.message)
+    }
     return data
   }
 

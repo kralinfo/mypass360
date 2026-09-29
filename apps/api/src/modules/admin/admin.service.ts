@@ -23,8 +23,28 @@ export class AdminService {
     return this.adminRepository.deleteUser(userId)
   }
 
-  updateEventStatus(eventId: string, status: 'draft' | 'published' | 'cancelled' | 'finished') {
-    return this.adminRepository.updateEventStatus(eventId, status)
+  async updateEventStatus(eventId: string, status: 'draft' | 'published' | 'cancelled' | 'finished') {
+    const updated = await this.adminRepository.updateEventStatus(eventId, status)
+    if (updated) {
+      if (status === 'published') {
+        void this.notificationsService.notifyEventPublished({
+          id: updated.id,
+          title: updated.title,
+          organizerId: updated.organizer_id,
+        })
+      } else {
+        const labelMap: Record<string, string> = {
+          draft: 'Rascunho',
+          cancelled: 'Cancelado',
+          finished: 'Encerrado',
+        }
+        void this.notificationsService.notifyEventEditedByAdmin(
+          { id: updated.id, title: updated.title, organizerId: updated.organizer_id },
+          `Status do evento alterado para ${labelMap[status] ?? status}.`
+        )
+      }
+    }
+    return updated
   }
 
   /**

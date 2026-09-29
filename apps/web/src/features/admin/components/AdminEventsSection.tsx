@@ -8,7 +8,7 @@ import { AttendeesModal } from './AttendeesModal'
 import { EventDetailsModal } from './EventDetailsModal'
 import { AdminDeleteConfirmModal } from './AdminDeleteConfirmModal'
 import { AdminEditEventModal } from './AdminEditEventModal'
-import { eventStatusOptions, eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
+import { eventStatusOptions, eventStatusLabels, getEventStatusLabel, formatCurrency, formatDate, statusColor } from '../admin.utils'
 
 type AdminEventsSectionProps = {
   dashboard: AdminDashboardData | null
@@ -346,7 +346,7 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
                           background: `${statusColor(event.status)}1a`, color: statusColor(event.status),
                           fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', whiteSpace: 'nowrap',
                         }}>
-                          {eventStatusLabels[event.status]}
+                          {getEventStatusLabel(event.status)}
                         </span>
                       </td>
 

@@ -59,15 +59,45 @@ export function CancelApprovalModal({ eventTitle, onConfirm, onClose }: CancelAp
           {/* Header */}
           <div style={{
             background: '#ffffff',
-            padding: '1.5rem 1.5rem 1.25rem',
+            padding: '1.25rem 1.5rem 1rem',
             borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
           }}>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
-              Cancelar solicitação de publicação
-            </h2>
-            <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
-              A solicitação enviada ao administrador será cancelada e o evento voltará para rascunho.
-            </p>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                Cancelar solicitação de publicação
+              </h2>
+              <p style={{ margin: '0.35rem 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+                A solicitação enviada ao administrador será cancelada e o evento voltará para rascunho.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              style={{
+                background: '#f1f5f9',
+                border: 'none',
+                color: '#64748b',
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              title="Fechar"
+            >
+              ✕
+            </button>
           </div>
 
           {/* Body */}

@@ -10,7 +10,9 @@ import {
 } from '@/features/admin/admin.service'
 import type { AdminDashboardData, AdminEventItem, AdminUserItem, EventStatus } from '@mypass360/types'
 import type { ReminderModalState } from './components/ReminderModal'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useContext } from 'react'
+import { useRealtimeSyncHandler } from '@/features/notifications/useRealtimeSyncHandler'
+import { _RealtimeSyncContext } from '@/features/notifications/RealtimeSyncContext'
 
 type ReminderModalData = {
   event: AdminEventItem
@@ -60,6 +62,20 @@ export function useAdminDashboard(): AdminDashboardState {
     void loadDashboard()
   }, [loadDashboard])
 
+  // Referência estável para loadDashboard — evita re-registro do handler a cada render
+  const loadDashboardRef = useRef(loadDashboard)
+  loadDashboardRef.current = loadDashboard
+
+  /**
+   * Quando uma nova solicitação de publicação ou exclusão chegar via Realtime,
+   * o dashboard do admin é automaticamente recarregado.
+   */
+  useRealtimeSyncHandler('admin_dashboard', 'useAdminDashboard', () => {
+    void loadDashboardRef.current()
+  })
+
+  const syncCtx = useContext(_RealtimeSyncContext)
+
   const handleEventStatusChange = useCallback(async (event: AdminEventItem, status: EventStatus) => {
     const actionKey = `event-status-${event.id}`
     setRunningAction(actionKey)
@@ -67,12 +83,15 @@ export function useAdminDashboard(): AdminDashboardState {
     try {
       await updateAdminEventStatus(event.id, status)
       await loadDashboard()
+      if (syncCtx) {
+        syncCtx.triggerSync(status === 'published' ? 'event_published' : 'admin_message', event.id)
+      }
     } catch (actionError) {
       alert(actionError instanceof Error ? actionError.message : 'Erro ao atualizar evento.')
     } finally {
       setRunningAction(null)
     }
-  }, [loadDashboard])
+  }, [loadDashboard, syncCtx])
 
   const handleEventDelete = useCallback(async (event: AdminEventItem, reason?: string) => {
     const actionKey = `event-delete-${event.id}`

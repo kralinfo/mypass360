@@ -195,6 +195,86 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
   const [showDirectPublishModal, setShowDirectPublishModal] = useState(false)
   const [showCancelApprovalModal, setShowCancelApprovalModal] = useState(false)
 
+  const closeAllModals = () => {
+    setShowScheduleModal(false)
+    setShowDeleteModal(false)
+    setShowManageModal(false)
+    setShowPublishRequestModal(false)
+    setShowDeleteRequestModal(false)
+    setShowAdminDialogModal(false)
+    setShowDeletionRejectedModal(false)
+    setShowShareModal(false)
+    setShowBankAccountModal(false)
+    setShowDirectPublishModal(false)
+    setShowCancelApprovalModal(false)
+  }
+
+  const openPublishRequestModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowPublishRequestModal(true)
+  }
+
+  const openDeleteRequestModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDeleteRequestModal(true)
+  }
+
+  const openDeleteModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDeleteModal(true)
+  }
+
+  const openCancelApprovalModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowCancelApprovalModal(true)
+  }
+
+  const openDirectPublishModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDirectPublishModal(true)
+  }
+
+  const openScheduleModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowScheduleModal(true)
+  }
+
+  const openManageModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowManageModal(true)
+  }
+
+  const openShareModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowShareModal(true)
+  }
+
+  const openAdminDialogModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowAdminDialogModal(true)
+  }
+
+  const openDeletionRejectedModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowDeletionRejectedModal(true)
+  }
+
+  const openBankAccountModal = () => {
+    closeAllModals()
+    setMenuOpen(false)
+    setShowBankAccountModal(true)
+  }
+
   const menuRef = useRef<HTMLDivElement>(null)
 
   const displayStatus = getEventDisplayStatus(event)
@@ -357,6 +437,48 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
         .my-event-btn-edit:hover {
           background: #f1f5f9;
           border-color: #94a3b8;
+        }
+        .my-event-btn-request {
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.5rem 0.75rem;
+          height: 36px;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          color: #1e293b;
+          font-size: 0.83rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .my-event-btn-request:hover {
+          background: #eff6ff;
+          border-color: #818cf8;
+          color: #4f46e5;
+        }
+        .my-event-btn-publish {
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.5rem 0.75rem;
+          height: 36px;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          color: #1e293b;
+          font-size: 0.83rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .my-event-btn-publish:hover {
+          background: #f0fdf4;
+          border-color: #34d399;
+          color: #059669;
         }
         .my-event-btn-menu {
           display: inline-flex;
@@ -597,7 +719,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           {/* Aviso: Exclusão em Análise (Clicável para ver diálogo) */}
           {displayStatus === 'deletion_pending' && (
             <div
-              onClick={() => setShowAdminDialogModal(true)}
+              onClick={openAdminDialogModal}
               style={{
                 background: '#fef2f2', border: '1px solid #fca5a5',
                 borderRadius: '8px', padding: '0.5rem 0.75rem',
@@ -621,7 +743,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           {/* Aviso: Exclusão Reprovada pelo Admin (Clicável para ver detalhes) */}
           {(event.deletion_status === 'rejected' || event.deletion_rejection_reason) && (
             <div
-              onClick={() => setShowDeletionRejectedModal(true)}
+              onClick={openDeletionRejectedModal}
               style={{
                 background: '#fef2f2', border: '1px solid #fca5a5',
                 borderRadius: '8px', padding: '0.5rem 0.75rem',
@@ -718,10 +840,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowPublishRequestModal(true)
-                      }}
+                      onClick={openPublishRequestModal}
                       style={{ color: '#4f46e5' }}
                       title="Solicitar aprovação de publicação"
                     >
@@ -747,10 +866,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                       <button
                         type="button"
                         className="my-event-dropdown-item danger"
-                        onClick={() => {
-                          setMenuOpen(false)
-                          setShowCancelApprovalModal(true)
-                        }}
+                        onClick={openCancelApprovalModal}
                         title="Cancelar a solicitação de publicação enviada ao administrador"
                       >
                         <span style={{ display: 'flex', color: '#dc2626' }}>✖</span>
@@ -764,10 +880,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowDirectPublishModal(true)
-                      }}
+                      onClick={openDirectPublishModal}
                       disabled={loading === 'publish'}
                       title="Publicar evento agora"
                       style={{ color: '#059669' }}
@@ -798,10 +911,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowManageModal(true)
-                    }}
+                    onClick={openManageModal}
                   >
                     <span style={{ display: 'flex', color: '#6366f1' }}><GearIcon /></span>
                     <span>Gerenciar</span>
@@ -811,10 +921,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowShareModal(true)
-                    }}
+                    onClick={openShareModal}
                     title="Copiar e compartilhar o link do evento"
                   >
                     <span style={{ display: 'flex', color: '#0ea5e9' }}>🔗</span>
@@ -825,10 +932,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowAdminDialogModal(true)
-                    }}
+                    onClick={openAdminDialogModal}
                     title="Ver mensagens e diálogo com a administração"
                     style={{ color: '#4f46e5' }}
                   >
@@ -840,10 +944,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                   <button
                     type="button"
                     className="my-event-dropdown-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setShowBankAccountModal(true)
-                    }}
+                    onClick={openBankAccountModal}
                     title="Cadastrar ou alterar conta bancária para recebimento do repasse"
                     style={{ color: '#059669', fontWeight: 600 }}
                   >
@@ -856,10 +957,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowScheduleModal(true)
-                      }}
+                      onClick={openScheduleModal}
                     >
                       <span style={{ display: 'flex', color: '#0ea5e9' }}><CalendarIcon /></span>
                       <span>Agendar publicação</span>
@@ -874,10 +972,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item danger"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowDeleteRequestModal(true)
-                      }}
+                      onClick={openDeleteRequestModal}
                       disabled={displayStatus === 'deletion_pending'}
                       title="Solicitar exclusão deste evento publicado ao administrador"
                     >
@@ -890,10 +985,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <button
                       type="button"
                       className="my-event-dropdown-item danger"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setShowDeleteModal(true)
-                      }}
+                      onClick={openDeleteModal}
                       title="Excluir rascunho permanentemente"
                     >
                       <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>

@@ -31,7 +31,7 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
         .publish-request-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(15, 23, 42, 0.55);
+          background: rgba(15, 23, 42, 0.6);
           backdrop-filter: blur(4px);
           z-index: 9999;
           display: flex;
@@ -42,15 +42,24 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
         }
         .publish-request-modal {
           background: #fff;
-          border-radius: 20px;
+          border-radius: 16px;
           width: 100%;
-          max-width: 460px;
+          max-width: 480px;
+          max-height: 88vh;
+          display: flex;
+          flex-direction: column;
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
           overflow: hidden;
           animation: slideUp 0.2s ease;
         }
+        .publish-request-body {
+          padding: 1.15rem 1.25rem;
+          overflow-y: auto;
+          flex: 1;
+        }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="publish-request-overlay" onClick={(e) => e.target === e.currentTarget && !isLoading && onClose()}>
@@ -58,148 +67,174 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
           {/* Header */}
           <div style={{
             background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-            padding: '1.5rem 1.5rem 1.25rem',
+            padding: '1.15rem 1.25rem 1rem',
             color: '#fff',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            flexShrink: 0,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <div style={{
-                width: 40, height: 40,
-                background: 'rgba(255,255,255,0.2)',
-                borderRadius: '10px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.2rem',
-              }}>
-                🚀
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.25rem' }}>
+                <div style={{
+                  width: 32, height: 32,
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1rem',
+                }}>
+                  🚀
+                </div>
+                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+                  Solicitar publicação
+                </h2>
               </div>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
-                Solicitar publicação
-              </h2>
+              <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.9, lineHeight: 1.4 }}>
+                Seu evento será enviado para análise da administração antes de ir ao ar.
+              </p>
             </div>
-            <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.85, lineHeight: 1.5 }}>
-              Seu evento será enviado para análise administrativa antes de ser publicado.
-            </p>
+
+            {/* Botão Fechar (✕) */}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                color: '#ffffff',
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              title="Fechar"
+            >
+              ✕
+            </button>
           </div>
 
-          {/* Body */}
-          <div style={{ padding: '1.25rem 1.5rem' }}>
-            {/* Evento */}
+          {/* Body com Scroll Suave */}
+          <div className="publish-request-body">
+            {/* Evento Selecionado */}
             <div style={{
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: '10px',
-              padding: '0.85rem 1rem',
-              marginBottom: '1.25rem',
+              padding: '0.75rem 0.9rem',
+              marginBottom: '1rem',
             }}>
-              <p style={{ margin: '0 0 0.2rem', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <p style={{ margin: '0 0 0.15rem', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Evento selecionado
               </p>
-              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
                 {eventTitle}
               </p>
             </div>
 
-            {/* Fluxo */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <p style={{ margin: '0 0 0.75rem', fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+            {/* Passo a passo compacto */}
+            <div style={{ marginBottom: '1rem' }}>
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
                 Como funciona:
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 {[
-                  { icon: '📤', text: 'Sua solicitação é enviada para análise' },
-                  { icon: '🔍', text: 'Um administrador revisa as informações do evento' },
-                  { icon: '✅', text: 'Após aprovação, o botão "Publicar" é liberado para você' },
-                  { icon: '🎉', text: 'Você decide o momento exato de publicar' },
+                  { icon: '📤', title: '1. Envio', desc: 'Solicitação enviada ao admin' },
+                  { icon: '🔍', title: '2. Análise', desc: 'Administrador revisa os dados' },
+                  { icon: '✅', title: '3. Aprovação', desc: 'Botão "Publicar" é liberado' },
+                  { icon: '🎉', title: '4. Publicação', desc: 'Você publica quando desejar' },
                 ].map((step, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
-                    <span style={{ fontSize: '0.95rem', flexShrink: 0, marginTop: '0.05rem' }}>{step.icon}</span>
-                    <span style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>{step.text}</span>
+                  <div key={i} style={{
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9',
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.65rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                  }}>
+                    <span style={{ fontSize: '0.9rem' }}>{step.icon}</span>
+                    <div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>{step.title}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.2 }}>{step.desc}</div>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Lembrete Financeiro & Repasse */}
+            {/* Lembrete Financeiro Compacto */}
             <div style={{
               background: '#f0fdf4',
               border: '1px solid #bbf7d0',
               borderRadius: '10px',
-              padding: '0.85rem 1rem',
-              marginBottom: '1.25rem',
-              fontSize: '0.82rem',
+              padding: '0.75rem 0.9rem',
+              marginBottom: '1rem',
+              fontSize: '0.78rem',
               color: '#166534',
-              lineHeight: 1.5,
+              lineHeight: 1.45,
             }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#15803d', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>💰</span> Como você recebe o dinheiro das vendas:
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#15803d', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span>💰</span> Recebimento das vendas:
               </div>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <li>O valor das vendas cai na sua conta bancária em <strong>até 3 dias úteis</strong> após a conclusão do evento.</li>
-                <li>Taxa de serviço: <strong>10%</strong> + <strong>2% a 2,5%</strong> por venda.</li>
-                <li>Transferência <strong>gratuita</strong> para Banco do Brasil, Bradesco, Itaú e Santander (R$ 7,50 para outros).</li>
+              <ul style={{ margin: 0, paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <li>Repasse na sua conta em <strong>até 3 dias úteis</strong> pós-evento.</li>
+                <li>Taxa: <strong>10% + 2% a 2,5%</strong> por venda. Transferência grátis para BB, Bradesco, Itaú e Santander.</li>
               </ul>
-              <div style={{ marginTop: '0.45rem', fontSize: '0.78rem', color: '#047857', fontWeight: 600 }}>
-                💡 Cadastre sua conta corrente ou poupança no menu <strong>“Financeiro”</strong>.
-              </div>
             </div>
 
-            {/* Aviso de Edição e Segurança */}
+            {/* Aviso de Segurança Compacto */}
             <div style={{
               background: '#fffbe8',
               border: '1px solid #fde047',
-              borderRadius: '10px',
-              padding: '0.75rem 0.9rem',
-              marginBottom: '1.25rem',
-              fontSize: '0.8rem',
-              color: '#713f12',
-              lineHeight: 1.45,
-            }}>
-              ⚠️ <strong>Importante:</strong> Confira todos os dados do seu evento (local, data, ingressos e valores). Por segurança dos compradores, <strong>estes dados não poderão ser editados após a aprovação e publicação</strong>.
-            </div>
-
-            {/* Aviso de Status */}
-            <div style={{
-              background: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: '8px',
+              borderRadius: '9px',
               padding: '0.65rem 0.85rem',
-              marginBottom: '1.25rem',
-              fontSize: '0.78rem',
-              color: '#92400e',
-              lineHeight: 1.5,
+              marginBottom: '1rem',
+              fontSize: '0.76rem',
+              color: '#713f12',
+              lineHeight: 1.4,
             }}>
-              Após enviar a solicitação, o evento ficará em modo <strong>&quot;Aguardando aprovação&quot;</strong> e não poderá ser publicado até a decisão do administrador.
+              ⚠️ <strong>Importante:</strong> Confira data, local e valores. Após a solicitação, o evento entra em análise e esses dados não poderão ser editados.
             </div>
 
-            {/* Erro */}
+            {/* Mensagem de Erro */}
             {error && (
               <div style={{
                 background: '#fef2f2',
                 border: '1px solid #fca5a5',
                 borderRadius: '8px',
-                padding: '0.65rem 0.85rem',
-                marginBottom: '1rem',
-                fontSize: '0.82rem',
+                padding: '0.55rem 0.75rem',
+                marginBottom: '0.85rem',
+                fontSize: '0.78rem',
                 color: '#991b1b',
               }}>
                 {error}
               </div>
             )}
 
-            {/* Botões */}
-            <div style={{ display: 'flex', gap: '0.6rem' }}>
+            {/* Footer / Botões de Ação */}
+            <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isLoading}
                 style={{
                   flex: 1,
-                  padding: '0.7rem',
-                  borderRadius: '10px',
+                  padding: '0.65rem',
+                  borderRadius: '9px',
                   border: '1px solid #cbd5e1',
                   background: '#f8fafc',
                   color: '#475569',
                   fontWeight: 600,
-                  fontSize: '0.88rem',
+                  fontSize: '0.85rem',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
                   opacity: isLoading ? 0.6 : 1,
                   transition: 'all 0.15s',
@@ -212,20 +247,20 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
                 onClick={handleConfirm}
                 disabled={isLoading}
                 style={{
-                  flex: 1,
-                  padding: '0.7rem',
-                  borderRadius: '10px',
+                  flex: 1.2,
+                  padding: '0.65rem',
+                  borderRadius: '9px',
                   border: 'none',
                   background: isLoading ? '#a5b4fc' : 'linear-gradient(135deg, #4f46e5, #6366f1)',
                   color: '#fff',
                   fontWeight: 700,
-                  fontSize: '0.88rem',
+                  fontSize: '0.85rem',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
                   transition: 'all 0.15s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.4rem',
+                  gap: '0.35rem',
                 }}
               >
                 {isLoading ? (
@@ -243,7 +278,6 @@ export function PublishRequestModal({ eventTitle, onConfirm, onClose }: PublishR
           </div>
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }
