@@ -29,8 +29,9 @@ export async function fetchPublishedEvents(): Promise<Event[]> {
     }
 
     return (data ?? []).map((item) => sanitizeEvent(item as Record<string, unknown>))
-  } catch (err: any) {
-    console.error('Failed to fetch events from Supabase (network or configuration error):', err?.message || err)
+  } catch (err) {
+    const error = err as { message?: string }
+    console.error('Failed to fetch events from Supabase (network or configuration error):', error?.message || err)
     return []
   }
 }
@@ -54,8 +55,9 @@ export async function fetchPublishedEventBySlug(slug: string): Promise<Event | n
     }
 
     return sanitizeEvent(data as Record<string, unknown>)
-  } catch (err: any) {
-    console.error('Failed to fetch event by slug from Supabase (network or configuration error):', err?.message || err)
+  } catch (err) {
+    const error = err as { message?: string }
+    console.error('Failed to fetch event by slug from Supabase (network or configuration error):', error?.message || err)
     return null
   }
 }

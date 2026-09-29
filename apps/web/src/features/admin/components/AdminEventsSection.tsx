@@ -91,7 +91,8 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
     if (periodTab === 'upcoming' && isPast) return false
     if (periodTab === 'past' && !isPast) return false
 
-    const isFree = (ev as any).event_type === 'FREE' || ev.price === 0
+    const evRec = ev as unknown as Record<string, unknown>
+    const isFree = evRec.event_type === 'FREE' || ev.price === 0
     if (eventTypeFilter === 'free' && !isFree) return false
     if (eventTypeFilter === 'paid' && isFree) return false
 
@@ -99,11 +100,12 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
       const q = search.toLowerCase().trim()
       const titleMatch = ev.title?.toLowerCase().includes(q)
       const locationMatch = ev.location?.toLowerCase().includes(q)
+      const orgObj = evRec.organizer as { email?: string; full_name?: string } | undefined
       const creatorMatch =
-        (ev as any).organizer_name?.toLowerCase().includes(q) ||
-        (ev as any).organizer_email?.toLowerCase().includes(q) ||
-        (ev as any).organizer?.email?.toLowerCase().includes(q) ||
-        (ev as any).organizer?.full_name?.toLowerCase().includes(q)
+        (evRec.organizer_name as string | undefined)?.toLowerCase().includes(q) ||
+        (evRec.organizer_email as string | undefined)?.toLowerCase().includes(q) ||
+        orgObj?.email?.toLowerCase().includes(q) ||
+        orgObj?.full_name?.toLowerCase().includes(q)
       if (!titleMatch && !locationMatch && !creatorMatch) return false
     }
 
@@ -113,8 +115,10 @@ export function AdminEventsSection({ dashboard, isLoading, runningAction, onChan
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     const aTime = a.date ? new Date(a.date).getTime() : 0
     const bTime = b.date ? new Date(b.date).getTime() : 0
-    const aRev = (a as any).totalRevenue ?? (a as any).revenue ?? 0
-    const bRev = (b as any).totalRevenue ?? (b as any).revenue ?? 0
+    const aRec = a as unknown as Record<string, unknown>
+    const bRec = b as unknown as Record<string, unknown>
+    const aRev = (aRec.totalRevenue ?? aRec.revenue ?? 0) as number
+    const bRev = (bRec.totalRevenue ?? bRec.revenue ?? 0) as number
     const aOrders = a.totalOrders ?? 0
     const bOrders = b.totalOrders ?? 0
 
