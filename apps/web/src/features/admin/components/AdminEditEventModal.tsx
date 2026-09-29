@@ -109,9 +109,12 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
         const { dateStr, timeStr } = parseDateAndTime(full.date ?? event.date)
 
         // Verificar se o evento tem senha (admin recebe access_password_hash diretamente)
-        const eventHasPassword = Boolean((full as any).access_password_hash) || Boolean(full.has_password)
+        const fullRecord = full as Record<string, unknown>
+        const eventHasPassword = Boolean(fullRecord.access_password_hash) || Boolean(full.has_password)
         setHasPassword(eventHasPassword)
         setEnablePassword(eventHasPassword)
+
+        const rawTicketTypes = (fullRecord.ticketTypes ?? fullRecord.ticket_types ?? []) as Array<Record<string, unknown>>
 
         setForm({
           title: full.title ?? '',
@@ -127,11 +130,11 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
           visibility: full.visibility ?? 'PUBLIC',
           price: String(full.price ?? 0),
           capacity: String(full.capacity ?? 0),
-          ticketTypes: ((full as any).ticketTypes ?? (full as any).ticket_types ?? []).map((t: any) => ({
-            name: t.name,
-            price: String(t.price),
-            quantity: String(t.quantity),
-            description: t.description ?? '',
+          ticketTypes: rawTicketTypes.map((t) => ({
+            name: String(t.name ?? ''),
+            price: String(t.price ?? 0),
+            quantity: String(t.quantity ?? 0),
+            description: String(t.description ?? ''),
           })),
         })
         setStep('edit')
@@ -229,8 +232,8 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Erro ao salvar.' }))
-        throw new Error((err as any).message ?? 'Erro ao salvar evento.')
+        const err = (await res.json().catch(() => ({ message: 'Erro ao salvar.' }))) as { message?: string }
+        throw new Error(err.message ?? 'Erro ao salvar evento.')
       }
 
       onSaved?.()
