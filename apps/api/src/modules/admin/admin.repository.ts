@@ -761,7 +761,7 @@ export class AdminRepository {
 
     return {
       ...event,
-      checkin_enabled: event.checkin_enabled !== false,
+      checkin_enabled: event.checkin_enabled === true,
       totalTickets: totalTicketsSold,
       checkedInTickets: checkedInTickets ?? 0,
       ticketTypes: formattedTicketTypes,

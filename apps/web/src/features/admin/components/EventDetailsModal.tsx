@@ -148,15 +148,15 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
 
   // Alternar Status Mestre de Check-in do Evento
   const handleToggleEventCheckin = async () => {
-    const newStatus = !(details?.checkin_enabled !== false)
+    const newStatus = !(details?.checkin_enabled === true)
     setIsTogglingCheckin(true)
     try {
       await updateEventCheckinStatus(event.id, newStatus)
       setDetails((prev) => (prev ? { ...prev, checkin_enabled: newStatus } : null))
       setResetFeedback(
         newStatus
-          ? '🟢 Portaria reaberta! O check-in deste evento está ativo.'
-          : '🔴 Portaria pausada! O check-in deste evento foi desativado.'
+          ? '🟢 Portaria aberta! O check-in deste evento está ativo.'
+          : '🔴 Portaria fechada! O check-in deste evento foi desativado.'
       )
       setTimeout(() => setResetFeedback(null), 4000)
     } catch (err) {
@@ -496,16 +496,16 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               type="button"
               onClick={handleToggleEventCheckin}
               disabled={isTogglingCheckin}
-              title={details?.checkin_enabled !== false ? 'Clique para pausar o check-in' : 'Clique para reabrir o check-in'}
+              title={details?.checkin_enabled === true ? 'Clique para fechar a portaria' : 'Clique para abrir a portaria'}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
                 padding: '6px 12px',
                 borderRadius: '6px',
-                border: details?.checkin_enabled !== false ? '1px solid #bbf7d0' : '1px solid #fecaca',
-                background: details?.checkin_enabled !== false ? '#f0fdf4' : '#fef2f2',
-                color: details?.checkin_enabled !== false ? '#166534' : '#991b1b',
+                border: details?.checkin_enabled === true ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                background: details?.checkin_enabled === true ? '#f0fdf4' : '#fef2f2',
+                color: details?.checkin_enabled === true ? '#166534' : '#991b1b',
                 fontSize: '0.78rem',
                 fontWeight: 600,
                 cursor: isTogglingCheckin ? 'not-allowed' : 'pointer',
@@ -513,10 +513,10 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                 transition: 'all 0.15s',
               }}
             >
-              <IconDot color={details?.checkin_enabled !== false ? '#16a34a' : '#dc2626'} />
+              <IconDot color={details?.checkin_enabled === true ? '#16a34a' : '#dc2626'} />
               {isTogglingCheckin
                 ? '...'
-                : details?.checkin_enabled !== false
+                : details?.checkin_enabled === true
                 ? 'Portaria Aberta'
                 : 'Portaria Fechada'}
             </button>
@@ -779,9 +779,9 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                           <span style={{
                             fontWeight: 700,
                             fontSize: '0.85rem',
-                            color: details?.checkin_enabled !== false ? '#15803d' : '#b91c1c',
+                            color: details?.checkin_enabled === true ? '#15803d' : '#b91c1c',
                           }}>
-                            {details?.checkin_enabled !== false ? '🟢 Aberta' : '🔴 Fechada'}
+                            {details?.checkin_enabled === true ? '🟢 Aberta' : '🔴 Fechada'}
                           </span>
                           <button
                             type="button"
@@ -798,7 +798,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                               cursor: isTogglingCheckin ? 'not-allowed' : 'pointer',
                             }}
                           >
-                            {isTogglingCheckin ? '...' : details?.checkin_enabled !== false ? 'Pausar' : 'Reabrir'}
+                            {isTogglingCheckin ? '...' : details?.checkin_enabled === true ? 'Fechar portaria' : 'Abrir portaria'}
                           </button>
                         </div>
                       </div>
