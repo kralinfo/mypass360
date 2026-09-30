@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AdminEventItem, CheckinAccess, CheckinRecord, Event } from '@mypass360/types'
+import type { AdminEventItem, CheckinAccess, CheckinRecord, Event, EventInvitation, EventMember } from '@mypass360/types'
 import {
   createEventCheckinAccess,
   deleteEventCheckin,
@@ -104,8 +104,8 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [isTogglingCheckin, setIsTogglingCheckin] = useState(false)
 
   // Sócios & Equipe
-  const [partners, setPartners] = useState<any[]>([])
-  const [invitations, setInvitations] = useState<any[]>([])
+  const [partners, setPartners] = useState<EventMember[]>([])
+  const [invitations, setInvitations] = useState<EventInvitation[]>([])
   const [isOwner, setIsOwner] = useState<boolean>(true)
   const [newPartnerEmail, setNewPartnerEmail] = useState('')
   const [isSendingInvite, setIsSendingInvite] = useState(false)
@@ -1699,7 +1699,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                             {isOwner && (
                               <button
                                 type="button"
-                                onClick={() => handleRemoveMember(m.user_id, m.user_name || m.user_email)}
+                                onClick={() => handleRemoveMember(m.user_id, m.user_name || m.user_email || 'Usuário')}
                                 style={{
                                   padding: '0.4rem 0.75rem',
                                   borderRadius: 6,
