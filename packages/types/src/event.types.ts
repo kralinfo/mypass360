@@ -106,6 +106,10 @@ export interface Event {
     quantity: number
     description?: string
   }>
+  /** Papel do usuário logado no evento: 'OWNER' (proprietário) ou 'PARTNER' (sócio/colaborador) */
+  member_role?: 'OWNER' | 'PARTNER'
+  /** Indica se o usuário logado é o proprietário principal do evento */
+  is_owner?: boolean
   created_at: string
   updated_at: string
 }

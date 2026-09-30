@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import type { PendingDeletionEventItem } from '@mypass360/types'
 import {
   fetchPendingDeletions,
@@ -90,6 +91,7 @@ function DeletionReviewModal({
 
   const [messages, setMessages] = useState<EventMessageItem[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(true)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
   const loadMessages = useCallback(async () => {
     try {
@@ -103,8 +105,44 @@ function DeletionReviewModal({
   }, [event.id])
 
   useEffect(() => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollTop = timelineRef.current.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
     void loadMessages()
-  }, [loadMessages])
+
+    const supabase = createClient()
+    let activeChannel: ReturnType<typeof supabase.channel> | null = null
+    let isCancelled = false
+
+    const channelName = `review-deletion-messages-${event.id}-${Date.now()}`
+    activeChannel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `entity_id=eq.${event.id}`,
+        },
+        () => {
+          if (!isCancelled) {
+            void loadMessages()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isCancelled = true
+      if (activeChannel) {
+        void supabase.removeChannel(activeChannel)
+      }
+    }
+  }, [event.id, loadMessages])
 
   const formattedEventDate = new Date(event.date).toLocaleDateString('pt-BR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -314,7 +352,7 @@ function DeletionReviewModal({
                   Nenhuma mensagem trocada ainda. Clique em &quot;Entrar em contato&quot; abaixo para enviar uma mensagem.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '220px', overflowY: 'auto', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem' }}>
+                <div ref={timelineRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '220px', overflowY: 'auto', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem' }}>
                   {messages.map((m) => {
                     const isAdmin = m.sender === 'admin'
                     return (

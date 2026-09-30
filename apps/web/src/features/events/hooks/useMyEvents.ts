@@ -30,7 +30,9 @@ export function useMyEvents(): UseMyEventsResult {
     let isMounted = true
 
     async function load() {
-      setIsLoading(true)
+      if (events.length === 0) {
+        setIsLoading(true)
+      }
       setError(null)
 
       try {
@@ -79,10 +81,12 @@ export function useMyEvents(): UseMyEventsResult {
   useEffect(() => {
     const supabase = createClient()
     let activeChannel: ReturnType<typeof supabase.channel> | null = null
+    let isCancelled = false
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user?.id) return
-      const channelName = `my-events-live-${session.user.id}`
+      if (isCancelled || !session?.user?.id) return
+
+      const channelName = `my-events-live-${session.user.id}-${Date.now()}`
       activeChannel = supabase
         .channel(channelName)
         .on(
@@ -97,10 +101,23 @@ export function useMyEvents(): UseMyEventsResult {
             refetchRef.current()
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'event_members',
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => {
+            refetchRef.current()
+          }
+        )
         .subscribe()
     })
 
     return () => {
+      isCancelled = true
       if (activeChannel) {
         void supabase.removeChannel(activeChannel)
       }

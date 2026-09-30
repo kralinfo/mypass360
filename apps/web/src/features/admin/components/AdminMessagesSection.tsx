@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import {
   fetchConversations,
   fetchEventMessages,
@@ -328,6 +329,13 @@ export function AdminMessagesSection({ dashboard, refreshKey }: AdminMessagesSec
   const [sendingReply, setSendingReply] = useState(false)
   const [replyError, setReplyError] = useState<string | null>(null)
   const [replySuccess, setReplySuccess] = useState(false)
+  const timelineRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollTop = timelineRef.current.scrollHeight
+    }
+  }, [messages])
 
   // Modal para iniciar conversa em qualquer evento
   const [showNewChatModal, setShowNewChatModal] = useState(false)
@@ -351,6 +359,39 @@ export function AdminMessagesSection({ dashboard, refreshKey }: AdminMessagesSec
     void loadConversations()
     if (activeModalEvent) {
       void fetchEventMessages(activeModalEvent.eventId).then(setMessages)
+    }
+
+    const supabase = createClient()
+    let activeChannel: ReturnType<typeof supabase.channel> | null = null
+    let isCancelled = false
+
+    const channelTopic = `admin-section-messages-${activeModalEvent ? activeModalEvent.eventId : 'global'}-${Date.now()}`
+    activeChannel = supabase
+      .channel(channelTopic)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          ...(activeModalEvent ? { filter: `entity_id=eq.${activeModalEvent.eventId}` } : {}),
+        },
+        () => {
+          if (!isCancelled) {
+            void loadConversations()
+            if (activeModalEvent) {
+              void fetchEventMessages(activeModalEvent.eventId).then(setMessages)
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isCancelled = true
+      if (activeChannel) {
+        void supabase.removeChannel(activeChannel)
+      }
     }
   }, [refreshKey, activeModalEvent])
 
@@ -655,12 +696,15 @@ export function AdminMessagesSection({ dashboard, refreshKey }: AdminMessagesSec
                       Nenhuma mensagem enviada ainda. Digite abaixo para iniciar o diálogo.
                     </div>
                   ) : (
-                    <div style={{
-                      display: 'flex', flexDirection: 'column', gap: '0.6rem',
-                      maxHeight: '220px', overflowY: 'auto',
-                      background: '#f8fafc', border: '1px solid #e2e8f0',
-                      borderRadius: '12px', padding: '0.85rem',
-                    }}>
+                    <div
+                      ref={timelineRef}
+                      style={{
+                        display: 'flex', flexDirection: 'column', gap: '0.6rem',
+                        maxHeight: '220px', overflowY: 'auto',
+                        background: '#f8fafc', border: '1px solid #e2e8f0',
+                        borderRadius: '12px', padding: '0.85rem',
+                      }}
+                    >
                       {messages.map((m) => {
                         const isAdmin = m.sender === 'admin'
                         return (

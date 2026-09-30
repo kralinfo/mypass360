@@ -126,3 +126,69 @@ export async function fetchEventMessages(
 ): Promise<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>> {
   return apiWithAuth(token).get<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>>(`/events/${id}/messages`)
 }
+
+/**
+ * Envia um convite de sócio por e-mail para o evento.
+ */
+export async function sendPartnerInvite(
+  eventId: string,
+  token: string,
+  email: string
+): Promise<any> {
+  return apiWithAuth(token).post(`/events/${eventId}/partners/invitations`, { email })
+}
+
+/**
+ * Busca a lista de sócios e convites pendentes do evento.
+ */
+export async function fetchEventPartners(
+  eventId: string,
+  token: string
+): Promise<{ members: any[]; invitations: any[]; isOwner: boolean }> {
+  return apiWithAuth(token).get(`/events/${eventId}/partners`)
+}
+
+/**
+ * Cancela um convite pendente.
+ */
+export async function cancelPartnerInvite(
+  eventId: string,
+  inviteId: string,
+  token: string
+): Promise<any> {
+  return apiWithAuth(token).delete(`/events/${eventId}/partners/invitations/${inviteId}`)
+}
+
+/**
+ * Remove um sócio do evento.
+ */
+export async function removePartnerMember(
+  eventId: string,
+  memberUserId: string,
+  token: string
+): Promise<any> {
+  return apiWithAuth(token).delete(`/events/${eventId}/partners/members/${memberUserId}`)
+}
+
+/**
+ * Busca os detalhes do convite por token (para a tela de aceite).
+ */
+export async function fetchInviteByToken(inviteToken: string): Promise<any> {
+  const { api } = await import('@/lib/api')
+  return api.get(`/invitations/${inviteToken}`)
+}
+
+/**
+ * Aceita o convite de sócio (exige autenticação).
+ */
+export async function acceptPartnerInvite(inviteToken: string, token: string): Promise<any> {
+  return apiWithAuth(token).post(`/invitations/${inviteToken}/accept`, {})
+}
+
+/**
+ * Rejeita o convite de sócio (exige autenticação).
+ */
+export async function rejectPartnerInvite(inviteToken: string, token: string): Promise<any> {
+  return apiWithAuth(token).post(`/invitations/${inviteToken}/reject`, {})
+}
+

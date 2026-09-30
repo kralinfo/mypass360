@@ -80,7 +80,7 @@ export class CheckinRepository {
         location: event.location,
         ticketLayout: event.ticket_layout ?? 'ticket',
         participantIdType: event.participant_id_type ?? 'name',
-        checkinEnabled: event.checkin_enabled !== false,
+        checkinEnabled: event.checkin_enabled === true,
         totalTickets: totalTickets ?? 0,
         checkedInTickets: checkedInTickets ?? 0,
       },
@@ -213,7 +213,25 @@ export class CheckinRepository {
       this.logger.warn(`Erro ao registrar histórico de checkin para ticket ${ticket.id}:`, insertErr)
     }
 
-    // 8. Aplicar regras de privacidade na resposta
+    // 8. Calcular se todos os check-ins foram realizados (REQ-26)
+    // Elegíveis = tickets VALID ou CHECKED_IN (descartando PENDING e CANCELED)
+    const { count: totalEligible } = await client
+      .from('tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', event.id)
+      .in('status', ['VALID', 'active', 'CHECKED_IN', 'used'])
+
+    const { count: totalCheckedIn } = await client
+      .from('tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', event.id)
+      .in('status', ['CHECKED_IN', 'used'])
+
+    const totalEligibleCount = totalEligible ?? 0
+    const checkedInCount = totalCheckedIn ?? 0
+    const allCheckedIn = totalEligibleCount > 0 && checkedInCount >= totalEligibleCount
+
+    // 9. Aplicar regras de privacidade na resposta
     const isAnonymous = event.ticketLayout !== 'formal_pdf' && event.participantIdType === 'none'
     const participantName = isAnonymous ? null : ticket.buyer_name ?? ticket.buyer_email ?? null
     const participantCpf = isAnonymous ? null : ticket.buyer_cpf ?? null
@@ -226,6 +244,9 @@ export class CheckinRepository {
       participantName,
       participantCpf,
       checkedInAt: checkinTime,
+      allCheckedIn,
+      totalEligibleTickets: totalEligibleCount,
+      checkedInCount,
       event: {
         id: event.id,
         title: event.title,

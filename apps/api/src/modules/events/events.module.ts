@@ -10,6 +10,7 @@ import { FreeRegistrationModule } from './free-registration/free-registration.mo
   imports: [AdminModule, NotificationsModule, FreeRegistrationModule],
   controllers: [EventsController],
   providers: [EventsService, EventsRepository],
+  exports: [EventsService, EventsRepository],
 })
 export class EventsModule {}
 

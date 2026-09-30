@@ -51,6 +51,12 @@ export interface CheckinValidationResult {
   checkedInAt?: string
   firstCheckedInAt?: string
   firstCheckedInBy?: string
+  /** Indica se todos os ingressos elegíveis já realizaram check-in (REQ-26) */
+  allCheckedIn?: boolean
+  /** Total de ingressos elegíveis para check-in no evento */
+  totalEligibleTickets?: number
+  /** Quantidade de check-ins já realizados após esta validação */
+  checkedInCount?: number
   event?: {
     id: string
     title: string

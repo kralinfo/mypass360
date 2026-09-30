@@ -14,6 +14,15 @@ interface CheckinTerminalProps {
   onLogout: () => void
 }
 
+// ── Estados explícitos da portaria ──────────────────────────────────────────
+type TerminalState =
+  | 'PORTARIA_FECHADA'
+  | 'AGUARDANDO_LEITURA'
+  | 'PROCESSANDO_LEITURA'
+  | 'CHECKIN_REALIZADO'
+  | 'CHECKIN_INVALIDO'
+  | 'TODOS_CHECKINS_REALIZADOS'
+
 function formatCpf(cpf: string | null | undefined): string {
   if (!cpf) return '—'
   const d = cpf.replace(/\D/g, '')
@@ -37,53 +46,37 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
   const { access, event } = authData
 
   const [manualCode, setManualCode] = useState('')
-  const [isValidating, setIsValidating] = useState(false)
   const [result, setResult] = useState<CheckinValidationResult | null>(null)
   const [recentEntries, setRecentEntries] = useState<CheckinRecord[]>([])
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
-  // Contadores ao vivo
+  // Estado explícito da portaria (REQ-24/25/26)
+  const [terminalState, setTerminalState] = useState<TerminalState>(
+    event.checkinEnabled === true ? 'AGUARDANDO_LEITURA' : 'PORTARIA_FECHADA'
+  )
+
+  // Contadores ao vivo — iniciados com os valores do authData
   const [checkedInCount, setCheckedInCount] = useState(event.checkedInTickets)
   const totalTickets = event.totalTickets
   const attendanceRate = totalTickets > 0 ? Math.round((checkedInCount / totalTickets) * 100) : 0
+
+  // Detectar se todos os check-ins já estavam completos ao abrir o terminal
+  // Só considera se a portaria estiver aberta (não faz sentido mostrar se fechada)
+  const [allCheckedInOnLoad] = useState(
+    event.checkinEnabled === true &&
+    event.totalTickets > 0 &&
+    event.checkedInTickets >= event.totalTickets
+  )
 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
   const lastScannedCodeRef = useRef<string | null>(null)
   const scanThrottleRef = useRef<number>(0)
   const usbBufferRef = useRef<string>('')
   const usbLastKeyTimeRef = useRef<number>(0)
-  const isPausedRef = useRef(false)
 
-  // Atualiza a flag de pausa sempre que o resultado ou validação mudar
-  isPausedRef.current = result !== null || isValidating
-
-  // Pausar/retomar processamento da câmera durante os 5 segundos de exibição do aviso
-  useEffect(() => {
-    if (!html5QrCodeRef.current || !cameraActive) return
-    try {
-      if (result !== null) {
-        if (html5QrCodeRef.current.isScanning) {
-          html5QrCodeRef.current.pause(true)
-        }
-      } else {
-        if (html5QrCodeRef.current.isScanning) {
-          html5QrCodeRef.current.resume()
-        }
-      }
-    } catch {
-      // Silencioso
-    }
-  }, [result, cameraActive])
-
-  // Temporizador para esconder o aviso de check-in / erro após 5 segundos
-  useEffect(() => {
-    if (!result) return
-    const timer = setTimeout(() => {
-      setResult(null)
-    }, 5000)
-    return () => clearTimeout(timer)
-  }, [result])
+  // Controla se o scanner está processando (evita duplo scan)
+  const isProcessingRef = useRef(false)
 
   // Carregar histórico recente
   const loadRecent = useCallback(async () => {
@@ -99,11 +92,47 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
     loadRecent()
   }, [loadRecent])
 
-  // Função central de validação
+  // Se a portaria estava aberta e todos os check-ins já estavam completos ao iniciar
+  useEffect(() => {
+    if (event.checkinEnabled === true && allCheckedInOnLoad) {
+      setTerminalState('TODOS_CHECKINS_REALIZADOS')
+    }
+  }, [event.checkinEnabled, allCheckedInOnLoad])
+
+  // ── Gerenciamento da Câmera ─────────────────────────────────────────────────
+
+  const stopCamera = useCallback(async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop()
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+    setCameraActive(false)
+  }, [])
+
+  // Limpeza ao desmontar o componente
+  useEffect(() => {
+    return () => {
+      if (html5QrCodeRef.current) {
+        if (html5QrCodeRef.current.isScanning) {
+          html5QrCodeRef.current.stop().catch(() => {})
+        }
+      }
+    }
+  }, [])
+
+  // ── Função central de validação ─────────────────────────────────────────────
   const handleValidate = useCallback(
     async (codeToValidate: string) => {
       const trimmed = codeToValidate.trim()
-      if (!trimmed || isValidating || isPausedRef.current) return
+      if (!trimmed || isProcessingRef.current) return
+
+      // Portaria fechada — rejeita silenciosamente (o UI já impede, mas garantia extra)
+      if (terminalState === 'PORTARIA_FECHADA') return
 
       // Evita duplo scan acidental no mesmo segundo
       const now = Date.now()
@@ -113,8 +142,12 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
 
       lastScannedCodeRef.current = trimmed
       scanThrottleRef.current = now
+      isProcessingRef.current = true
 
-      setIsValidating(true)
+      // Para a câmera imediatamente ao iniciar processamento (REQ-25)
+      await stopCamera()
+
+      setTerminalState('PROCESSANDO_LEITURA')
 
       try {
         const res = await validateCheckinTicket(trimmed, access.code)
@@ -132,6 +165,15 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           setCheckedInCount((c) => c + 1)
           setManualCode('')
           loadRecent()
+
+          // Verificar se todos os check-ins foram realizados (REQ-26)
+          if (res.allCheckedIn) {
+            setTerminalState('TODOS_CHECKINS_REALIZADOS')
+          } else {
+            setTerminalState('CHECKIN_REALIZADO')
+          }
+        } else {
+          setTerminalState('CHECKIN_INVALIDO')
         }
       } catch (err) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -145,58 +187,33 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           valid: false,
           reason: err instanceof Error ? err.message : 'Erro na comunicação com o servidor.',
         })
+        setTerminalState('CHECKIN_INVALIDO')
       } finally {
-        setIsValidating(false)
+        isProcessingRef.current = false
       }
     },
-    [access.code, isValidating, loadRecent]
+    [access.code, terminalState, loadRecent, stopCamera]
   )
 
+  // ── Nova leitura (REQ-25) ───────────────────────────────────────────────────
+  const handleNovaLeitura = useCallback(async () => {
+    // Garante que o scanner anterior foi encerrado antes de iniciar outro
+    await stopCamera()
+    setResult(null)
+    setManualCode('')
+    lastScannedCodeRef.current = null
+    setTerminalState('AGUARDANDO_LEITURA')
+  }, [stopCamera])
 
-  // Listener para leitor físico USB / Bluetooth (emulador de teclado)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Se o foco já está num input específico, deixa o comportamento normal
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        return
-      }
+  // ── Iniciar câmera ──────────────────────────────────────────────────────────
+  const startCamera = useCallback(async () => {
+    // Garante encerramento de eventual scanner anterior
+    await stopCamera()
 
-      const now = Date.now()
-      const timeDiff = now - usbLastKeyTimeRef.current
-      usbLastKeyTimeRef.current = now
-
-      if (e.key === 'Enter') {
-        if (usbBufferRef.current.length >= 6) {
-          const code = usbBufferRef.current
-          usbBufferRef.current = ''
-          handleValidate(code)
-        } else {
-          usbBufferRef.current = ''
-        }
-        return
-      }
-
-      // Se a digitação for rápida (típico de leitor de código de barras: < 50ms entre caracteres)
-      if (timeDiff > 200) {
-        usbBufferRef.current = ''
-      }
-
-      if (e.key.length === 1) {
-        usbBufferRef.current += e.key
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleValidate])
-
-  // Gerenciamento da Câmera com Html5Qrcode
-  const startCamera = async () => {
     setCameraError(null)
     setCameraActive(true)
 
-    // Pequeno delay para garantir que o container DOM esteja visível e com dimensões calculadas
+    // Pequeno delay para garantir que o container DOM esteja visível
     await new Promise((resolve) => setTimeout(resolve, 50))
 
     try {
@@ -247,34 +264,63 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           : 'Não foi possível acessar a câmera do dispositivo. Verifique as permissões do navegador.'
       )
     }
-  }
+  }, [handleValidate, stopCamera])
 
-
-  const stopCamera = async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        if (html5QrCodeRef.current.isScanning) {
-          await html5QrCodeRef.current.stop()
-        }
-      } catch {
-        // Silencioso
-      }
-    }
-    setCameraActive(false)
-  }
-
-  // Limpeza ao desmontar o componente
+  // ── Listener para leitor físico USB / Bluetooth ─────────────────────────────
   useEffect(() => {
-    return () => {
-      if (html5QrCodeRef.current) {
-        if (html5QrCodeRef.current.isScanning) {
-          html5QrCodeRef.current.stop().catch(() => {})
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Se o foco já está num input específico, deixa o comportamento normal
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      // Portaria fechada ou processando — ignora
+      if (terminalState === 'PORTARIA_FECHADA' || terminalState === 'PROCESSANDO_LEITURA') {
+        return
+      }
+
+      // Se já tem resultado, aguarda "Nova leitura" — não processa novos scans do USB
+      if (terminalState === 'CHECKIN_REALIZADO' ||
+          terminalState === 'CHECKIN_INVALIDO' ||
+          terminalState === 'TODOS_CHECKINS_REALIZADOS') {
+        return
+      }
+
+      const now = Date.now()
+      const timeDiff = now - usbLastKeyTimeRef.current
+      usbLastKeyTimeRef.current = now
+
+      if (e.key === 'Enter') {
+        if (usbBufferRef.current.length >= 6) {
+          const code = usbBufferRef.current
+          usbBufferRef.current = ''
+          handleValidate(code)
+        } else {
+          usbBufferRef.current = ''
         }
+        return
+      }
+
+      // Se a digitação for rápida (típico de leitor de código de barras: < 50ms entre caracteres)
+      if (timeDiff > 200) {
+        usbBufferRef.current = ''
+      }
+
+      if (e.key.length === 1) {
+        usbBufferRef.current += e.key
       }
     }
-  }, [])
 
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleValidate, terminalState])
+
+  const isPortariaFechada = terminalState === 'PORTARIA_FECHADA'
+  const isProcessing = terminalState === 'PROCESSANDO_LEITURA'
+  const hasResult = result !== null
   const isAnonymousEvent = event.ticketLayout !== 'formal_pdf' && event.participantIdType === 'none'
+  const allCheckedInNow = terminalState === 'TODOS_CHECKINS_REALIZADOS'
 
   return (
     <div className="checkin-terminal-wrapper">
@@ -391,8 +437,8 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
             </span>
             <span
               style={{
-                background: event.checkinEnabled !== false ? '#dcfce7' : '#fee2e2',
-                color: event.checkinEnabled !== false ? '#15803d' : '#b91c1c',
+                background: isPortariaFechada ? '#fee2e2' : '#dcfce7',
+                color: isPortariaFechada ? '#b91c1c' : '#15803d',
                 padding: '2px 8px',
                 borderRadius: '999px',
                 fontSize: '0.75rem',
@@ -400,7 +446,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                 whiteSpace: 'nowrap',
               }}
             >
-              {event.checkinEnabled !== false ? '🟢 Portaria Aberta' : '🔴 Portaria Fechada'}
+              {isPortariaFechada ? '🔴 Portaria Fechada' : '🟢 Portaria Aberta'}
             </span>
           </div>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.82rem', wordBreak: 'break-word' }}>
@@ -444,8 +490,8 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
         </div>
       </header>
 
-      {/* Banner de Portaria Fechada / Desativada */}
-      {event.checkinEnabled === false && (
+      {/* Banner de Portaria Fechada (REQ-24) */}
+      {isPortariaFechada && (
         <div
           style={{
             padding: '1rem 1.25rem',
@@ -464,10 +510,40 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🚫</span>
           <div>
             <strong style={{ display: 'block', fontSize: '0.95rem' }}>
-              Portaria Fechada pelo Administrador
+              Portaria Fechada
             </strong>
             <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#b91c1c', lineHeight: 1.4 }}>
-              O check-in para este evento está pausado. Nenhuma validação de ingresso será autorizada até que a administração reabra a portaria.
+              O check-in para este evento está pausado. Para realizar check-ins, o organizador deve
+              abrir a portaria em <strong>Gerenciar → Portaria</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Banner "Todos os check-ins realizados" — exibido quando todos já fizeram (REQ-26) */}
+      {allCheckedInNow && (
+        <div
+          style={{
+            padding: '1rem 1.25rem',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            border: '2px solid #86efac',
+            color: '#166534',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.15)',
+            boxSizing: 'border-box',
+            width: '100%',
+          }}
+        >
+          <span style={{ fontSize: '1.75rem', flexShrink: 0 }}>🎉</span>
+          <div>
+            <strong style={{ display: 'block', fontSize: '1rem' }}>
+              ✓ Todos os check-ins foram realizados
+            </strong>
+            <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#15803d', lineHeight: 1.4 }}>
+              Não há mais ingressos pendentes de check-in para este evento.
             </p>
           </div>
         </div>
@@ -495,10 +571,12 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
             <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
               Validação de Entrada
             </h2>
-            <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-              Leitor USB / Teclado Pronto
-            </span>
+            {!isPortariaFechada && (
+              <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                Leitor USB / Teclado Pronto
+              </span>
+            )}
           </div>
 
           {/* Área da Câmera */}
@@ -529,181 +607,55 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               }}
             />
 
-            {/* Overlay de Feedback em destaque sobre a Câmera */}
-            {cameraActive && result && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: result.valid
-                    ? 'linear-gradient(180deg, rgba(22, 101, 52, 0.96) 0%, rgba(20, 83, 45, 0.97) 100%)'
-                    : 'linear-gradient(180deg, rgba(153, 27, 27, 0.96) 0%, rgba(127, 29, 29, 0.97) 100%)',
-                  backdropFilter: 'blur(6px)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  color: '#fff',
-                  zIndex: 10,
-                  padding: '1rem',
-                  boxSizing: 'border-box',
-                  overflowY: 'auto',
-                }}
-              >
-                {/* Botão para Retomar Scanner Rapidamente */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
-                  <button
-                    type="button"
-                    onClick={() => setResult(null)}
-                    style={{
-                      border: 'none',
-                      background: 'rgba(255, 255, 255, 0.25)',
-                      color: '#fff',
-                      borderRadius: '999px',
-                      padding: '5px 12px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    }}
-                  >
-                    <span>✕</span> Nova Leitura
-                  </button>
-                </div>
-
-                {/* Conteúdo Principal do Resultado */}
-                <div style={{ textAlign: 'center', margin: 'auto 0', padding: '0.5rem 0' }}>
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      color: result.valid ? '#15803d' : '#dc2626',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.75rem',
-                      fontWeight: 900,
-                      margin: '0 auto 0.5rem',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    }}
-                  >
-                    {result.valid ? '✓' : '✕'}
-                  </div>
-
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>
-                    {result.valid ? 'Check-in Realizado com Sucesso!' : 'Entrada Não Permitida'}
-                  </h3>
-
-                  {result.valid ? (
-                    <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#dcfce7', fontWeight: 600 }}>
-                      Entrada autorizada às {formatTime(result.checkedInAt)}
-                    </p>
-                  ) : (
-                    <p style={{ margin: '6px 0 0', fontSize: '0.9rem', color: '#fecaca', fontWeight: 700, lineHeight: 1.3 }}>
-                      {result.reason ?? 'Ingresso inválido ou não autorizado.'}
-                    </p>
-                  )}
-
-                  {/* Card Interno com Detalhes do Participante / Ingresso / 1ª Leitura */}
-                  <div
-                    style={{
-                      marginTop: '0.75rem',
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      borderRadius: '10px',
-                      padding: '0.65rem 0.85rem',
-                      textAlign: 'left',
-                      fontSize: '0.8rem',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                    }}
-                  >
-                    {result.valid ? (
-                      <>
-                        {!isAnonymousEvent && result.participantName && (
-                          <div style={{ marginBottom: '4px' }}>
-                            <span style={{ opacity: 0.8, fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>
-                              Participante:
-                            </span>
-                            <strong style={{ fontSize: '0.95rem', color: '#fff', wordBreak: 'break-word' }}>
-                              {result.participantName}
-                            </strong>
-                          </div>
-                        )}
-                        {!isAnonymousEvent && result.participantCpf && (
-                          <div style={{ marginBottom: '4px' }}>
-                            <span style={{ opacity: 0.8, fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>
-                              CPF:
-                            </span>
-                            <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>
-                              {formatCpf(result.participantCpf)}
-                            </span>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                          <span>Tipo: <strong>{result.ticketTypeName ?? 'Ingresso'}</strong></span>
-                          <span>Cód: <strong style={{ fontFamily: 'monospace' }}>{result.publicCode}</strong></span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {result.firstCheckedInAt && (
-                          <div>
-                            <strong style={{ display: 'block', fontSize: '0.75rem', color: '#fee2e2', textTransform: 'uppercase' }}>
-                              Detalhes da 1ª Entrada:
-                            </strong>
-                            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#fff' }}>
-                              🕒 Realizado em: {formatTime(result.firstCheckedInAt)}
-                              {result.firstCheckedInBy ? ` • Por: ${result.firstCheckedInBy}` : ''}
-                            </p>
-                          </div>
-                        )}
-                        {result.publicCode && (
-                          <div style={{ marginTop: result.firstCheckedInAt ? '4px' : '0', paddingTop: result.firstCheckedInAt ? '4px' : '0', borderTop: result.firstCheckedInAt ? '1px solid rgba(255, 255, 255, 0.2)' : 'none' }}>
-                            <span>Código Lido: <strong style={{ fontFamily: 'monospace' }}>{result.publicCode}</strong></span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Rodapé com aviso de tempo de leitura */}
-                <div style={{ textAlign: 'center', paddingTop: '0.25rem' }}>
-                  <p style={{ margin: 0, fontSize: '0.72rem', opacity: 0.85 }}>
-                    ⏱️ Scanner retoma em 5s (ou toque em Nova Leitura)
-                  </p>
-                </div>
-              </div>
-            )}
-
-
+            {/* Placeholder quando câmera não está ativa */}
             {!cameraActive && (
               <div style={{ textAlign: 'center', padding: '2rem 1.5rem', color: '#94a3b8' }}>
-                <p style={{ fontSize: '2.5rem', margin: '0 0 0.5rem' }}>📷</p>
-                <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                  Aponte a câmera para o QR Code do ingresso.
-                </p>
-                <button
-                  type="button"
-                  disabled={event.checkinEnabled === false}
-                  onClick={startCamera}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: event.checkinEnabled === false ? '#64748b' : '#4f46e5',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    cursor: event.checkinEnabled === false ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
-                  }}
-                >
-                  Ativar Câmera
-                </button>
+                {isProcessing ? (
+                  <>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        border: '3px solid rgba(255,255,255,0.15)',
+                        borderTopColor: '#4f46e5',
+                        animation: 'ct-spin 0.7s linear infinite',
+                        margin: '0 auto 1rem',
+                      }}
+                    />
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>
+                      Validando ingresso...
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: '2.5rem', margin: '0 0 0.5rem' }}>📷</p>
+                    <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
+                      {isPortariaFechada
+                        ? 'Portaria fechada. Abra a portaria para iniciar leituras.'
+                        : 'Aponte a câmera para o QR Code do ingresso.'}
+                    </p>
+                    {!isPortariaFechada && !hasResult && (
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: '#4f46e5',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: '0.95rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                        }}
+                      >
+                        Ativar Câmera
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -733,7 +685,6 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
             </p>
           )}
 
-
           {/* Validação por Digitação ou Scanner */}
           <form
             onSubmit={(e) => {
@@ -748,7 +699,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
             <div className="checkin-input-group">
               <input
                 type="text"
-                disabled={event.checkinEnabled === false}
+                disabled={isPortariaFechada || isProcessing || hasResult}
                 placeholder="Ex: MP360-8A2F9C1E ou UUID"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
@@ -762,28 +713,28 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                   fontSize: '0.875rem',
                   outline: 'none',
                   fontFamily: 'monospace',
-                  background: event.checkinEnabled === false ? '#f1f5f9' : '#fff',
-                  cursor: event.checkinEnabled === false ? 'not-allowed' : 'text',
+                  background: isPortariaFechada || isProcessing || hasResult ? '#f1f5f9' : '#fff',
+                  cursor: isPortariaFechada || isProcessing || hasResult ? 'not-allowed' : 'text',
                   boxSizing: 'border-box',
                 }}
               />
               <button
                 type="submit"
-                disabled={isValidating || !manualCode.trim() || event.checkinEnabled === false}
+                disabled={isProcessing || !manualCode.trim() || isPortariaFechada || hasResult}
                 style={{
                   padding: '0.65rem 1.1rem',
                   borderRadius: '8px',
                   border: 'none',
-                  background: isValidating || !manualCode.trim() || event.checkinEnabled === false ? '#94a3b8' : '#0f172a',
+                  background: isProcessing || !manualCode.trim() || isPortariaFechada || hasResult ? '#94a3b8' : '#0f172a',
                   color: '#fff',
                   fontWeight: 700,
                   fontSize: '0.875rem',
-                  cursor: isValidating || !manualCode.trim() || event.checkinEnabled === false ? 'not-allowed' : 'pointer',
+                  cursor: isProcessing || !manualCode.trim() || isPortariaFechada || hasResult ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap',
                   boxSizing: 'border-box',
                 }}
               >
-                {isValidating ? 'Validando...' : 'Validar Entrada'}
+                {isProcessing ? 'Validando...' : 'Validar Entrada'}
               </button>
             </div>
           </form>
@@ -842,26 +793,6 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setResult(null)}
-                    title="Fechar aviso"
-                    style={{
-                      border: 'none',
-                      background: 'rgba(21, 128, 61, 0.1)',
-                      color: '#15803d',
-                      borderRadius: '8px',
-                      width: '28px',
-                      height: '28px',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
                 </div>
 
                 <div
@@ -911,6 +842,50 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* Banner "Todos realizados" inline no card de sucesso (REQ-26) */}
+                {allCheckedInNow && (
+                  <div
+                    style={{
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #166534 0%, #15803d 100%)',
+                      color: '#fff',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <strong style={{ fontSize: '0.9rem', display: 'block' }}>
+                      🎉 Todos os check-ins foram realizados
+                    </strong>
+                    <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                      Não há mais ingressos pendentes de check-in.
+                    </span>
+                  </div>
+                )}
+
+                {/* Botão Nova Leitura (REQ-25) */}
+                <button
+                  type="button"
+                  onClick={handleNovaLeitura}
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#4f46e5',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  📷 Nova leitura
+                </button>
               </div>
             ) : (
               // ❌ ERRO / ENTRADA INVÁLIDA
@@ -954,28 +929,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setResult(null)}
-                    title="Fechar aviso"
-                    style={{
-                      border: 'none',
-                      background: 'rgba(220, 38, 38, 0.1)',
-                      color: '#dc2626',
-                      borderRadius: '8px',
-                      width: '28px',
-                      height: '28px',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
                 </div>
-
 
                 {result.firstCheckedInAt && (
                   <div
@@ -995,6 +949,30 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                     </p>
                   </div>
                 )}
+
+                {/* Botão Nova Leitura (REQ-25) */}
+                <button
+                  type="button"
+                  onClick={handleNovaLeitura}
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#dc2626',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  📷 Nova leitura
+                </button>
               </div>
             )
           ) : (
@@ -1003,18 +981,28 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               style={{
                 padding: '2.5rem 1.5rem',
                 borderRadius: '16px',
-                background: '#f8fafc',
-                border: '2px dashed #cbd5e1',
+                background: isPortariaFechada ? '#fef2f2' : '#f8fafc',
+                border: isPortariaFechada ? '2px dashed #fca5a5' : '2px dashed #cbd5e1',
                 textAlign: 'center',
                 color: '#64748b',
               }}
             >
-              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>🎟️</span>
-              <strong style={{ fontSize: '1.1rem', color: '#334155', display: 'block' }}>
-                Aguardando leitura de QR Code...
+              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>
+                {isPortariaFechada ? '🔒' : isProcessing ? '⏳' : '🎟️'}
+              </span>
+              <strong style={{ fontSize: '1.1rem', color: isPortariaFechada ? '#b91c1c' : '#334155', display: 'block' }}>
+                {isPortariaFechada
+                  ? 'Portaria Fechada'
+                  : isProcessing
+                  ? 'Validando...'
+                  : 'Aguardando leitura de QR Code...'}
               </strong>
               <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
-                Use a câmera, o leitor USB ou digite o código acima para validar o participante.
+                {isPortariaFechada
+                  ? 'Abra a portaria em Gerenciar para habilitar o check-in.'
+                  : isProcessing
+                  ? 'Aguarde o resultado da validação.'
+                  : 'Use a câmera, o leitor USB ou digite o código acima para validar o participante.'}
               </p>
             </div>
           )}
@@ -1075,6 +1063,9 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
         @keyframes ct-scale {
           from { opacity: 0; transform: scale(0.96); }
           to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes ct-spin {
+          to { transform: rotate(360deg) }
         }
       `}</style>
     </div>

@@ -761,7 +761,7 @@ export class AdminRepository {
 
     return {
       ...event,
-      checkin_enabled: event.checkin_enabled !== false,
+      checkin_enabled: event.checkin_enabled === true,
       totalTickets: totalTicketsSold,
       checkedInTickets: checkedInTickets ?? 0,
       ticketTypes: formattedTicketTypes,
@@ -1043,16 +1043,37 @@ export class AdminRepository {
       .from('notifications')
       .select('id, type, title, message, metadata, created_at, user_id')
       .eq('entity_id', eventId)
-      .in('type', ['admin_message', 'organizer_reply'])
+      .in('type', [
+        'admin_message',
+        'organizer_reply',
+        'event_approval_requested',
+        'event_approved',
+        'event_rejected',
+        'event_published',
+        'event_deletion_requested',
+        'event_deletion_approved',
+        'event_deletion_rejected',
+      ])
       .order('created_at', { ascending: true })
 
     if (error) throw new Error(error.message)
 
     const mapped = (notifs ?? []).map((n: any) => {
-      const isAdminMsg = n.type === 'admin_message'
-      const rawMsg = isAdminMsg
-        ? (n.metadata?.adminMessage || n.message)
-        : (n.metadata?.replyMessage || n.message)
+      const isAdminMsg = [
+        'admin_message',
+        'event_approved',
+        'event_rejected',
+        'event_published',
+        'event_deletion_approved',
+        'event_deletion_rejected',
+      ].includes(n.type)
+
+      let rawMsg = n.message
+      if (n.type === 'admin_message') {
+        rawMsg = n.metadata?.adminMessage || n.message
+      } else if (n.type === 'organizer_reply') {
+        rawMsg = n.metadata?.replyMessage || n.message
+      }
 
       // Se a mensagem começar com "O organizador do evento ... respondeu: ", limpar prefixo para exibição limpa no chat
       let cleanMessage = rawMsg

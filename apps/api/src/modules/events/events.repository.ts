@@ -60,19 +60,75 @@ export class EventsRepository {
   }
 
   /**
-   * Retorna todos os eventos do usuário (sem filtro de publicação).
+   * Retorna todos os eventos do usuário (proprietário ou sócio/colaborador).
    * Usado pela tela "Meus Eventos".
    */
   async findByOwner(userId: string) {
-    const { data, error } = await this.supabase
-      .getClient()
+    const client = this.supabase.getClient()
+
+    // 1. Eventos onde o usuário é dono
+    const { data: ownerEvents, error: ownerErr } = await client
       .from(this.table)
       .select('*, ticket_types(*)')
       .eq('organizer_id', userId)
       .order('created_at', { ascending: false })
 
-    if (error) throw new Error(error.message)
-    return (data ?? []).map((item) => sanitizeEvent(item))
+    if (ownerErr) throw new Error(ownerErr.message)
+
+    const ownerList = (ownerEvents ?? []).map((item) => ({
+      ...sanitizeEvent(item),
+      member_role: 'OWNER' as const,
+      is_owner: true,
+    }))
+
+    // 2. Eventos onde o usuário é sócio ativo
+    const { data: memberRecords } = await client
+      .from('event_members')
+      .select('event_id')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+
+    const ownerEventIds = new Set(ownerList.map((e) => e.id))
+    const partnerEventIds = (memberRecords ?? [])
+      .map((m) => m.event_id)
+      .filter((id) => !ownerEventIds.has(id))
+
+    let partnerList: Array<any> = []
+    if (partnerEventIds.length > 0) {
+      const { data: partnerEvents, error: partnerErr } = await client
+        .from(this.table)
+        .select('*, ticket_types(*)')
+        .in('id', partnerEventIds)
+        .order('created_at', { ascending: false })
+
+      if (partnerErr) throw new Error(partnerErr.message)
+
+      partnerList = (partnerEvents ?? []).map((item) => ({
+        ...sanitizeEvent(item),
+        member_role: 'PARTNER' as const,
+        is_owner: false,
+      }))
+    }
+
+    const combined = [...ownerList, ...partnerList]
+    combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return combined
+  }
+
+  /**
+   * Verifica se o usuário é sócio ativo de um evento
+   */
+  async isPartner(eventId: string, userId: string): Promise<boolean> {
+    const { data } = await this.supabase
+      .getClient()
+      .from('event_members')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+      .maybeSingle()
+
+    return Boolean(data)
   }
 
   /**

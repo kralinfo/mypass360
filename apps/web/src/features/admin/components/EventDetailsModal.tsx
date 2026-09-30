@@ -15,6 +15,13 @@ import {
 
 import { eventStatusLabels, formatCurrency, formatDate, statusColor } from '../admin.utils'
 import { getAllOrganizerBankAccounts, type BankAccountData } from '@/features/events/services/bank-account.service'
+import {
+  fetchEventPartners,
+  sendPartnerInvite,
+  cancelPartnerInvite,
+  removePartnerMember,
+} from '@/features/events/services/my-events.service'
+import { createClient } from '@/lib/supabase/client'
 
 interface EventDetailsModalProps {
   event: AdminEventItem | Event
@@ -22,7 +29,7 @@ interface EventDetailsModalProps {
   onUpdated?: () => void
 }
 
-type TabType = 'overview' | 'financial' | 'accesses' | 'checkins'
+type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'partners'
 
 function formatCpf(cpf: string | null): string {
   if (!cpf) return '—'
@@ -96,6 +103,15 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   // Status Mestre do Check-in do Evento (Ativo/Desativado)
   const [isTogglingCheckin, setIsTogglingCheckin] = useState(false)
 
+  // Sócios & Equipe
+  const [partners, setPartners] = useState<any[]>([])
+  const [invitations, setInvitations] = useState<any[]>([])
+  const [isOwner, setIsOwner] = useState<boolean>(true)
+  const [newPartnerEmail, setNewPartnerEmail] = useState('')
+  const [isSendingInvite, setIsSendingInvite] = useState(false)
+  const [partnerFeedback, setPartnerFeedback] = useState<string | null>(null)
+  const [partnerError, setPartnerError] = useState<string | null>(null)
+
   // Modais de Confirmação Customizados
   const [deleteAccessTarget, setDeleteAccessTarget] = useState<CheckinAccess | null>(null)
   const [deleteCheckinTarget, setDeleteCheckinTarget] = useState<CheckinRecord | null>(null)
@@ -135,6 +151,19 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
           setBankAccount(acc)
         })
         .catch((err) => console.warn('Erro ao carregar conta bancária:', err))
+
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        try {
+          const partnerRes = await fetchEventPartners(event.id, session.access_token)
+          setPartners(partnerRes.members || [])
+          setInvitations(partnerRes.invitations || [])
+          setIsOwner(partnerRes.isOwner ?? true)
+        } catch (pErr) {
+          console.warn('Erro ao buscar sócios:', pErr)
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar detalhes do evento.')
     } finally {
@@ -142,21 +171,70 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
     }
   }, [event.id])
 
+  const handleSendInvite = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newPartnerEmail.trim()) return
+    setIsSendingInvite(true)
+    setPartnerError(null)
+    setPartnerFeedback(null)
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+
+      await sendPartnerInvite(event.id, session.access_token, newPartnerEmail.trim())
+      setPartnerFeedback(`✓ Convite enviado com sucesso para ${newPartnerEmail.trim()}`)
+      setNewPartnerEmail('')
+      await loadData()
+    } catch (err: unknown) {
+      setPartnerError(err instanceof Error ? err.message : 'Falha ao enviar convite.')
+    } finally {
+      setIsSendingInvite(false)
+    }
+  }
+
+  const handleCancelInvite = async (inviteId: string) => {
+    if (!confirm('Deseja realmente cancelar este convite?')) return
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      await cancelPartnerInvite(event.id, inviteId, session.access_token)
+      await loadData()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Erro ao cancelar convite.')
+    }
+  }
+
+  const handleRemoveMember = async (memberUserId: string, memberName: string) => {
+    if (!confirm(`Deseja realmente remover o acesso do sócio ${memberName}?`)) return
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      await removePartnerMember(event.id, memberUserId, session.access_token)
+      await loadData()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Erro ao remover sócio.')
+    }
+  }
+
   useEffect(() => {
     loadData()
   }, [loadData])
 
   // Alternar Status Mestre de Check-in do Evento
   const handleToggleEventCheckin = async () => {
-    const newStatus = !(details?.checkin_enabled !== false)
+    const newStatus = !(details?.checkin_enabled === true)
     setIsTogglingCheckin(true)
     try {
       await updateEventCheckinStatus(event.id, newStatus)
       setDetails((prev) => (prev ? { ...prev, checkin_enabled: newStatus } : null))
       setResetFeedback(
         newStatus
-          ? '🟢 Portaria reaberta! O check-in deste evento está ativo.'
-          : '🔴 Portaria pausada! O check-in deste evento foi desativado.'
+          ? '🟢 Portaria aberta! O check-in deste evento está ativo.'
+          : '🔴 Portaria fechada! O check-in deste evento foi desativado.'
       )
       setTimeout(() => setResetFeedback(null), 4000)
     } catch (err) {
@@ -496,16 +574,16 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               type="button"
               onClick={handleToggleEventCheckin}
               disabled={isTogglingCheckin}
-              title={details?.checkin_enabled !== false ? 'Clique para pausar o check-in' : 'Clique para reabrir o check-in'}
+              title={details?.checkin_enabled === true ? 'Clique para fechar a portaria' : 'Clique para abrir a portaria'}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
                 padding: '6px 12px',
                 borderRadius: '6px',
-                border: details?.checkin_enabled !== false ? '1px solid #bbf7d0' : '1px solid #fecaca',
-                background: details?.checkin_enabled !== false ? '#f0fdf4' : '#fef2f2',
-                color: details?.checkin_enabled !== false ? '#166534' : '#991b1b',
+                border: details?.checkin_enabled === true ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                background: details?.checkin_enabled === true ? '#f0fdf4' : '#fef2f2',
+                color: details?.checkin_enabled === true ? '#166534' : '#991b1b',
                 fontSize: '0.78rem',
                 fontWeight: 600,
                 cursor: isTogglingCheckin ? 'not-allowed' : 'pointer',
@@ -513,10 +591,10 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                 transition: 'all 0.15s',
               }}
             >
-              <IconDot color={details?.checkin_enabled !== false ? '#16a34a' : '#dc2626'} />
+              <IconDot color={details?.checkin_enabled === true ? '#16a34a' : '#dc2626'} />
               {isTogglingCheckin
                 ? '...'
-                : details?.checkin_enabled !== false
+                : details?.checkin_enabled === true
                 ? 'Portaria Aberta'
                 : 'Portaria Fechada'}
             </button>
@@ -676,6 +754,26 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
           >
             Check-ins Realizados ({checkins.length})
           </button>
+          {isOwner && (
+            <button
+              onClick={() => setActiveTab('partners')}
+              style={{
+                padding: '0.75rem 1rem',
+                border: 'none',
+                background: 'transparent',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === 'partners' ? 700 : 500,
+                color: activeTab === 'partners' ? '#4f46e5' : '#64748b',
+                borderBottom: activeTab === 'partners' ? '2px solid #4f46e5' : '2px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              Sócios & Equipe ({partners.length})
+            </button>
+          )}
         </div>
 
         {/* ── BODY RESPONSIVO ── */}
@@ -779,9 +877,9 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                           <span style={{
                             fontWeight: 700,
                             fontSize: '0.85rem',
-                            color: details?.checkin_enabled !== false ? '#15803d' : '#b91c1c',
+                            color: details?.checkin_enabled === true ? '#15803d' : '#b91c1c',
                           }}>
-                            {details?.checkin_enabled !== false ? '🟢 Aberta' : '🔴 Fechada'}
+                            {details?.checkin_enabled === true ? '🟢 Aberta' : '🔴 Fechada'}
                           </span>
                           <button
                             type="button"
@@ -798,7 +896,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                               cursor: isTogglingCheckin ? 'not-allowed' : 'pointer',
                             }}
                           >
-                            {isTogglingCheckin ? '...' : details?.checkin_enabled !== false ? 'Pausar' : 'Reabrir'}
+                            {isTogglingCheckin ? '...' : details?.checkin_enabled === true ? 'Fechar portaria' : 'Abrir portaria'}
                           </button>
                         </div>
                       </div>
@@ -1501,6 +1599,183 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── TAB 5: SÓCIOS & EQUIPE ── */}
+              {activeTab === 'partners' && (
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  {/* Formulário para adicionar sócio */}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1.25rem' }}>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
+                      Adicionar Sócio do Evento
+                    </h3>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#64748b' }}>
+                      Informe o e-mail da conta do MyPass360 da pessoa que você deseja convidar como sócia para administrar e operar este evento.
+                    </p>
+
+                    <form onSubmit={handleSendInvite} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <input
+                        type="email"
+                        value={newPartnerEmail}
+                        onChange={(e) => setNewPartnerEmail(e.target.value)}
+                        placeholder="joao@email.com"
+                        required
+                        style={{
+                          flex: 1,
+                          minWidth: 240,
+                          padding: '0.6rem 0.85rem',
+                          borderRadius: 8,
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.9rem',
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSendingInvite}
+                        style={{
+                          padding: '0.6rem 1.25rem',
+                          borderRadius: 8,
+                          background: '#4f46e5',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          cursor: isSendingInvite ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {isSendingInvite ? 'Enviando...' : '+ Enviar convite'}
+                      </button>
+                    </form>
+
+                    {partnerFeedback && (
+                      <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, color: '#166534', fontSize: '0.85rem', fontWeight: 600 }}>
+                        {partnerFeedback}
+                      </div>
+                    )}
+
+                    {partnerError && (
+                      <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, color: '#991b1b', fontSize: '0.85rem' }}>
+                        ⚠️ {partnerError}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lista de Sócios Ativos */}
+                  <div>
+                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', color: '#1e293b', fontWeight: 700 }}>
+                      Sócios do Evento ({partners.length})
+                    </h4>
+                    {partners.length === 0 ? (
+                      <p style={{ color: '#64748b', fontSize: '0.875rem', fontStyle: 'italic', margin: 0 }}>
+                        Nenhum sócio adicionado a este evento até o momento.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '0.5rem' }}>
+                        {partners.map((m) => (
+                          <div
+                            key={m.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.75rem 1rem',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: 10,
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>
+                                {m.user_name || m.user_email}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                {m.user_email} • <span style={{ color: '#059669', fontWeight: 600 }}>Status: Ativo</span>
+                              </div>
+                            </div>
+
+                            {isOwner && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(m.user_id, m.user_name || m.user_email)}
+                                style={{
+                                  padding: '0.4rem 0.75rem',
+                                  borderRadius: 6,
+                                  border: '1px solid #fecaca',
+                                  background: '#fef2f2',
+                                  color: '#dc2626',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Remover
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lista de Convites Pendentes */}
+                  {isOwner && (
+                    <div>
+                      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', color: '#1e293b', fontWeight: 700 }}>
+                        Convites Pendentes ({invitations.filter((i) => i.status === 'PENDING').length})
+                      </h4>
+                      {invitations.filter((i) => i.status === 'PENDING').length === 0 ? (
+                        <p style={{ color: '#64748b', fontSize: '0.875rem', fontStyle: 'italic', margin: 0 }}>
+                          Nenhum convite pendente.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'grid', gap: '0.5rem' }}>
+                          {invitations
+                            .filter((i) => i.status === 'PENDING')
+                            .map((inv) => (
+                              <div
+                                key={inv.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.75rem 1rem',
+                                  background: '#fffbeb',
+                                  border: '1px solid #fde68a',
+                                  borderRadius: 10,
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontWeight: 600, color: '#92400e', fontSize: '0.9rem' }}>
+                                    {inv.invited_email}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: '#b45309' }}>
+                                    Status: Convite pendente • Enviado em {new Date(inv.created_at).toLocaleDateString('pt-BR')}
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelInvite(inv.id)}
+                                  style={{
+                                    padding: '0.4rem 0.75rem',
+                                    borderRadius: 6,
+                                    border: '1px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    color: '#475569',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Cancelar convite
+                                </button>
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

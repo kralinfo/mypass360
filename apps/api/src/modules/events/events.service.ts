@@ -262,67 +262,68 @@ export class EventsService {
   }
 
   /** Detalhes e métricas consolidadas do evento (valida propriedade). */
+  /** Detalhes e métricas consolidadas do evento (valida acesso de dono/sócio). */
   async getEventDetails(id: string, userId: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.getEventDetails(id)
   }
 
-  /** Credenciais de portaria do evento (valida propriedade). */
+  /** Credenciais de portaria do evento (valida acesso de dono/sócio). */
   async getCheckinAccesses(id: string, userId: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.getCheckinAccesses(id)
   }
 
-  /** Cria credencial de portaria para o evento (valida propriedade). */
+  /** Cria credencial de portaria para o evento (valida acesso de dono/sócio). */
   async createCheckinAccess(id: string, userId: string, name: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.createCheckinAccess(id, name)
   }
 
-  /** Atualiza credencial de portaria do evento (valida propriedade). */
+  /** Atualiza credencial de portaria do evento (valida acesso de dono/sócio). */
   async updateCheckinAccess(
     id: string,
     userId: string,
     accessId: string,
     dto: { name?: string; isActive?: boolean }
   ) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.updateCheckinAccess(accessId, dto)
   }
 
-  /** Exclui credencial de portaria do evento (valida propriedade). */
+  /** Exclui credencial de portaria do evento (valida acesso de dono/sócio). */
   async deleteCheckinAccess(id: string, userId: string, accessId: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.deleteCheckinAccess(accessId)
   }
 
-  /** Lista registros de check-in do evento (valida propriedade). */
+  /** Lista registros de check-in do evento (valida acesso de dono/sócio). */
   async getEventCheckins(id: string, userId: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.getEventCheckins(id)
   }
 
-  /** Ativa ou desativa portaria do evento (valida propriedade). */
+  /** Ativa ou desativa portaria do evento (valida acesso de dono/sócio). */
   async updateEventCheckinStatus(id: string, userId: string, enabled: boolean) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.updateEventCheckinStatus(id, enabled)
   }
 
-  /** Exclui check-in individual (valida propriedade e restaura ingresso). */
+  /** Exclui check-in individual (valida acesso de dono/sócio e restaura ingresso). */
   async deleteEventCheckin(id: string, userId: string, checkinId: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.deleteEventCheckin(id, checkinId)
   }
 
-  /** Reseta todos os check-ins do evento para testes (valida propriedade). */
+  /** Reseta todos os check-ins do evento para testes (valida acesso de dono/sócio). */
   async resetEventCheckins(id: string, userId: string) {
-    await this.assertOwnership(id, userId)
+    await this.assertAccess(id, userId)
     return this.adminRepository.resetEventCheckins(id)
   }
 
   /**
-   * Valida que o evento existe e pertence ao usuário (ou concede acesso irrestrito se for Admin).
-   * Lança ForbiddenException (403) se não for o proprietário nem administrador.
+   * Valida que o usuário é o proprietário principal (ou Administrador).
+   * Usado para ações exclusivas do dono (editar, publicar, excluir, etc.).
    */
   private async assertOwnership(id: string, user: AuthenticatedUser | string): Promise<void> {
     const userId = typeof user === 'string' ? user : user.id
@@ -338,8 +339,38 @@ export class EventsService {
 
     if (!event) {
       throw new ForbiddenException(
-        'Você não tem permissão para gerenciar este evento'
+        'Ação exclusiva do proprietário do evento.'
       )
     }
+  }
+
+  /**
+   * Valida que o usuário tem acesso ao evento (seja como proprietário, sócio ativo ou Administrador).
+   * Usado para ações operacionais (portaria, check-in, visualização de dados operacionais).
+   */
+  private async assertAccess(id: string, user: AuthenticatedUser | string): Promise<void> {
+    const userId = typeof user === 'string' ? user : user.id
+    const userRole = typeof user !== 'string' ? (user.user_metadata?.role as string) : undefined
+    const userEmail = typeof user !== 'string' ? user.email : ''
+
+    if (userRole === 'admin' || userRole === 'superadmin' || userEmail === 'admin@mypass360.com') {
+      return
+    }
+
+    const event = await this.eventsRepository.findById(id)
+    if (!event) throw new NotFoundException('Evento não encontrado.')
+
+    if (event.organizer_id === userId) {
+      return
+    }
+
+    const isPartner = await this.eventsRepository.isPartner(id, userId)
+    if (isPartner) {
+      return
+    }
+
+    throw new ForbiddenException(
+      'Você não tem permissão para operar este evento.'
+    )
   }
 }
