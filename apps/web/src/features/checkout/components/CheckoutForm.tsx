@@ -66,6 +66,10 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   const { getItemsForEvent } = useCart()
   const hydratedFromCartRef = useRef(false)
   const hydratedFromDirectCheckoutRef = useRef(false)
+  const hydratedFromSnapshotRef = useRef(false)
+
+  // Chave do snapshot de seleção (para restaurar ao voltar da tela de pagamento)
+  const snapshotKey = `mypass360-checkout-snapshot:${eventId}`
 
   // Determinar o modo de identificação do evento
   const ticketLayout = event?.ticket_layout ?? 'ticket'
@@ -113,6 +117,47 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
     }
   }, [event, eventId, from, hydrateSelectedItems, ticketTypes])
 
+  // Restaurar snapshot salvo ao confirmar pedido (usuário voltou da tela de pagamento)
+  // Este useEffect tem prioridade sobre os demais de hidratação
+  useEffect(() => {
+    if (!event || ticketTypes.length === 0 || hydratedFromSnapshotRef.current) return
+
+    const stored = window.sessionStorage.getItem(snapshotKey)
+    if (!stored) return
+
+    try {
+      const parsed = JSON.parse(stored) as Array<{
+        ticketTypeId: string
+        quantity: number
+        unitPrice: number
+        nomineeNames?: string[]
+        nomineeCpfs?: string[]
+      }>
+      const validIds = new Set(ticketTypes.map((t) => t.id))
+      const filtered = parsed.filter((item) => validIds.has(item.ticketTypeId) && item.quantity > 0)
+      if (filtered.length > 0) {
+        hydrateSelectedItems(filtered)
+        // Marcar todos os mecanismos como já hidratados para evitar sobreposição
+        hydratedFromSnapshotRef.current = true
+        hydratedFromCartRef.current = true
+        hydratedFromDirectCheckoutRef.current = true
+      }
+    } catch {
+      window.sessionStorage.removeItem(snapshotKey)
+    }
+  }, [event, ticketTypes, snapshotKey, hydrateSelectedItems])
+
+  // Auto-salvar seleção no sessionStorage a cada mudança (persiste mesmo antes de confirmar)
+  useEffect(() => {
+    if (!event) return
+    if (selectedItems.length > 0) {
+      window.sessionStorage.setItem(snapshotKey, JSON.stringify(selectedItems))
+    } else if (hydratedFromSnapshotRef.current || hydratedFromCartRef.current || hydratedFromDirectCheckoutRef.current) {
+      // Usuário removeu todos os itens manualmente após hidratação — limpar snapshot
+      window.sessionStorage.removeItem(snapshotKey)
+    }
+  }, [selectedItems, snapshotKey, event])
+
   useEffect(() => {
     if (from === 'event' || !event || ticketTypes.length === 0 || hydratedFromCartRef.current) {
       return
@@ -134,6 +179,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
 
     hydratedFromCartRef.current = true
   }, [event, eventId, from, getItemsForEvent, setTicketQuantity, ticketTypes])
+
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -167,6 +213,11 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
           }
         }
       }
+    }
+
+    // Salvar snapshot final antes de navegar (garante dados frescos)
+    if (selectedItems.length > 0) {
+      window.sessionStorage.setItem(snapshotKey, JSON.stringify(selectedItems))
     }
 
     const result = await handleSubmit(eventId)

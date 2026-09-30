@@ -47,6 +47,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
   const [manualCode, setManualCode] = useState('')
   const [result, setResult] = useState<CheckinValidationResult | null>(null)
   const [recentEntries, setRecentEntries] = useState<CheckinRecord[]>([])
+  const [checkinSearch, setCheckinSearch] = useState('')
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
@@ -559,58 +560,38 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
       {allCheckedInNow && (
         <div
           style={{
-            padding: '1.5rem 1.25rem',
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, #052e16 0%, #14532d 50%, #166534 100%)',
-            border: '2px solid #4ade80',
-            color: '#f0fdf4',
+            padding: '1.25rem 1.5rem',
+            borderRadius: '12px',
+            background: '#ffffff',
+            border: '1.5px solid #4ade80',
+            color: '#15803d',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.85rem',
+            gap: '0.5rem',
             boxSizing: 'border-box',
             width: '100%',
             textAlign: 'center',
-            boxShadow: '0 8px 32px rgba(21, 128, 61, 0.35)',
+            boxShadow: '0 2px 12px rgba(21, 128, 61, 0.10)',
           }}
         >
-          <div
+          <strong style={{ display: 'block', fontSize: '1.05rem', fontWeight: 700, color: '#15803d' }}>
+            Todos os Check-ins Realizados
+          </strong>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#4b7c5e', lineHeight: 1.5 }}>
+            Todos os {totalTickets} ingresso{totalTickets !== 1 ? 's' : ''} foram validados.
+            O terminal está bloqueado.
+          </p>
+          <span
             style={{
-              width: 72,
-              height: 72,
-              borderRadius: '50%',
-              background: 'rgba(74, 222, 128, 0.2)',
-              border: '2px solid #4ade80',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '2.25rem',
+              marginTop: '0.25rem',
+              fontSize: '0.72rem',
+              color: '#22c55e',
+              fontWeight: 500,
             }}
           >
-            🎉
-          </div>
-          <div>
-            <strong style={{ display: 'block', fontSize: '1.15rem', fontWeight: 800, color: '#86efac', marginBottom: '0.35rem' }}>
-              ✓ Todos os Check-ins Realizados!
-            </strong>
-            <p style={{ margin: 0, fontSize: '0.88rem', color: '#bbf7d0', lineHeight: 1.5 }}>
-              Todos os {totalTickets} ingresso{totalTickets !== 1 ? 's' : ''} foram validados com sucesso.
-              <br />
-              O terminal está bloqueado — não é necessária nenhuma ação.
-            </p>
-          </div>
-          <div
-            style={{
-              background: 'rgba(0,0,0,0.25)',
-              borderRadius: '8px',
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.75rem',
-              color: '#86efac',
-              fontWeight: 600,
-            }}
-          >
-            🔄 Verificando automaticamente a cada 30s por alterações...
-          </div>
+            Verificando automaticamente a cada 30s por alterações
+          </span>
         </div>
       )}
 
@@ -1006,58 +987,146 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           </form>
         </div>
 
-        {/* Histórico Recente de Entradas (Abaixo) */}
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: '14px',
-            padding: '0.75rem 0.85rem',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-          }}
-        >
-          <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: '#0f172a', fontWeight: 700 }}>
-            Últimas Entradas Registradas
-          </h3>
+      </div>}
 
-          {recentEntries.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
-              Nenhuma entrada registrada nesta sessão ainda.
-            </p>
-          ) : (
-            <div style={{ display: 'grid', gap: '0.35rem' }}>
-              {recentEntries.slice(0, 4).map((entry) => (
+      {/* Histórico de Entradas — sempre visível */}
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: '14px',
+          padding: '0.85rem',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+          display: 'grid',
+          gap: '0.65rem',
+        }}
+      >
+        {/* Cabeçalho + Barra de Pesquisa */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0, fontSize: '0.85rem', color: '#0f172a', fontWeight: 700 }}>
+            Entradas Registradas
+            {recentEntries.length > 0 && (
+              <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                ({recentEntries.length})
+              </span>
+            )}
+          </h3>
+          {recentEntries.length > 0 && (
+            <div style={{ position: 'relative', flex: '1 1 160px', maxWidth: 260 }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94a3b8',
+                  fontSize: '0.8rem',
+                  pointerEvents: 'none',
+                }}
+              >
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar por nome ou código..."
+                value={checkinSearch}
+                onChange={(e) => setCheckinSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  paddingLeft: '1.8rem',
+                  paddingRight: '0.6rem',
+                  paddingTop: '0.35rem',
+                  paddingBottom: '0.35rem',
+                  borderRadius: '7px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.75rem',
+                  color: '#0f172a',
+                  background: '#f8fafc',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#4ade80'; e.currentTarget.style.background = '#fff'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Lista */}
+        {recentEntries.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+            Nenhuma entrada registrada nesta sessão ainda.
+          </p>
+        ) : (() => {
+          const q = checkinSearch.toLowerCase().trim()
+          const filtered = q
+            ? recentEntries.filter(
+                (e) =>
+                  e.participantName?.toLowerCase().includes(q) ||
+                  e.publicCode.toLowerCase().includes(q)
+              )
+            : recentEntries
+
+          if (filtered.length === 0) {
+            return (
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+                Nenhum resultado para &quot;{checkinSearch}&quot;.
+              </p>
+            )
+          }
+
+          return (
+            <div style={{ display: 'grid', gap: '0.3rem', maxHeight: '260px', overflowY: 'auto' }}>
+              {filtered.map((entry) => (
                 <div
                   key={entry.id}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    alignItems: 'stretch',
                     gap: '0.5rem',
-                    padding: '0.4rem 0.6rem',
+                    padding: '0.45rem 0.65rem',
                     background: '#f8fafc',
                     borderRadius: '7px',
                     fontSize: '0.78rem',
                     minWidth: 0,
+                    borderLeft: '3px solid #4ade80',
                   }}
                 >
-                  <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <strong style={{ color: '#0f172a' }}>
-                      {entry.participantName ?? entry.publicCode}
+                  {/* Coluna esquerda: nome + tipo */}
+                  <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <strong style={{ color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                      {entry.participantName ?? '—'}
                     </strong>
-                    <span style={{ color: '#64748b', marginLeft: '4px' }}>
-                      ({entry.ticketTypeName})
+                    <span style={{ fontSize: '0.70rem', color: '#64748b' }}>{entry.ticketTypeName}</span>
+                  </div>
+
+                  {/* Coluna direita: código (cima) + horário (baixo) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.2rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        background: '#f0fdf4',
+                        color: '#15803d',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: '4px',
+                        padding: '0 0.35rem',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {entry.publicCode}
+                    </span>
+                    <span style={{ color: '#94a3b8', fontWeight: 500, whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+                      {formatTime(entry.checkedInAt)}
                     </span>
                   </div>
-                  <span style={{ color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {formatTime(entry.checkedInAt)}
-                  </span>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </div>}
+          )
+        })()}
+      </div>
     </div>
   )
 }

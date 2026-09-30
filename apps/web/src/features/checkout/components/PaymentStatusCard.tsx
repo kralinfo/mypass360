@@ -137,6 +137,14 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       mpPopupRef.current.close()
       mpPopupRef.current = null
     }
+    // Apagar snapshot de seleção — pagamento aprovado, não há mais necessidade de restaurar
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith('mypass360-checkout-snapshot:')) {
+          sessionStorage.removeItem(key)
+        }
+      }
+    } catch { /* silencioso */ }
     setTimeout(() => router.push('/meus-ingressos'), 1200)
   }, [clearCart, router])
 
@@ -459,9 +467,9 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   )
 }
 
-// ─── Componente de Resgate de Cupom de Desconto ─────────────────────────────────
+// ─── Componente de Resgate de Cupom de Desconto (Accordion) ─────────────────────
 function CouponConfirmationBox({
-  orderId,
+  orderId: _orderId,
   manualCode,
   setManualCode,
   isManualConfirming,
@@ -475,79 +483,129 @@ function CouponConfirmationBox({
   manualError: string | null
   onConfirm: () => void
 }) {
+  const [open, setOpen] = useState(false)
+
   return (
-    <div style={{
-      background: '#f8fafc',
-      border: '1px solid #e2e8f0',
-      borderRadius: '12px',
-      padding: '1.25rem',
-      display: 'grid',
-      gap: '0.75rem',
-      marginTop: '1rem',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span style={{ fontSize: '1.2rem' }}>🎟️</span>
-        <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-          Cupom de Desconto / Código Promocional
-        </p>
-      </div>
-      <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
-        Possui um cupom de desconto ou código de cortesia? Digite o código abaixo para resgatar sua oferta.
-      </p>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          placeholder="Digite o código do cupom"
-          value={manualCode}
-          onChange={(e) => setManualCode(e.target.value)}
+    <div
+      style={{
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        background: '#fff',
+        marginTop: '1rem',
+      }}
+    >
+      {/* Cabeçalho clicável */}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.9rem 1.1rem',
+          background: open ? '#f8fafc' : '#fff',
+          border: 'none',
+          cursor: 'pointer',
+          gap: '0.5rem',
+          transition: 'background 0.15s',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '1.05rem' }}>🎟️</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
+            Tenho um cupom de desconto
+          </span>
+        </div>
+        {/* Seta animada */}
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#64748b"
+          strokeWidth="2.5"
           style={{
-            flex: 1,
-            minWidth: '200px',
-            padding: '0.65rem 0.85rem',
-            borderRadius: '8px',
-            border: '1px solid #cbd5e1',
-            background: '#ffffff',
-            fontSize: '0.88rem',
-            fontWeight: 600,
-            letterSpacing: '0.5px',
-            outline: 'none',
-            color: '#0f172a',
-          }}
-          onFocus={(e) => (e.target.style.borderColor = '#4f46e5')}
-          onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-        />
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={isManualConfirming || !manualCode.trim()}
-          style={{
-            padding: '0.65rem 1.25rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: '#4f46e5',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-            cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
-            opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
-            whiteSpace: 'nowrap',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            if (!isManualConfirming && manualCode.trim()) e.currentTarget.style.background = '#4338ca'
-          }}
-          onMouseLeave={(e) => {
-            if (!isManualConfirming && manualCode.trim()) e.currentTarget.style.background = '#4f46e5'
+            flexShrink: 0,
+            transition: 'transform 0.22s ease',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
           }}
         >
-          {isManualConfirming ? 'Aplicando...' : 'Aplicar Cupom'}
-        </button>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Conteúdo do accordion */}
+      <div
+        style={{
+          maxHeight: open ? '240px' : '0',
+          overflow: 'hidden',
+          transition: 'max-height 0.28s ease',
+        }}
+      >
+        <div
+          style={{
+            padding: '0.25rem 1.1rem 1.1rem',
+            display: 'grid',
+            gap: '0.65rem',
+            borderTop: '1px solid #f1f5f9',
+          }}
+        >
+          <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: '0.65rem 0 0' }}>
+            Possui um cupom de desconto ou código de cortesia? Digite o código abaixo para resgatar.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Digite o código do cupom"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: '180px',
+                padding: '0.6rem 0.85rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+                outline: 'none',
+                color: '#0f172a',
+              }}
+              onFocus={(e) => (e.target.style.borderColor = '#4f46e5')}
+              onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+            />
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={isManualConfirming || !manualCode.trim()}
+              style={{
+                padding: '0.6rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#4f46e5',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
+                opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+              }}
+            >
+              {isManualConfirming ? 'Aplicando...' : 'Aplicar'}
+            </button>
+          </div>
+          {manualError && (
+            <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
+              {manualError.includes('manual') ? 'Código de cupom inválido ou expirado.' : manualError}
+            </p>
+          )}
+        </div>
       </div>
-      {manualError && (
-        <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
-          {manualError.includes('manual') ? 'Código de cupom inválido ou expirado.' : manualError}
-        </p>
-      )}
     </div>
   )
 }
