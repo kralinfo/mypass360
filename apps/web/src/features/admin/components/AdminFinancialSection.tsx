@@ -164,8 +164,7 @@ Conta: ${bankAccount.account_number}-${bankAccount.account_digit}
                   // Cálculo estimado de valores
                   const gross = ev.price * (ev.capacity > 0 ? Math.min(ev.capacity, 50) : 10)
                   const platformFee = gross * 0.125
-                  const isFreeBank = bankAccount && ['001', '237', '341', '033'].includes(bankAccount.bank_code)
-                  const transferFee = gross > 0 ? (isFreeBank ? 0 : 7.50) : 0
+                  const transferFee = gross > 0 ? 7.50 : 0
                   const netPayout = Math.max(0, gross - platformFee - transferFee)
 
                   const formattedDate = new Date(ev.date).toLocaleDateString('pt-BR', {
@@ -212,11 +211,6 @@ Conta: ${bankAccount.account_number}-${bankAccount.account_digit}
                           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.65rem 0.85rem' }}>
                             <div style={{ fontWeight: 700, color: '#166534', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               <span>🏦</span> {bankAccount.bank_name}
-                              {isFreeBank && (
-                                <span style={{ fontSize: '0.7rem', background: '#dcfce7', color: '#15803d', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
-                                  GRÁTIS
-                                </span>
-                              )}
                             </div>
                             <div style={{ fontSize: '0.8rem', color: '#334155', marginTop: '0.2rem' }}>
                               <strong>Titular:</strong> {bankAccount.holder_name} ({bankAccount.person_type.toUpperCase()}: {bankAccount.document})

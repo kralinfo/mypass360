@@ -7,7 +7,7 @@ import type {
   CheckinRecord,
   CheckinValidationResult,
 } from '@mypass360/types'
-import { fetchRecentCheckins, validateCheckinTicket } from '../checkin.service'
+import { fetchRecentCheckins, validateCheckinTicket, fetchCheckinStatus } from '../checkin.service'
 
 interface CheckinTerminalProps {
   authData: CheckinAuthResponse
@@ -35,7 +35,6 @@ function formatTime(iso: string | null | undefined): string {
   try {
     return new Intl.DateTimeFormat('pt-BR', {
       timeStyle: 'medium',
-      dateStyle: 'short',
     }).format(new Date(iso))
   } catch {
     return '—'
@@ -69,6 +68,9 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
     event.checkedInTickets >= event.totalTickets
   )
 
+  // Ref para evitar múltiplos loops de polling simultâneos
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
   const lastScannedCodeRef = useRef<string | null>(null)
   const scanThrottleRef = useRef<number>(0)
@@ -98,6 +100,46 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
       setTerminalState('TODOS_CHECKINS_REALIZADOS')
     }
   }, [event.checkinEnabled, allCheckedInOnLoad])
+
+  // ── Polling periódico para detectar exclusão de check-in pelo admin ─────────
+  // Quando todos os check-ins estão realizados, verifica a cada 30s se algum
+  // foi removido. Se sim, reativa o terminal automaticamente.
+  useEffect(() => {
+    if (terminalState !== 'TODOS_CHECKINS_REALIZADOS') {
+      // Limpa o polling quando não está neste estado
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      return
+    }
+
+    const checkStatus = async () => {
+      try {
+        const status = await fetchCheckinStatus(access.code)
+        if (status.checkedInTickets < status.totalTickets) {
+          setCheckedInCount(status.checkedInTickets)
+          setResult(null)
+          setManualCode('')
+          lastScannedCodeRef.current = null
+          setTerminalState('AGUARDANDO_LEITURA')
+        } else {
+          setCheckedInCount(status.checkedInTickets)
+        }
+      } catch {
+        // Silencioso — não interrompe o fluxo em caso de erro de rede
+      }
+    }
+
+    pollingIntervalRef.current = setInterval(checkStatus, 30_000)
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [terminalState, access.code])
 
   // ── Gerenciamento da Câmera ─────────────────────────────────────────────────
 
@@ -329,23 +371,23 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
         .checkin-terminal-wrapper {
           max-width: 960px;
           margin: 0 auto;
-          padding: 1rem 0.5rem;
+          padding: 0.5rem 0.35rem;
           display: grid;
-          gap: 1rem;
+          gap: 0.5rem;
           width: 100%;
           box-sizing: border-box;
           overflow-x: hidden;
         }
         .checkin-terminal-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
-          gap: 1rem;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+          gap: 0.5rem;
           width: 100%;
           box-sizing: border-box;
         }
         .checkin-input-group {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.4rem;
           width: 100%;
           box-sizing: border-box;
         }
@@ -360,9 +402,10 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
         #qr-reader-container video {
           width: 100% !important;
           max-width: 100% !important;
-          height: auto !important;
+          height: 100% !important;
+          max-height: none !important;
           border-radius: 12px;
-          object-fit: cover;
+          object-fit: cover !important;
         }
         #qr-reader-container img {
           display: none !important;
@@ -371,122 +414,116 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           max-width: 100% !important;
         }
         #qr-reader-container__scan_region {
-          border-radius: 12px;
+          border-radius: 10px;
           max-width: 100% !important;
           overflow: hidden !important;
         }
         @media (max-width: 768px) {
           .checkin-terminal-wrapper {
-            padding: 0.5rem 0.25rem;
-            gap: 0.75rem;
+            padding: 0rem 0.1rem 0.25rem;
+            gap: 0.35rem;
           }
           .checkin-terminal-grid {
             grid-template-columns: 1fr !important;
-            gap: 0.75rem !important;
-          }
-          .checkin-input-group {
-            flex-direction: column !important;
-          }
-          .checkin-input-group button {
-            width: 100% !important;
+            gap: 0.35rem !important;
           }
           .checkin-header-card {
-            padding: 1rem !important;
+            padding: 0.4rem 0.65rem !important;
+            border-radius: 10px !important;
           }
           .checkin-main-card {
-            padding: 1rem !important;
+            padding: 0.65rem 0.75rem !important;
+            border-radius: 12px !important;
+            gap: 0.5rem !important;
           }
         }
       `}</style>
 
-      {/* ── BARRA SUPERIOR ── */}
+      {/* ── BARRA SUPERIOR HIPER COMPACTA EM 2 LINHAS LIMPAS ── */}
       <header
         className="checkin-header-card"
         style={{
           background: '#ffffff',
-          borderRadius: '16px',
-          padding: '1.25rem 1.5rem',
+          borderRadius: '12px',
+          padding: '0.55rem 0.85rem',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
+          flexDirection: 'column',
+          gap: '0.35rem',
           boxSizing: 'border-box',
           width: '100%',
+          minWidth: 0,
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0, wordBreak: 'break-word' }}>
-              {event.title}
-            </h1>
-            <span
-              style={{
-                background: '#e0e7ff',
-                color: '#4338ca',
-                padding: '2px 8px',
-                borderRadius: '999px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              📍 {access.name}
-            </span>
-            <span
-              style={{
-                background: isPortariaFechada ? '#fee2e2' : '#dcfce7',
-                color: isPortariaFechada ? '#b91c1c' : '#15803d',
-                padding: '2px 8px',
-                borderRadius: '999px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {isPortariaFechada ? '🔴 Portaria Fechada' : '🟢 Portaria Aberta'}
-            </span>
-          </div>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.82rem', wordBreak: 'break-word' }}>
-            Credencial: <code style={{ fontWeight: 700, color: '#4f46e5' }}>{access.code}</code> • {event.location}
-          </p>
-        </div>
-
-        {/* Contador e Botão Sair */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-              Presença
-            </p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', justifyContent: 'flex-end' }}>
-              <strong style={{ fontSize: '1.2rem', color: '#15803d' }}>{checkedInCount}</strong>
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/ {totalTickets}</span>
-              <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700, marginLeft: '2px' }}>
-                ({attendanceRate}%)
-              </span>
-            </div>
-          </div>
-
+        {/* Linha 1: Título do Evento + Botão Sair */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', width: '100%', minWidth: 0 }}>
+          <h1 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2, flex: 1, minWidth: 0 }}>
+            {event.title}
+          </h1>
           <button
             onClick={() => {
               stopCamera()
               onLogout()
             }}
             style={{
-              padding: '0.45rem 0.8rem',
-              borderRadius: '8px',
+              padding: '0.25rem 0.55rem',
+              borderRadius: '6px',
               border: '1px solid #cbd5e1',
               background: '#f8fafc',
               color: '#475569',
-              fontSize: '0.8rem',
+              fontSize: '0.72rem',
               fontWeight: 600,
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             Sair
           </button>
+        </div>
+
+        {/* Linha 2: Badges (Status, Portaria) + Contador de Presença */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', width: '100%', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', minWidth: 0 }}>
+            <span
+              style={{
+                background: isPortariaFechada ? '#fee2e2' : '#dcfce7',
+                color: isPortariaFechada ? '#b91c1c' : '#15803d',
+                padding: '1px 7px',
+                borderRadius: '999px',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isPortariaFechada ? '🔴 Fechada' : '🟢 Aberta'}
+            </span>
+            <span
+              style={{
+                background: '#e0e7ff',
+                color: '#4338ca',
+                padding: '1px 7px',
+                borderRadius: '999px',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {access.name}
+            </span>
+          </div>
+
+          <div style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginRight: '3px' }}>
+              PRESENÇA:
+            </span>
+            <strong style={{ fontSize: '0.95rem', color: '#15803d' }}>{checkedInCount}</strong>
+            <span>/{totalTickets}</span>
+            <span style={{ fontSize: '0.7rem', color: '#166534', fontWeight: 700, marginLeft: '2px' }}>
+              ({attendanceRate}%)
+            </span>
+          </div>
         </div>
       </header>
 
@@ -494,183 +531,411 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
       {isPortariaFechada && (
         <div
           style={{
-            padding: '1rem 1.25rem',
-            borderRadius: '12px',
+            padding: '0.65rem 0.85rem',
+            borderRadius: '10px',
             background: '#fef2f2',
-            border: '2px solid #f87171',
+            border: '1.5px solid #f87171',
             color: '#991b1b',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(185, 28, 28, 0.1)',
+            gap: '0.5rem',
             boxSizing: 'border-box',
             width: '100%',
           }}
         >
-          <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>🚫</span>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🚫</span>
           <div>
-            <strong style={{ display: 'block', fontSize: '0.95rem' }}>
+            <strong style={{ display: 'block', fontSize: '0.85rem' }}>
               Portaria Fechada
             </strong>
-            <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#b91c1c', lineHeight: 1.4 }}>
-              O check-in para este evento está pausado. Para realizar check-ins, o organizador deve
-              abrir a portaria em <strong>Gerenciar → Portaria</strong>.
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#b91c1c', lineHeight: 1.3 }}>
+              O check-in está pausado. O organizador deve abrir a portaria em <strong>Gerenciar → Portaria</strong>.
             </p>
           </div>
         </div>
       )}
 
-      {/* Banner "Todos os check-ins realizados" — exibido quando todos já fizeram (REQ-26) */}
+      {/* Banner permanente "Todos os check-ins realizados" (REQ-26) */}
       {allCheckedInNow && (
         <div
           style={{
-            padding: '1rem 1.25rem',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            border: '2px solid #86efac',
-            color: '#166534',
+            padding: '1.5rem 1.25rem',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, #052e16 0%, #14532d 50%, #166534 100%)',
+            border: '2px solid #4ade80',
+            color: '#f0fdf4',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.15)',
+            gap: '0.85rem',
             boxSizing: 'border-box',
             width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 8px 32px rgba(21, 128, 61, 0.35)',
           }}
         >
-          <span style={{ fontSize: '1.75rem', flexShrink: 0 }}>🎉</span>
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: 'rgba(74, 222, 128, 0.2)',
+              border: '2px solid #4ade80',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.25rem',
+            }}
+          >
+            🎉
+          </div>
           <div>
-            <strong style={{ display: 'block', fontSize: '1rem' }}>
-              ✓ Todos os check-ins foram realizados
+            <strong style={{ display: 'block', fontSize: '1.15rem', fontWeight: 800, color: '#86efac', marginBottom: '0.35rem' }}>
+              ✓ Todos os Check-ins Realizados!
             </strong>
-            <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#15803d', lineHeight: 1.4 }}>
-              Não há mais ingressos pendentes de check-in para este evento.
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#bbf7d0', lineHeight: 1.5 }}>
+              Todos os {totalTickets} ingresso{totalTickets !== 1 ? 's' : ''} foram validados com sucesso.
+              <br />
+              O terminal está bloqueado — não é necessária nenhuma ação.
             </p>
+          </div>
+          <div
+            style={{
+              background: 'rgba(0,0,0,0.25)',
+              borderRadius: '8px',
+              padding: '0.45rem 0.85rem',
+              fontSize: '0.75rem',
+              color: '#86efac',
+              fontWeight: 600,
+            }}
+          >
+            🔄 Verificando automaticamente a cada 30s por alterações...
           </div>
         </div>
       )}
 
-      {/* ── CARD PRINCIPAL: SCANNER & FEEDBACK ── */}
-      <div className="checkin-terminal-grid">
-        {/* Lado Esquerdo: Câmera e Entrada */}
+      {/* ── CARD PRINCIPAL: SCANNER & RESULTADO — oculto quando todos os check-ins foram realizados ── */}
+      {!allCheckedInNow && <div className="checkin-terminal-grid">
         <div
           className="checkin-main-card"
           style={{
             background: '#ffffff',
-            borderRadius: '16px',
-            padding: '1.25rem',
+            borderRadius: '14px',
+            padding: '0.85rem',
             border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
             display: 'grid',
-            gap: '1rem',
+            gap: '0.65rem',
             boxSizing: 'border-box',
             width: '100%',
             minWidth: 0,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
               Validação de Entrada
             </h2>
             {!isPortariaFechada && (
-              <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                Leitor USB / Teclado Pronto
+              <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                Leitor USB / Teclado
               </span>
             )}
           </div>
 
-          {/* Área da Câmera */}
-          <div
-            style={{
-              position: 'relative',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              background: '#0f172a',
-              minHeight: '220px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
-            {/* O container onde o Html5Qrcode renderiza o stream da câmera */}
+          {/* ── CARD DE RESULTADO / FEEDBACK (RENDERIZADO NO TOPO QUANDO HOUVER VALIDAÇÃO) ── */}
+          {result && (
+            result.valid ? (
+              // ✅ SUCESSO - Card Ultra Destaque no Topo
+              <div
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  border: '2px solid #86efac',
+                  boxShadow: '0 4px 12px rgba(22, 101, 52, 0.12)',
+                  display: 'grid',
+                  gap: '0.65rem',
+                  animation: 'ct-scale 0.2s ease-out',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: '#15803d',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.1rem',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ✓
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#15803d', fontWeight: 800, lineHeight: 1.2 }}>
+                      Check-in Realizado com Sucesso
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#166534', fontWeight: 600 }}>
+                      Entrada autorizada às {formatTime(result.checkedInAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    borderRadius: '10px',
+                    padding: '0.6rem 0.8rem',
+                    display: 'grid',
+                    gap: '0.35rem',
+                    border: '1px solid #bbf7d0',
+                  }}
+                >
+                  {!isAnonymousEvent && result.participantName && (
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Participante:
+                      </span>
+                      <p style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                        {result.participantName}
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '0.35rem', marginTop: '0.15rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Tipo: </span>
+                      <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>
+                        {result.ticketTypeName ?? 'Ingresso'}
+                      </strong>
+                    </div>
+                    {!isAnonymousEvent && result.participantCpf && (
+                      <div>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>CPF: </span>
+                        <strong style={{ fontSize: '0.82rem', color: '#334155', fontFamily: 'monospace' }}>
+                          {formatCpf(result.participantCpf)}
+                        </strong>
+                      </div>
+                    )}
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Código: </span>
+                      <strong style={{ fontSize: '0.82rem', color: '#4f46e5', fontFamily: 'monospace' }}>
+                        {result.publicCode}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão "Nova leitura" CENTRALIZADO ABAIXO do card do participante */}
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '0.1rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleNovaLeitura}
+                    style={{
+                      padding: '0.5rem 1.25rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#4f46e5',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    📷 Nova leitura
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // ❌ ERRO - Card Ultra Destaque no Topo
+              <div
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                  border: '2px solid #fca5a5',
+                  boxShadow: '0 4px 12px rgba(185, 28, 28, 0.12)',
+                  display: 'grid',
+                  gap: '0.65rem',
+                  animation: 'ct-scale 0.2s ease-out',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: '#dc2626',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.1rem',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ✕
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#b91c1c', fontWeight: 800, lineHeight: 1.2 }}>
+                      Entrada Não Permitida
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                      {result.reason}
+                    </p>
+                  </div>
+                </div>
+
+                {result.firstCheckedInAt && (
+                  <div
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      borderRadius: '10px',
+                      padding: '0.5rem 0.75rem',
+                      border: '1px solid #fecaca',
+                      fontSize: '0.78rem',
+                      color: '#7f1d1d',
+                    }}
+                  >
+                    <strong>Detalhes da 1ª Entrada:</strong> 🕒 {formatTime(result.firstCheckedInAt)}
+                    {result.firstCheckedInBy ? ` • Por: ${result.firstCheckedInBy}` : ''}
+                  </div>
+                )}
+
+                {/* Botão "Nova leitura" CENTRALIZADO ABAIXO */}
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '0.1rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleNovaLeitura}
+                    style={{
+                      padding: '0.5rem 1.25rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#dc2626',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    📷 Nova leitura
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+
+          {/* Área da Câmera (Oculta quando há resultado de validação ativo) */}
+          {!hasResult && (
             <div
-              id="qr-reader-container"
               style={{
+                position: 'relative',
+                borderRadius: '14px',
+                overflow: 'hidden',
+                background: '#0f172a',
                 width: '100%',
-                maxWidth: '100%',
-                display: cameraActive ? 'block' : 'none',
+                maxWidth: '210px',
+                aspectRatio: '1 / 1',
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
                 boxSizing: 'border-box',
               }}
-            />
+            >
+              {/* O container onde o Html5Qrcode renderiza o stream da câmera */}
+              <div
+                id="qr-reader-container"
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  display: cameraActive ? 'block' : 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
 
-            {/* Placeholder quando câmera não está ativa */}
-            {!cameraActive && (
-              <div style={{ textAlign: 'center', padding: '2rem 1.5rem', color: '#94a3b8' }}>
-                {isProcessing ? (
-                  <>
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        border: '3px solid rgba(255,255,255,0.15)',
-                        borderTopColor: '#4f46e5',
-                        animation: 'ct-spin 0.7s linear infinite',
-                        margin: '0 auto 1rem',
-                      }}
-                    />
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontWeight: 600 }}>
-                      Validando ingresso...
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ fontSize: '2.5rem', margin: '0 0 0.5rem' }}>📷</p>
-                    <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                      {isPortariaFechada
-                        ? 'Portaria fechada. Abra a portaria para iniciar leituras.'
-                        : 'Aponte a câmera para o QR Code do ingresso.'}
-                    </p>
-                    {!isPortariaFechada && !hasResult && (
-                      <button
-                        type="button"
-                        onClick={startCamera}
+              {/* Placeholder quando câmera não está ativa */}
+              {!cameraActive && (
+                <div style={{ textAlign: 'center', padding: '0.85rem 0.5rem', color: '#94a3b8' }}>
+                  {isProcessing ? (
+                    <>
+                      <div
                         style={{
-                          padding: '0.75rem 1.5rem',
-                          borderRadius: '10px',
-                          border: 'none',
-                          background: '#4f46e5',
-                          color: '#fff',
-                          fontWeight: 700,
-                          fontSize: '0.95rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          border: '3px solid rgba(255,255,255,0.15)',
+                          borderTopColor: '#4f46e5',
+                          animation: 'ct-spin 0.7s linear infinite',
+                          margin: '0 auto 0.5rem',
                         }}
-                      >
-                        Ativar Câmera
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                      />
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>
+                        Validando ingresso...
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: '1.6rem', margin: '0 0 0.25rem' }}>📷</p>
+                      <p style={{ margin: '0 0 0.65rem', fontSize: '0.82rem', color: '#cbd5e1' }}>
+                        {isPortariaFechada
+                          ? 'Portaria fechada.'
+                          : 'Aponte a câmera para o QR Code.'}
+                      </p>
+                      {!isPortariaFechada && (
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          style={{
+                            padding: '0.45rem 1.1rem',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: '#4f46e5',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
+                          }}
+                        >
+                          Ativar Câmera
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-          {cameraActive && (
+          {cameraActive && !hasResult && (
             <button
               type="button"
               onClick={stopCamera}
               style={{
-                padding: '0.55rem',
-                borderRadius: '8px',
+                padding: '0.45rem',
+                borderRadius: '7px',
                 border: '1px solid #cbd5e1',
                 background: '#fff',
                 color: '#64748b',
-                fontSize: '0.85rem',
+                fontSize: '0.8rem',
                 cursor: 'pointer',
                 fontWeight: 600,
               }}
@@ -680,7 +945,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           )}
 
           {cameraError && (
-            <p style={{ margin: 0, color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>
+            <p style={{ margin: 0, color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
               ⚠️ {cameraError}
             </p>
           )}
@@ -691,26 +956,26 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
               e.preventDefault()
               handleValidate(manualCode)
             }}
-            style={{ display: 'grid', gap: '0.5rem' }}
+            style={{ display: 'grid', gap: '0.35rem' }}
           >
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
-              ⌨️ Ou Digite o Código (Código MP360-... ou UUID do QR Code):
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
+              ⌨️ Ou Digite o Código (MP360-... ou UUID):
             </label>
             <div className="checkin-input-group">
               <input
                 type="text"
                 disabled={isPortariaFechada || isProcessing || hasResult}
-                placeholder="Ex: MP360-8A2F9C1E ou UUID"
+                placeholder="Ex: MP360-... ou UUID"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 style={{
                   flex: 1,
                   minWidth: 0,
                   width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  borderRadius: '8px',
+                  padding: '0.45rem 0.55rem',
+                  borderRadius: '7px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.875rem',
+                  fontSize: '0.82rem',
                   outline: 'none',
                   fontFamily: 'monospace',
                   background: isPortariaFechada || isProcessing || hasResult ? '#f1f5f9' : '#fff',
@@ -722,352 +987,78 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                 type="submit"
                 disabled={isProcessing || !manualCode.trim() || isPortariaFechada || hasResult}
                 style={{
-                  padding: '0.65rem 1.1rem',
-                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '7px',
                   border: 'none',
                   background: isProcessing || !manualCode.trim() || isPortariaFechada || hasResult ? '#94a3b8' : '#0f172a',
                   color: '#fff',
                   fontWeight: 700,
-                  fontSize: '0.875rem',
+                  fontSize: '0.82rem',
                   cursor: isProcessing || !manualCode.trim() || isPortariaFechada || hasResult ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap',
                   boxSizing: 'border-box',
+                  flexShrink: 0,
                 }}
               >
-                {isProcessing ? 'Validando...' : 'Validar Entrada'}
+                {isProcessing ? 'Validando...' : 'Validar'}
               </button>
             </div>
           </form>
-
         </div>
 
-        {/* Lado Direito: Feedback Visual em Destaque */}
+        {/* Histórico Recente de Entradas (Abaixo) */}
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
+            background: '#ffffff',
+            borderRadius: '14px',
+            padding: '0.75rem 0.85rem',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
           }}
         >
-          {/* Card de Resultado */}
-          {result ? (
-            result.valid ? (
-              // ✅ SUCESSO
-              <div
-                style={{
-                  padding: '1.75rem',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  border: '2px solid #86efac',
-                  boxShadow: '0 10px 25px -5px rgba(22, 101, 52, 0.15)',
-                  display: 'grid',
-                  gap: '1rem',
-                  animation: 'ct-scale 0.2s ease-out',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: '50%',
-                        background: '#15803d',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.5rem',
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      ✓
-                    </div>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#15803d', fontWeight: 800 }}>
-                        Check-in Realizado com Sucesso
-                      </h3>
-                      <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: '#166534', fontWeight: 600 }}>
-                        Entrada autorizada às {formatTime(result.checkedInAt)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+          <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: '#0f172a', fontWeight: 700 }}>
+            Últimas Entradas Registradas
+          </h3>
 
+          {recentEntries.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+              Nenhuma entrada registrada nesta sessão ainda.
+            </p>
+          ) : (
+            <div style={{ display: 'grid', gap: '0.35rem' }}>
+              {recentEntries.slice(0, 4).map((entry) => (
                 <div
+                  key={entry.id}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    borderRadius: '12px',
-                    padding: '1rem',
-                    display: 'grid',
-                    gap: '0.6rem',
-                    border: '1px solid #bbf7d0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.4rem 0.6rem',
+                    background: '#f8fafc',
+                    borderRadius: '7px',
+                    fontSize: '0.78rem',
+                    minWidth: 0,
                   }}
                 >
-                  {!isAnonymousEvent && result.participantName && (
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
-                        Participante:
-                      </span>
-                      <p style={{ margin: '1px 0 0', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                        {result.participantName}
-                      </p>
-                    </div>
-                  )}
-
-                  {!isAnonymousEvent && result.participantCpf && (
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
-                        CPF:
-                      </span>
-                      <p style={{ margin: '1px 0 0', fontSize: '0.95rem', fontWeight: 700, color: '#334155', fontFamily: 'monospace' }}>
-                        {formatCpf(result.participantCpf)}
-                      </p>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Tipo:</span>
-                      <strong style={{ display: 'block', fontSize: '0.9rem', color: '#0f172a' }}>
-                        {result.ticketTypeName ?? 'Ingresso'}
-                      </strong>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Código:</span>
-                      <strong style={{ display: 'block', fontSize: '0.9rem', color: '#4f46e5', fontFamily: 'monospace' }}>
-                        {result.publicCode}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Banner "Todos realizados" inline no card de sucesso (REQ-26) */}
-                {allCheckedInNow && (
-                  <div
-                    style={{
-                      padding: '0.75rem 1rem',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #166534 0%, #15803d 100%)',
-                      color: '#fff',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <strong style={{ fontSize: '0.9rem', display: 'block' }}>
-                      🎉 Todos os check-ins foram realizados
+                  <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <strong style={{ color: '#0f172a' }}>
+                      {entry.participantName ?? entry.publicCode}
                     </strong>
-                    <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>
-                      Não há mais ingressos pendentes de check-in.
+                    <span style={{ color: '#64748b', marginLeft: '4px' }}>
+                      ({entry.ticketTypeName})
                     </span>
                   </div>
-                )}
-
-                {/* Botão Nova Leitura (REQ-25) */}
-                <button
-                  type="button"
-                  onClick={handleNovaLeitura}
-                  style={{
-                    padding: '0.75rem 1.25rem',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: '#4f46e5',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    cursor: 'pointer',
-                    width: '100%',
-                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                  }}
-                >
-                  📷 Nova leitura
-                </button>
-              </div>
-            ) : (
-              // ❌ ERRO / ENTRADA INVÁLIDA
-              <div
-                style={{
-                  padding: '1.75rem',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-                  border: '2px solid #fca5a5',
-                  boxShadow: '0 10px 25px -5px rgba(185, 28, 28, 0.15)',
-                  display: 'grid',
-                  gap: '1rem',
-                  animation: 'ct-scale 0.2s ease-out',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: '50%',
-                        background: '#dc2626',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.5rem',
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}
-                    >
-                      ✕
-                    </div>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#b91c1c', fontWeight: 800 }}>
-                        Entrada Não Permitida
-                      </h3>
-                      <p style={{ margin: '2px 0 0', fontSize: '0.95rem', color: '#991b1b', fontWeight: 700 }}>
-                        {result.reason}
-                      </p>
-                    </div>
-                  </div>
+                  <span style={{ color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {formatTime(entry.checkedInAt)}
+                  </span>
                 </div>
-
-                {result.firstCheckedInAt && (
-                  <div
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.85)',
-                      borderRadius: '12px',
-                      padding: '0.85rem 1rem',
-                      border: '1px solid #fecaca',
-                      fontSize: '0.85rem',
-                      color: '#7f1d1d',
-                    }}
-                  >
-                    <strong>Detalhes da 1ª Entrada:</strong>
-                    <p style={{ margin: '3px 0 0' }}>
-                      🕒 Realizado em: {formatTime(result.firstCheckedInAt)}
-                      {result.firstCheckedInBy ? ` • Por: ${result.firstCheckedInBy}` : ''}
-                    </p>
-                  </div>
-                )}
-
-                {/* Botão Nova Leitura (REQ-25) */}
-                <button
-                  type="button"
-                  onClick={handleNovaLeitura}
-                  style={{
-                    padding: '0.75rem 1.25rem',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: '#dc2626',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    cursor: 'pointer',
-                    width: '100%',
-                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                  }}
-                >
-                  📷 Nova leitura
-                </button>
-              </div>
-            )
-          ) : (
-            // Aguardando primeiro scan
-            <div
-              style={{
-                padding: '2.5rem 1.5rem',
-                borderRadius: '16px',
-                background: isPortariaFechada ? '#fef2f2' : '#f8fafc',
-                border: isPortariaFechada ? '2px dashed #fca5a5' : '2px dashed #cbd5e1',
-                textAlign: 'center',
-                color: '#64748b',
-              }}
-            >
-              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>
-                {isPortariaFechada ? '🔒' : isProcessing ? '⏳' : '🎟️'}
-              </span>
-              <strong style={{ fontSize: '1.1rem', color: isPortariaFechada ? '#b91c1c' : '#334155', display: 'block' }}>
-                {isPortariaFechada
-                  ? 'Portaria Fechada'
-                  : isProcessing
-                  ? 'Validando...'
-                  : 'Aguardando leitura de QR Code...'}
-              </strong>
-              <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
-                {isPortariaFechada
-                  ? 'Abra a portaria em Gerenciar para habilitar o check-in.'
-                  : isProcessing
-                  ? 'Aguarde o resultado da validação.'
-                  : 'Use a câmera, o leitor USB ou digite o código acima para validar o participante.'}
-              </p>
+              ))}
             </div>
           )}
-
-          {/* Histórico Recente de Entradas */}
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '16px',
-              padding: '1.25rem',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>
-              Últimas Entradas Registradas
-            </h3>
-
-            {recentEntries.length === 0 ? (
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
-                Nenhuma entrada registrada nesta sessão ainda.
-              </p>
-            ) : (
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                {recentEntries.slice(0, 5).map((entry) => (
-                  <div
-                    key={entry.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '0.5rem 0.75rem',
-                      background: '#f8fafc',
-                      borderRadius: '8px',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: '#0f172a' }}>
-                        {entry.participantName ?? entry.publicCode}
-                      </strong>
-                      <span style={{ color: '#64748b', marginLeft: '6px' }}>
-                        ({entry.ticketTypeName})
-                      </span>
-                    </div>
-                    <span style={{ color: '#15803d', fontWeight: 600 }}>
-                      {formatTime(entry.checkedInAt)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
-      </div>
-
-      <style>{`
-        @keyframes ct-scale {
-          from { opacity: 0; transform: scale(0.96); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes ct-spin {
-          to { transform: rotate(360deg) }
-        }
-      `}</style>
+      </div>}
     </div>
   )
 }
+

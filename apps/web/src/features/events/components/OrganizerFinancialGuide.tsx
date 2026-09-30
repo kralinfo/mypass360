@@ -20,8 +20,7 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
   const totalPricePerTicket = ticketPrice + feePerTicket
 
   const totalGrossRevenue = ticketPrice * ticketQty
-  const isFreeBank = ['bb', 'bradesco', 'itau', 'santander'].includes(selectedBank)
-  const transferFee = totalGrossRevenue > 0 ? (isFreeBank ? 0 : 7.50) : 0
+  const transferFee = totalGrossRevenue > 0 ? 7.50 : 0
   const netPayout = Math.max(0, totalGrossRevenue - transferFee)
 
   const formatCurrency = (val: number) => {
@@ -140,11 +139,8 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
             Tarifas de Transferência Bancária
           </h4>
           <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
-            A transferência é <strong>GRATUITA</strong> se a conta cadastrada for dos bancos parceiros: <strong>Banco do Brasil, Bradesco, Itaú ou Santander</strong>.
+            Para a realização do repasse bancário, é deduzida uma taxa de <strong>R$ 7,50 por evento</strong> para todas as instituições financeiras.
           </p>
-          <span style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
-            Para demais instituições financeiras, é deduzida uma taxa de <strong>R$ 7,50 por evento</strong>.
-          </span>
         </div>
       </div>
 
@@ -215,10 +211,10 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
                 boxSizing: 'border-box',
               }}
             >
-              <option value="bb">Banco do Brasil (Grátis)</option>
-              <option value="bradesco">Bradesco (Grátis)</option>
-              <option value="itau">Itaú (Grátis)</option>
-              <option value="santander">Santander (Grátis)</option>
+              <option value="bb">Banco do Brasil (R$ 7,50)</option>
+              <option value="bradesco">Bradesco (R$ 7,50)</option>
+              <option value="itau">Itaú (R$ 7,50)</option>
+              <option value="santander">Santander (R$ 7,50)</option>
               <option value="nubank">Nubank (R$ 7,50)</option>
               <option value="inter">Banco Inter (R$ 7,50)</option>
               <option value="outros">Outros Bancos (R$ 7,50)</option>
@@ -238,8 +234,8 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#475569' }}>
             <span>Tarifa de transferência bancária:</span>
-            <span style={{ color: isFreeBank ? '#059669' : '#dc2626', fontWeight: 600 }}>
-              {isFreeBank ? 'Isento (Banco Parceiro)' : `- ${formatCurrency(transferFee)}`}
+            <span style={{ color: '#dc2626', fontWeight: 600 }}>
+              - {formatCurrency(transferFee)}
             </span>
           </div>
           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

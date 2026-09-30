@@ -31,4 +31,11 @@ export class CheckinService {
   async getRecentCheckins(accessCode: string): Promise<CheckinRecord[]> {
     return this.checkinRepository.getRecentCheckins(accessCode)
   }
+
+  /**
+   * Retorna os contadores de ingressos/check-ins para o polling do terminal.
+   */
+  async getEventStatus(accessCode: string): Promise<{ totalTickets: number; checkedInTickets: number } | null> {
+    return this.checkinRepository.getEventStatus(accessCode)
+  }
 }

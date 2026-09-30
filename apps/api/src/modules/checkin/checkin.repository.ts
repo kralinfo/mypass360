@@ -257,6 +257,40 @@ export class CheckinRepository {
   }
 
   /**
+   * Retorna os contadores atualizados de ingressos e check-ins para o evento.
+   * Usado pelo polling do terminal para detectar exclusões feitas pelo admin.
+   */
+  async getEventStatus(accessCode: string): Promise<{ totalTickets: number; checkedInTickets: number } | null> {
+    const client = this.supabase.getClient()
+    const trimmedCode = accessCode.trim().toUpperCase()
+
+    const { data: access } = await client
+      .from('checkin_accesses')
+      .select('event_id')
+      .eq('code', trimmedCode)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!access) return null
+
+    const { count: totalTickets } = await client
+      .from('tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', access.event_id)
+
+    const { count: checkedInTickets } = await client
+      .from('tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', access.event_id)
+      .in('status', ['CHECKED_IN', 'used'])
+
+    return {
+      totalTickets: totalTickets ?? 0,
+      checkedInTickets: checkedInTickets ?? 0,
+    }
+  }
+
+  /**
    * Retorna os check-ins mais recentes para o evento autenticado.
    */
   async getRecentCheckins(accessCode: string, limit = 10): Promise<CheckinRecord[]> {

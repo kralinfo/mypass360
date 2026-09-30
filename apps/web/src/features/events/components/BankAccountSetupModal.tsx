@@ -88,7 +88,7 @@ export function BankAccountSetupModal({ isOpen, onClose, eventId, onSaved }: Ban
     }
   }
 
-  const isFreeBank = ['001', '237', '341', '033'].includes(bankCode)
+
 
   return (
     <div
@@ -287,7 +287,7 @@ export function BankAccountSetupModal({ isOpen, onClose, eventId, onSaved }: Ban
                   <li><strong>Repasse de Taxa Transparente:</strong> A taxa de serviço da plataforma é acrescida no valor pago pelo comprador no checkout. Você recebe <strong>100% do valor nominal</strong> do seu ingresso.</li>
                   <li><strong>Política de Estorno:</strong> Em cancelamentos, é reembolsado ao comprador exclusivamente o valor nominal do ingresso (a taxa de serviço não é objeto de restituição).</li>
                   <li><strong>Titularidade Obrigatória:</strong> A conta cadastrada deve pertencer ao mesmo CPF ou CNPJ informado em “Minha Conta”.</li>
-                  <li><strong>Isenção de Tarifa:</strong> Transferências para Banco do Brasil, Bradesco, Itaú e Santander são <strong>gratuitas</strong> (R$ 7,50 para demais bancos).</li>
+                  <li><strong>Tarifa Bancária:</strong> Para a transferência bancária do repasse, é deduzida uma tarifa de <strong>R$ 7,50 por evento</strong> (para qualquer banco).</li>
                 </ul>
               </div>
 
@@ -364,17 +364,17 @@ export function BankAccountSetupModal({ isOpen, onClose, eventId, onSaved }: Ban
                   onChange={(e) => setBankCode(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', backgroundColor: '#fff', boxSizing: 'border-box' }}
                 >
-                  <option value="001">001 - Banco do Brasil S.A. (Transferência Gratuita ✓)</option>
-                  <option value="237">237 - Banco Bradesco S.A. (Transferência Gratuita ✓)</option>
-                  <option value="341">341 - Itaú Unibanco S.A. (Transferência Gratuita ✓)</option>
-                  <option value="033">033 - Banco Santander Brasil (Transferência Gratuita ✓)</option>
+                  <option value="001">001 - Banco do Brasil S.A. (R$ 7,50 por evento)</option>
+                  <option value="237">237 - Banco Bradesco S.A. (R$ 7,50 por evento)</option>
+                  <option value="341">341 - Itaú Unibanco S.A. (R$ 7,50 por evento)</option>
+                  <option value="033">033 - Banco Santander Brasil (R$ 7,50 por evento)</option>
                   <option value="260">260 - Nu Pagamentos S.A. (Nubank - R$ 7,50 por evento)</option>
                   <option value="077">077 - Banco Inter S.A. (R$ 7,50 por evento)</option>
                   <option value="104">104 - Caixa Econômica Federal (R$ 7,50 por evento)</option>
                   <option value="999">Outro Banco (R$ 7,50 por evento)</option>
                 </select>
-                <div style={{ fontSize: '0.78rem', marginTop: '0.3rem', color: isFreeBank ? '#059669' : '#b45309', fontWeight: 600 }}>
-                  {isFreeBank ? '✓ Banco parceiro com transferência gratuita por evento!' : '⚠️ Tarifa bancária de R$ 7,50 aplicável no repasse.'}
+                <div style={{ fontSize: '0.78rem', marginTop: '0.3rem', color: '#b45309', fontWeight: 600 }}>
+                  ⚠️ Tarifa bancária de R$ 7,50 aplicável no repasse.
                 </div>
               </div>
 
