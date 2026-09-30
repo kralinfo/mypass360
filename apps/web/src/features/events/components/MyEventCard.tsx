@@ -408,7 +408,6 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
           border-radius: 16px;
           border: 1px solid #e2e8f0;
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-          overflow: hidden;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
           display: flex;
           flex-direction: column;
@@ -547,6 +546,8 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
             width: '100%',
             height: '160px',
             background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            borderTopLeftRadius: '16px',
+            borderTopRightRadius: '16px',
             overflow: 'hidden',
           }}
         >
@@ -636,16 +637,34 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
 
         {/* ── 2. INFORMAÇÕES ── */}
         <div style={{ padding: '0.85rem 1rem 0.75rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
-          <h2
-            style={{
-              margin: '0 0 0.4rem',
-              fontSize: '1rem', color: '#0f172a',
-              fontWeight: 700, lineHeight: 1.3,
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {event.title}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '1rem', color: '#0f172a',
+                fontWeight: 700, lineHeight: 1.3,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {event.title}
+            </h2>
+            {event.member_role === 'PARTNER' || event.is_owner === false ? (
+              <span
+                style={{
+                  background: '#ccfbf1',
+                  color: '#0f766e',
+                  border: '1px solid #99f6e4',
+                  borderRadius: '999px',
+                  padding: '2px 8px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                🤝 Sócio
+              </span>
+            ) : null}
+          </div>
 
           <div style={{ display: 'grid', gap: '0.25rem', marginBottom: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#64748b' }}>
@@ -796,19 +815,21 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
               marginTop: 'auto', position: 'relative',
             }}
           >
-            {/* Botão Editar */}
-            <button
-              type="button"
-              className="my-event-btn-edit"
-              onClick={() => router.push(`/eventos/cadastrar?edit=${event.id}`)}
-              title="Editar informações do evento"
-            >
-              <EditIcon />
-              <span>Editar</span>
-            </button>
+            {/* Botão Editar (Apenas para Proprietários) */}
+            {(event.member_role !== 'PARTNER' && event.is_owner !== false) && (
+              <button
+                type="button"
+                className="my-event-btn-edit"
+                onClick={() => router.push(`/eventos/cadastrar?edit=${event.id}`)}
+                title="Editar informações do evento"
+              >
+                <EditIcon />
+                <span>Editar</span>
+              </button>
+            )}
 
             {/* Menu de Ações (... ˅) */}
-            <div ref={menuRef} style={{ position: 'relative' }}>
+            <div ref={menuRef} style={{ position: 'relative', marginLeft: 'auto' }}>
               <button
                 type="button"
                 className="my-event-btn-menu"
@@ -830,13 +851,13 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     marginBottom: '8px', width: '210px',
                     background: '#ffffff', borderRadius: '12px',
                     border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
-                    padding: '6px', zIndex: 100,
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    padding: '6px', zIndex: 1000,
                   }}
                 >
 
-                  {/* 1. Solicitar publicação — visível apenas quando aplicável */}
-                  {showRequestApproval && (
+                  {/* 1. Solicitar publicação — visível apenas para o proprietário quando aplicável */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && showRequestApproval && (
                     <button
                       type="button"
                       className="my-event-dropdown-item"
@@ -863,20 +884,22 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                         <span style={{ display: 'flex', color: '#8b5cf6' }}>⏳</span>
                         <span style={{ color: '#6d28d9' }}>Aguardando aprovação</span>
                       </button>
-                      <button
-                        type="button"
-                        className="my-event-dropdown-item danger"
-                        onClick={openCancelApprovalModal}
-                        title="Cancelar a solicitação de publicação enviada ao administrador"
-                      >
-                        <span style={{ display: 'flex', color: '#dc2626' }}>✖</span>
-                        <span>Cancelar solicitação</span>
-                      </button>
+                      {(event.member_role !== 'PARTNER' && event.is_owner !== false) && (
+                        <button
+                          type="button"
+                          className="my-event-dropdown-item danger"
+                          onClick={openCancelApprovalModal}
+                          title="Cancelar a solicitação de publicação enviada ao administrador"
+                        >
+                          <span style={{ display: 'flex', color: '#dc2626' }}>✖</span>
+                          <span>Cancelar solicitação</span>
+                        </button>
+                      )}
                     </>
                   )}
 
-                  {/* 2. Publicar — apenas quando aprovado */}
-                  {showPublish && (
+                  {/* 2. Publicar — apenas proprietário quando aprovado */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && showPublish && (
                     <button
                       type="button"
                       className="my-event-dropdown-item"
@@ -890,8 +913,8 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     </button>
                   )}
 
-                  {/* 3. Ocultar — apenas quando publicado */}
-                  {showUnpublish && (
+                  {/* 3. Ocultar — apenas proprietário quando publicado */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && showUnpublish && (
                     <button
                       type="button"
                       className="my-event-dropdown-item"
@@ -907,7 +930,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     </button>
                   )}
 
-                  {/* 4. Gerenciar */}
+                  {/* 4. Gerenciar (Permitido para Dono e Sócio) */}
                   <button
                     type="button"
                     className="my-event-dropdown-item"
@@ -928,32 +951,36 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     <span>Compartilhar evento</span>
                   </button>
 
-                  {/* 4.5 Ver mensagens / diálogo */}
-                  <button
-                    type="button"
-                    className="my-event-dropdown-item"
-                    onClick={openAdminDialogModal}
-                    title="Ver mensagens e diálogo com a administração"
-                    style={{ color: '#4f46e5' }}
-                  >
-                    <span style={{ display: 'flex', color: '#4f46e5' }}>💬</span>
-                    <span>Ver mensagens</span>
-                  </button>
+                  {/* 4.5 Ver mensagens / diálogo (Apenas Proprietário) */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      onClick={openAdminDialogModal}
+                      title="Ver mensagens e diálogo com a administração"
+                      style={{ color: '#4f46e5' }}
+                    >
+                      <span style={{ display: 'flex', color: '#4f46e5' }}>💬</span>
+                      <span>Ver mensagens</span>
+                    </button>
+                  )}
 
-                  {/* 4.8 Financeiro & Repasse (Cadastrar Conta Bancária) */}
-                  <button
-                    type="button"
-                    className="my-event-dropdown-item"
-                    onClick={openBankAccountModal}
-                    title="Cadastrar ou alterar conta bancária para recebimento do repasse"
-                    style={{ color: '#059669', fontWeight: 600 }}
-                  >
-                    <span style={{ display: 'flex', color: '#059669' }}>💰</span>
-                    <span>Financeiro & Repasses</span>
-                  </button>
+                  {/* 4.8 Financeiro & Repasse (Apenas Proprietário) */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && (
+                    <button
+                      type="button"
+                      className="my-event-dropdown-item"
+                      onClick={openBankAccountModal}
+                      title="Cadastrar ou alterar conta bancária para recebimento do repasse"
+                      style={{ color: '#059669', fontWeight: 600 }}
+                    >
+                      <span style={{ display: 'flex', color: '#059669' }}>💰</span>
+                      <span>Financeiro & Repasses</span>
+                    </button>
+                  )}
 
-                  {/* 5. Agendar publicação — apenas quando aprovado e não publicado */}
-                  {displayStatus === 'approved' && (
+                  {/* 5. Agendar publicação — apenas para proprietário quando aprovado */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && displayStatus === 'approved' && (
                     <button
                       type="button"
                       className="my-event-dropdown-item"
@@ -964,33 +991,35 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                     </button>
                   )}
 
-                  {/* Divisória */}
-                  <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
-
-                  {/* 6. Excluir / Solicitar exclusão */}
-                  {requiresDeletionApproval(event) ? (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item danger"
-                      onClick={openDeleteRequestModal}
-                      disabled={displayStatus === 'deletion_pending'}
-                      title="Solicitar exclusão deste evento publicado ao administrador"
-                    >
-                      <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
-                      <span>
-                        {displayStatus === 'deletion_pending' ? 'Exclusão em análise' : 'Solicitar exclusão'}
-                      </span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="my-event-dropdown-item danger"
-                      onClick={openDeleteModal}
-                      title="Excluir rascunho permanentemente"
-                    >
-                      <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
-                      <span>Excluir</span>
-                    </button>
+                  {/* 6. Excluir / Solicitar exclusão — Apenas Proprietários */}
+                  {(event.member_role !== 'PARTNER' && event.is_owner !== false) && (
+                    <>
+                      <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
+                      {requiresDeletionApproval(event) ? (
+                        <button
+                          type="button"
+                          className="my-event-dropdown-item danger"
+                          onClick={openDeleteRequestModal}
+                          disabled={displayStatus === 'deletion_pending'}
+                          title="Solicitar exclusão deste evento publicado ao administrador"
+                        >
+                          <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
+                          <span>
+                            {displayStatus === 'deletion_pending' ? 'Exclusão em análise' : 'Solicitar exclusão'}
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="my-event-dropdown-item danger"
+                          onClick={openDeleteModal}
+                          title="Excluir rascunho permanentemente"
+                        >
+                          <span style={{ display: 'flex', color: '#ef4444' }}><TrashIcon /></span>
+                          <span>Excluir</span>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}

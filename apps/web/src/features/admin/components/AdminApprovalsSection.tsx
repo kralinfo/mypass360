@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import type { PendingApprovalEventItem } from '@mypass360/types'
 import {
   fetchPendingApprovals,
@@ -83,6 +84,7 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
   const loadMessages = useCallback(async () => {
     setIsLoadingMessages(true)
@@ -97,8 +99,44 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
   }, [event.id])
 
   useEffect(() => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollTop = timelineRef.current.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
     void loadMessages()
-  }, [loadMessages])
+
+    const supabase = createClient()
+    let activeChannel: ReturnType<typeof supabase.channel> | null = null
+    let isCancelled = false
+
+    const channelName = `review-approval-messages-${event.id}-${Date.now()}`
+    activeChannel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `entity_id=eq.${event.id}`,
+        },
+        () => {
+          if (!isCancelled) {
+            void loadMessages()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isCancelled = true
+      if (activeChannel) {
+        void supabase.removeChannel(activeChannel)
+      }
+    }
+  }, [event.id, loadMessages])
 
   const formattedEventDate = new Date(event.date).toLocaleDateString('pt-BR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -337,12 +375,15 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
                   Nenhuma mensagem trocada ainda com o organizador deste evento.
                 </div>
               ) : (
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: '0.5rem',
-                  maxHeight: '180px', overflowY: 'auto',
-                  background: '#f8fafc', border: '1px solid #e2e8f0',
-                  borderRadius: '10px', padding: '0.75rem',
-                }}>
+                <div
+                  ref={timelineRef}
+                  style={{
+                    display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                    maxHeight: '180px', overflowY: 'auto',
+                    background: '#f8fafc', border: '1px solid #e2e8f0',
+                    borderRadius: '10px', padding: '0.75rem',
+                  }}
+                >
                   {messages.map((m) => {
                     const isAdmin = m.sender === 'admin'
                     return (

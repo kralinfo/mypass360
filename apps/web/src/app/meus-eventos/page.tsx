@@ -58,10 +58,14 @@ function MeusEventosContent() {
     if (urlAdminMessage && urlEventId) {
       setActiveAdminMessage(urlAdminMessage)
       setActiveEventId(urlEventId)
+      // Limpa os parâmetros de consulta da URL para não reabrir a modal ao atualizar a página (F5)
+      router.replace(`/meus-eventos?event_id=${urlEventId}`, { scroll: false })
     } else if (urlDeletionRejected && urlEventId) {
       setActiveDeletionRejectedEventId(urlEventId)
+      // Limpa os parâmetros de consulta da URL
+      router.replace(`/meus-eventos?event_id=${urlEventId}`, { scroll: false })
     }
-  }, [urlAdminMessage, urlEventId, urlDeletionRejected])
+  }, [urlAdminMessage, urlEventId, urlDeletionRejected, router])
 
   useEffect(() => {
     if (urlEventId && events.length > 0) {

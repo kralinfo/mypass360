@@ -42,6 +42,15 @@ export class MailService {
     })
   }
 
+  async sendMail(params: {
+    to: string
+    subject: string
+    html: string
+    attachments?: MailAttachment[]
+  }) {
+    return this.sendTicketEmail(params)
+  }
+
   async sendTicketEmail(params: {
     to: string
     subject: string
@@ -70,3 +79,4 @@ export class MailService {
     }
   }
 }
+

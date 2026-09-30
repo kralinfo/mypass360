@@ -50,6 +50,12 @@ function NotificationIcon({ type }: { type: NotificationType }) {
     case 'admin_message':
     case 'organizer_reply':
       return <span style={{ fontSize: '1.1rem' }}>💬</span>
+    case 'event_partner_invite':
+      return <span style={{ fontSize: '1.1rem' }}>🤝</span>
+    case 'event_partner_accepted':
+      return <span style={{ fontSize: '1.1rem' }}>🎉</span>
+    case 'event_partner_removed':
+      return <span style={{ fontSize: '1.1rem' }}>🚫</span>
     case 'order_paid':
       return <span style={{ fontSize: '1.1rem' }}>💰</span>
     case 'checkin_completed':
@@ -63,6 +69,11 @@ function resolveNotificationUrl(n: Notification): string | null {
   if (n.action_url) return n.action_url
 
   switch (n.type) {
+    case 'event_partner_invite':
+      return n.metadata?.token ? `/convite/${n.metadata.token}` : '/meus-eventos'
+    case 'event_partner_accepted':
+    case 'event_partner_removed':
+      return n.entity_id ? `/meus-eventos?event_id=${n.entity_id}` : '/meus-eventos'
     case 'event_approval_requested':
       return `/admin?sec=aprovacoes${n.entity_id ? `&event_id=${n.entity_id}` : ''}`
     case 'event_deletion_requested':

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchEventMessages } from '../services/my-events.service'
 
@@ -34,6 +34,7 @@ export function DeletionRejectedModal({
 
   const [messages, setMessages] = useState<EventMessageItem[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(true)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
   const loadMessages = useCallback(async () => {
     try {
@@ -50,8 +51,44 @@ export function DeletionRejectedModal({
   }, [eventId])
 
   useEffect(() => {
+    if (timelineRef.current) {
+      timelineRef.current.scrollTop = timelineRef.current.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
     void loadMessages()
-  }, [loadMessages])
+
+    const supabase = createClient()
+    let activeChannel: ReturnType<typeof supabase.channel> | null = null
+    let isCancelled = false
+
+    const channelName = `del-rejected-messages-${eventId}-${Date.now()}`
+    activeChannel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `entity_id=eq.${eventId}`,
+        },
+        () => {
+          if (!isCancelled) {
+            void loadMessages()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isCancelled = true
+      if (activeChannel) {
+        void supabase.removeChannel(activeChannel)
+      }
+    }
+  }, [eventId, loadMessages])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -107,7 +144,7 @@ export function DeletionRejectedModal({
         @keyframes delSlideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
 
-      <div className="deletion-modal-overlay" onClick={(e) => e.target === e.currentTarget && !isLoading && onClose()}>
+      <div className="deletion-modal-overlay">
         <div className="deletion-modal-card">
 
           {/* Cabeçalho */}
@@ -196,11 +233,14 @@ export function DeletionRejectedModal({
                 <p style={{ margin: '0 0 0.4rem', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   💬 Mensagens Anteriores com a Administração ({messages.length})
                 </p>
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: '0.5rem',
-                  maxHeight: '180px', overflowY: 'auto',
-                  background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem',
-                }}>
+                <div
+                  ref={timelineRef}
+                  style={{
+                    display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                    maxHeight: '180px', overflowY: 'auto',
+                    background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.75rem',
+                  }}
+                >
                   {messages.map((m) => (
                     <div
                       key={m.id}

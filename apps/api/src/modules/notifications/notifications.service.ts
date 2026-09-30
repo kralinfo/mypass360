@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { NotificationsRepository } from './notifications.repository'
+import { SupabaseService } from '@/common/supabase/supabase.service'
+import { MailService } from '@/common/mail/mail.service'
 import type { CreateNotificationBackendDto } from './dto/create-notification-backend.dto'
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly notificationsRepository: NotificationsRepository) {}
+  constructor(
+    private readonly notificationsRepository: NotificationsRepository,
+    private readonly supabase: SupabaseService,
+    private readonly mailService: MailService,
+    private readonly config: ConfigService,
+  ) {}
 
   /**
    * Notifica todos os administradores sobre uma nova solicitação de publicação.
@@ -48,9 +56,11 @@ export class NotificationsService {
 
   /**
    * Notifica o organizador que seu evento foi APROVADO.
-   * Direciona para /meus-eventos
+   * 1. Notificação interna do sistema (Notificação em tempo real)
+   * 2. Envio de e-mail de confirmação para o proprietário do evento (mesmo offline)
    */
   async notifyEventApproved(event: { id: string; title: string; organizerId: string }) {
+    // 1. Notificação interna
     try {
       await this.notificationsRepository.create({
         userId: event.organizerId,
@@ -63,7 +73,68 @@ export class NotificationsService {
         metadata: { eventTitle: event.title },
       })
     } catch (err) {
-      console.error('[NotificationsService] Erro ao notificar aprovação ao organizador:', err)
+      console.error('[NotificationsService] Erro ao criar notificação interna de aprovação:', err)
+    }
+
+    // 2. Envio de e-mail ao proprietário do evento
+    try {
+      const { data: userData } = await this.supabase
+        .getClient()
+        .auth.admin.getUserById(event.organizerId)
+
+      const organizerEmail = userData?.user?.email
+      if (!organizerEmail) {
+        console.warn(`[NotificationsService] E-mail do proprietário não encontrado para evento '${event.id}'.`)
+        return
+      }
+
+      const organizerName =
+        (userData?.user?.user_metadata?.name as string) ||
+        (userData?.user?.user_metadata?.full_name as string) ||
+        organizerEmail
+
+      const baseUrl =
+        this.config.get<string>('WEB_URL') ??
+        this.config.get<string>('FRONTEND_URL') ??
+        'http://localhost:3000'
+
+      const eventUrl = `${baseUrl}/meus-eventos?event_id=${event.id}`
+
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb;">
+          <h2 style="color: #4f46e5; margin-top: 0;">Seu evento foi aprovado para publicação! 🎉</h2>
+          <p style="color: #374151; font-size: 16px;">
+            Olá, <strong>${organizerName}</strong>!
+          </p>
+          <p style="color: #374151; font-size: 16px;">
+            Seu evento <strong>"${event.title}"</strong> foi aprovado pela administração do MyPass360.
+          </p>
+          <p style="color: #374151; font-size: 16px;">
+            Agora você pode acessar o evento e realizar a publicação para disponibilizá-lo ao público.
+          </p>
+          <div style="text-align: center; margin-top: 32px; margin-bottom: 24px;">
+            <a href="${eventUrl}" target="_blank" style="background-color: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block;">
+              Acessar meu evento
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 13px; text-align: center;">
+            Se o botão acima não funcionar, acesse:<br/>
+            <a href="${eventUrl}" style="color: #4f46e5;">${eventUrl}</a>
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
+            Equipe MyPass360 — Gestão Completa de Eventos
+          </p>
+        </div>
+      `
+
+      await this.mailService.sendMail({
+        to: organizerEmail,
+        subject: 'Seu evento foi aprovado para publicação 🎉',
+        html,
+      })
+    } catch (err) {
+      console.error('[NotificationsService] Erro ao enviar e-mail de aprovação:', err)
     }
   }
 
