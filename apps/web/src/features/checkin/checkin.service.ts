@@ -22,3 +22,11 @@ export async function validateCheckinTicket(
 export async function fetchRecentCheckins(accessCode: string): Promise<CheckinRecord[]> {
   return api.get<CheckinRecord[]>(`/checkin/recent?accessCode=${encodeURIComponent(accessCode)}`)
 }
+
+export async function fetchCheckinStatus(
+  accessCode: string
+): Promise<{ totalTickets: number; checkedInTickets: number }> {
+  return api.get<{ totalTickets: number; checkedInTickets: number }>(
+    `/checkin/status?accessCode=${encodeURIComponent(accessCode)}`
+  )
+}

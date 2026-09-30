@@ -125,7 +125,7 @@ export function ScheduleModal({ eventTitle, onConfirm, onClose }: ScheduleModalP
           <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <li>O valor cai na sua conta bancária em <strong>até 3 dias úteis</strong> após o evento.</li>
             <li>Taxa de serviço: <strong>10%</strong> + <strong>2% a 2,5%</strong> por venda.</li>
-            <li>Transferência <strong>gratuita</strong> para Banco do Brasil, Bradesco, Itaú e Santander (R$ 7,50 para outros).</li>
+            <li>Tarifa de transferência bancária: <strong>R$ 7,50 por evento</strong> (para qualquer banco).</li>
           </ul>
           <div style={{ marginTop: '0.45rem', fontSize: '0.78rem', color: '#047857', fontWeight: 600 }}>
             💡 Cadastre sua conta corrente ou poupança no menu <strong>“Financeiro”</strong>.

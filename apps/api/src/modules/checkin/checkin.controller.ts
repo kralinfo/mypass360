@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, NotFoundException, Post, Query } from '@nestjs/common'
 import { CheckinService } from './checkin.service'
 import { AuthCheckinDto } from './dto/auth-checkin.dto'
 import { ValidateCheckinDto } from './dto/validate-checkin.dto'
@@ -32,5 +32,16 @@ export class CheckinController {
   @Get('recent')
   getRecentCheckins(@Query('accessCode') accessCode: string) {
     return this.checkinService.getRecentCheckins(accessCode)
+  }
+
+  /**
+   * Retorna os contadores de ingressos/check-ins do evento.
+   * Usado pelo polling do terminal a cada 30s para detectar exclusões feitas pelo admin.
+   */
+  @Get('status')
+  async getEventStatus(@Query('accessCode') accessCode: string) {
+    const status = await this.checkinService.getEventStatus(accessCode)
+    if (!status) throw new NotFoundException('Credencial de check-in inválida.')
+    return status
   }
 }

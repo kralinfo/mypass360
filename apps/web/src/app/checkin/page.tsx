@@ -82,7 +82,7 @@ function CheckinContent() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: '1rem 0.5rem', width: '100%', maxWidth: '100vw', boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: '0.25rem', width: '100%', maxWidth: '100vw', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {authData ? (
         <CheckinTerminal authData={authData} onLogout={handleLogout} />
       ) : (
