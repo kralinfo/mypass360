@@ -127,6 +127,8 @@ export async function fetchEventMessages(
   return apiWithAuth(token).get<Array<{ id: string; sender: 'admin' | 'organizer'; senderName: string; message: string; createdAt: string }>>(`/events/${id}/messages`)
 }
 
+import type { EventInvitation, EventMember, InvitationDetailsResponse } from '@mypass360/types'
+
 /**
  * Envia um convite de sócio por e-mail para o evento.
  */
@@ -134,7 +136,7 @@ export async function sendPartnerInvite(
   eventId: string,
   token: string,
   email: string
-): Promise<any> {
+): Promise<{ success: boolean; invitation: EventInvitation }> {
   return apiWithAuth(token).post(`/events/${eventId}/partners/invitations`, { email })
 }
 
@@ -144,7 +146,7 @@ export async function sendPartnerInvite(
 export async function fetchEventPartners(
   eventId: string,
   token: string
-): Promise<{ members: any[]; invitations: any[]; isOwner: boolean }> {
+): Promise<{ members: EventMember[]; invitations: EventInvitation[]; isOwner: boolean }> {
   return apiWithAuth(token).get(`/events/${eventId}/partners`)
 }
 
@@ -155,7 +157,7 @@ export async function cancelPartnerInvite(
   eventId: string,
   inviteId: string,
   token: string
-): Promise<any> {
+): Promise<{ success: boolean }> {
   return apiWithAuth(token).delete(`/events/${eventId}/partners/invitations/${inviteId}`)
 }
 
@@ -166,14 +168,14 @@ export async function removePartnerMember(
   eventId: string,
   memberUserId: string,
   token: string
-): Promise<any> {
+): Promise<{ success: boolean }> {
   return apiWithAuth(token).delete(`/events/${eventId}/partners/members/${memberUserId}`)
 }
 
 /**
  * Busca os detalhes do convite por token (para a tela de aceite).
  */
-export async function fetchInviteByToken(inviteToken: string): Promise<any> {
+export async function fetchInviteByToken(inviteToken: string): Promise<InvitationDetailsResponse> {
   const { api } = await import('@/lib/api')
   return api.get(`/invitations/${inviteToken}`)
 }
@@ -181,14 +183,14 @@ export async function fetchInviteByToken(inviteToken: string): Promise<any> {
 /**
  * Aceita o convite de sócio (exige autenticação).
  */
-export async function acceptPartnerInvite(inviteToken: string, token: string): Promise<any> {
+export async function acceptPartnerInvite(inviteToken: string, token: string): Promise<{ success: boolean }> {
   return apiWithAuth(token).post(`/invitations/${inviteToken}/accept`, {})
 }
 
 /**
  * Rejeita o convite de sócio (exige autenticação).
  */
-export async function rejectPartnerInvite(inviteToken: string, token: string): Promise<any> {
+export async function rejectPartnerInvite(inviteToken: string, token: string): Promise<{ success: boolean }> {
   return apiWithAuth(token).post(`/invitations/${inviteToken}/reject`, {})
 }
 
