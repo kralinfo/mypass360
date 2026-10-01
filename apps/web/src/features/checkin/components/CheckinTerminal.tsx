@@ -77,6 +77,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
   const scanThrottleRef = useRef<number>(0)
   const usbBufferRef = useRef<string>('')
   const usbLastKeyTimeRef = useRef<number>(0)
+  const cameraEnabledRef = useRef<boolean>(false)
 
   // Controla se o scanner está processando (evita duplo scan)
   const isProcessingRef = useRef(false)
@@ -234,30 +235,11 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
     [access.code, terminalState, loadRecent, stopCamera]
   )
 
-  // ── Concluir check-in ou Nova leitura (REQ-25 / REQ-26) ───────────────────
-  const handleNovaLeitura = useCallback(async () => {
-    // Garante que o scanner anterior foi encerrado antes de iniciar outro
-    await stopCamera()
-    setResult(null)
-    setManualCode('')
-    lastScannedCodeRef.current = null
-    if (totalTickets > 0 && checkedInCount >= totalTickets) {
-      setTerminalState('TODOS_CHECKINS_REALIZADOS')
-    } else {
-      setTerminalState('AGUARDANDO_LEITURA')
-    }
-  }, [stopCamera, totalTickets, checkedInCount])
-
-  const handleConcluirCheckin = useCallback(async () => {
-    await stopCamera()
-    setResult(null)
-    setManualCode('')
-    lastScannedCodeRef.current = null
-    setTerminalState('TODOS_CHECKINS_REALIZADOS')
-  }, [stopCamera])
-
   // ── Iniciar câmera ──────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
+    // Marca que a câmera foi ativada pelo operador
+    cameraEnabledRef.current = true
+
     // Garante encerramento de eventual scanner anterior
     await stopCamera()
 
@@ -316,6 +298,37 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
       )
     }
   }, [handleValidate, stopCamera])
+
+  // ── Concluir check-in ou Nova leitura (REQ-25 / REQ-26) ───────────────────
+  const handleNovaLeitura = useCallback(async () => {
+    // Garante que o scanner anterior foi encerrado antes de iniciar outro
+    await stopCamera()
+    setResult(null)
+    setManualCode('')
+    lastScannedCodeRef.current = null
+
+    if (totalTickets > 0 && checkedInCount >= totalTickets) {
+      cameraEnabledRef.current = false
+      setTerminalState('TODOS_CHECKINS_REALIZADOS')
+    } else {
+      setTerminalState('AGUARDANDO_LEITURA')
+      // Se a câmera já estava ativada pelo operador, reativa automaticamente sem exigir clique manual
+      if (cameraEnabledRef.current) {
+        setTimeout(() => {
+          void startCamera()
+        }, 60)
+      }
+    }
+  }, [stopCamera, totalTickets, checkedInCount, startCamera])
+
+  const handleConcluirCheckin = useCallback(async () => {
+    cameraEnabledRef.current = false
+    await stopCamera()
+    setResult(null)
+    setManualCode('')
+    lastScannedCodeRef.current = null
+    setTerminalState('TODOS_CHECKINS_REALIZADOS')
+  }, [stopCamera])
 
   // ── Listener para leitor físico USB / Bluetooth ─────────────────────────────
   useEffect(() => {
@@ -926,7 +939,10 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           {cameraActive && !hasResult && (
             <button
               type="button"
-              onClick={stopCamera}
+              onClick={() => {
+                cameraEnabledRef.current = false
+                void stopCamera()
+              }}
               style={{
                 padding: '0.45rem',
                 borderRadius: '7px',

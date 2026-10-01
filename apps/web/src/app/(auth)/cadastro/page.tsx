@@ -2,7 +2,15 @@ import Link from 'next/link'
 import { GoogleSignInButton } from '@/features/auth/components/GoogleSignInButton'
 import { BackButton } from '@/components/BackButton'
 
-export default function RegisterPage() {
+interface RegisterPageProps {
+  searchParams: Promise<{ next?: string }>
+}
+
+export default async function RegisterPage({ searchParams }: RegisterPageProps) {
+  const { next } = await searchParams
+  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login'
+  const backHref = next && next.startsWith('/') && !next.startsWith('//') ? next : '/eventos'
+
   return (
     <main
       style={{
@@ -13,7 +21,7 @@ export default function RegisterPage() {
       }}
     >
       <BackButton
-        href="/eventos"
+        href={backHref}
         style={{ position: 'absolute', top: 'calc(6rem + env(safe-area-inset-top))', left: 'max(2rem, env(safe-area-inset-left))' }}
       />
       <section
@@ -32,10 +40,10 @@ export default function RegisterPage() {
           Crie sua conta rapidamente usando Google.
         </p>
 
-        <GoogleSignInButton label="Cadastrar com Google" />
+        <GoogleSignInButton label="Cadastrar com Google" nextUrl={next} />
 
         <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.9rem' }}>
-          Já tem conta? <Link href="/login">Entrar</Link>
+          Já tem conta? <Link href={loginHref}>Entrar</Link>
         </p>
       </section>
     </main>
