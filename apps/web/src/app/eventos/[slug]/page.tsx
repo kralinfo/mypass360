@@ -100,37 +100,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     }))
   }
 
-  function handleAddToCart(ticketType: CheckoutTicketType) {
-    const quantity = quantities[ticketType.id] ?? 0
-    const available = Math.max(ticketType.quantity - ticketType.sold, 0)
-    const currentEvent = event
-
-    if (!currentEvent || quantity <= 0) {
-      setWarningMessage('Escolha uma quantidade antes de adicionar ao carrinho.')
-      return
-    }
-
-    setWarningMessage(null)
-    addToCart({
-      eventId: currentEvent.id,
-      eventSlug: currentEvent.slug,
-      eventTitle: currentEvent.title,
-      eventDate: currentEvent.date,
-      eventLocation: currentEvent.location,
-      ticketTypeId: ticketType.id,
-      ticketTypeName: ticketType.name,
-      unitPrice: ticketType.price,
-      available,
-      quantity,
-    })
-
-    setQuantities((current) => ({
-      ...current,
-      [ticketType.id]: 0,
-    }))
-
-    setSuccessMessage(`${quantity} ingressos ${ticketType.name} adicionados ao carrinho.`)
-  }
 
   function handleAddAllToCart() {
     if (!event) return false
@@ -221,25 +190,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
     router.push(`/checkout?eventId=${event.id}&from=event&slug=${event.slug}`)
   }
 
-  function handleBuyNow(ticketType: CheckoutTicketType) {
-    const quantity = quantities[ticketType.id] ?? 0
-
-    if (!event || quantity <= 0) {
-      setWarningMessage('Escolha uma quantidade antes de continuar.')
-      return
-    }
-
-    setWarningMessage(null)
-    persistDirectCheckoutSelection([
-      {
-        ticketTypeId: ticketType.id,
-        quantity,
-        unitPrice: ticketType.price,
-      },
-    ])
-    setSuccessMessage(null)
-    router.push(`/checkout?eventId=${event.id}&from=event&slug=${event.slug}`)
-  }
 
   if (isLoading) {
     return (
@@ -260,6 +210,16 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   }
 
   const requiresPassword = Boolean(event.has_password)
+
+  const totalSelectedQuantity = ticketTypes.reduce(
+    (sum, t) => sum + (quantities[t.id] ?? 0),
+    0
+  )
+
+  const totalSelectedPrice = ticketTypes.reduce(
+    (sum, t) => sum + (quantities[t.id] ?? 0) * t.price,
+    0
+  )
 
   // 🔒 Gate de senha: se o evento exige senha e ainda não foi verificado, oculta TODAS as informações do evento
   if (requiresPassword && !paidPasswordVerified) {
@@ -490,6 +450,17 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
         .chevron.expanded {
           transform: rotate(180deg);
         }
+        .ticket-quantity-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border: 1px solid #cbd5e1;
+          border-radius: 10px;
+          background: #fff;
+          padding: 0.35rem 0.5rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+          width: 150px;
+        }
         @media (max-width: 680px) {
           .detail-banner {
             height: 120px;
@@ -515,6 +486,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
             padding: 0.6rem 0.5rem !important;
             font-size: 0.78rem !important;
             justify-content: center;
+          }
+          .ticket-quantity-bar {
+            width: 100%;
           }
         }
       `}</style>
@@ -787,76 +761,135 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                             </p>
                           )}
 
-                          <div className="ticket-actions-group">
-                            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '0.75rem',
+                            }}
+                          >
+                            <div className="ticket-quantity-bar">
                               <button
                                 type="button"
                                 onClick={() => setTicketQuantity(ticketType.id, quantity - 1, available)}
-                                style={{ width: 32, height: 32, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', color: '#475569' }}
+                                disabled={quantity <= 0}
+                                style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  background: quantity > 0 ? '#f1f5f9' : '#f8fafc',
+                                  cursor: quantity > 0 ? 'pointer' : 'not-allowed',
+                                  fontWeight: 700,
+                                  fontSize: '1.2rem',
+                                  color: quantity > 0 ? '#0f172a' : '#cbd5e1',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                  userSelect: 'none',
+                                  WebkitTapHighlightColor: 'transparent',
+                                }}
                               >
                                 -
                               </button>
-                              <span style={{ padding: '0 0.5rem', minWidth: 24, textAlign: 'center', fontSize: '0.9rem', fontWeight: 600 }}>{quantity}</span>
+
+                              <span
+                                style={{
+                                  fontSize: '1.05rem',
+                                  fontWeight: 700,
+                                  color: '#0f172a',
+                                  textAlign: 'center',
+                                  flex: 1,
+                                }}
+                              >
+                                {quantity}
+                              </span>
+
                               <button
                                 type="button"
                                 onClick={() => setTicketQuantity(ticketType.id, quantity + 1, available)}
-                                style={{ width: 32, height: 32, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', color: '#475569' }}
+                                disabled={available <= 0 || quantity >= available}
+                                style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  background: available > 0 && quantity < available ? '#f1f5f9' : '#f8fafc',
+                                  cursor: available > 0 && quantity < available ? 'pointer' : 'not-allowed',
+                                  fontWeight: 700,
+                                  fontSize: '1.2rem',
+                                  color: available > 0 && quantity < available ? '#0f172a' : '#cbd5e1',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                  userSelect: 'none',
+                                  WebkitTapHighlightColor: 'transparent',
+                                }}
                               >
                                 +
                               </button>
                             </div>
 
-                            <button
-                              type="button"
-                              className="ticket-action-btn"
-                              onClick={() => handleAddToCart(ticketType)}
-                              disabled={quantity <= 0 || available <= 0}
-                              style={{
-                                padding: '0.5rem 0.85rem',
-                                borderRadius: '8px',
-                                border: '1px solid #0f172a',
-                                background: '#fff',
-                                color: '#0f172a',
-                                fontWeight: 700,
-                                fontSize: '0.82rem',
-                                cursor: quantity <= 0 || available <= 0 ? 'not-allowed' : 'pointer',
-                                opacity: quantity <= 0 || available <= 0 ? 0.5 : 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                              }}
-                            >
-                              🛒 Adicionar
-                            </button>
-
-                            <button
-                              type="button"
-                              className="ticket-action-btn"
-                              onClick={() => handleBuyNow(ticketType)}
-                              disabled={quantity <= 0 || available <= 0}
-                              style={{
-                                padding: '0.5rem 0.85rem',
-                                borderRadius: '8px',
-                                border: 'none',
-                                background: '#0f172a',
-                                color: '#fff',
-                                fontWeight: 700,
-                                fontSize: '0.82rem',
-                                cursor: quantity <= 0 || available <= 0 ? 'not-allowed' : 'pointer',
-                                opacity: quantity <= 0 || available <= 0 ? 0.5 : 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                              }}
-                            >
-                              ⚡ Comprar Agora
-                            </button>
+                            {quantity > 0 && (
+                              <div style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>
+                                Subtotal:{' '}
+                                <span style={{ color: '#10b981' }}>
+                                  {(quantity * ticketType.price).toLocaleString('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL',
+                                  })}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
+
                     </article>
                   )
                 })}
+
+                {/* Card de Resumo do Total da Compra */}
+                {totalSelectedQuantity > 0 && (
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '0.85rem 1.1rem',
+                      marginTop: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+                      animation: 'fadeIn 0.2s ease',
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Resumo da seleção
+                      </span>
+                      <span style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 700 }}>
+                        {totalSelectedQuantity} {totalSelectedQuantity === 1 ? 'ingresso selecionado' : 'ingressos selecionados'}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'block' }}>
+                        Valor Total
+                      </span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#10b981' }}>
+                        {totalSelectedPrice.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Botões de Ação Global no Rodapé da Lista */}
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
@@ -873,9 +906,28 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                       fontWeight: 700,
                       fontSize: '0.9rem',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.45rem',
                     }}
                   >
-                    🛒 Adicionar Ingressos Selecionados
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="9" cy="21" r="1" />
+                      <circle cx="20" cy="21" r="1" />
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </svg>
+                    Adicionar Ingressos Selecionados
                   </button>
                   <button
                     type="button"
@@ -891,11 +943,16 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                       fontSize: '0.9rem',
                       cursor: 'pointer',
                       boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.45rem',
                     }}
                   >
-                    ⚡ Ir para o Pagamento
+                    Ir para o Pagamento
                   </button>
                 </div>
+
               </>
             )}
           </section>
