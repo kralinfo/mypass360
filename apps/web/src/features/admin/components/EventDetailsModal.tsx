@@ -112,6 +112,49 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [partnerFeedback, setPartnerFeedback] = useState<string | null>(null)
   const [partnerError, setPartnerError] = useState<string | null>(null)
 
+  // Copy feedback para dados PIX
+  const [copiedPixKey, setCopiedPixKey] = useState(false)
+  const [copiedAll, setCopiedAll] = useState(false)
+
+  // Notificação de PIX pendente
+  const [notifyingPix, setNotifyingPix] = useState(false)
+  const [notifiedPix, setNotifiedPix] = useState(false)
+
+  const handleNotifyPix = async () => {
+    // AdminEventItem usa `organizerId` (camelCase), Event usa `organizer_id` (snake_case)
+    const organizerId =
+      ('organizer_id' in event && (event as { organizer_id?: string }).organizer_id) ||
+      ('organizerId' in event && (event as { organizerId?: string }).organizerId) ||
+      null
+
+    if (!organizerId) {
+      alert('Não foi possível identificar o organizador deste evento.')
+      return
+    }
+    setNotifyingPix(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('notifications').insert({
+        user_id: organizerId,
+        type: 'pix_key_missing',
+        title: '⚠️ Chave PIX não cadastrada',
+        message: `O repasse das vendas do evento "${event.title}" está pendente. Por favor, acesse o painel e cadastre sua Chave PIX para receber o valor apurado.`,
+        entity_type: 'event',
+        entity_id: event.id,
+        action_url: `/meus-eventos`,
+        metadata: { event_title: event.title },
+      })
+      if (error) throw error
+      setNotifiedPix(true)
+      setTimeout(() => setNotifiedPix(false), 4000)
+    } catch (err) {
+      console.warn('Erro ao enviar notificação PIX:', err)
+      alert('Não foi possível enviar a notificação. Tente novamente.')
+    } finally {
+      setNotifyingPix(false)
+    }
+  }
+
   // Modais de Confirmação Customizados
   const [deleteAccessTarget, setDeleteAccessTarget] = useState<CheckinAccess | null>(null)
   const [deleteCheckinTarget, setDeleteCheckinTarget] = useState<CheckinRecord | null>(null)
@@ -1083,49 +1126,160 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                     )}
                   </div>
 
-                  {/* ── CONTA BANCÁRIA DO ORGANIZADOR PARA REPASSE ── */}
+                  {/* ── CONTA PIX DO ORGANIZADOR PARA REPASSE ── */}
                   <div style={{ padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff' }}>
                     <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: '#0f172a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span>🏦</span> Dados Bancários para Repasse ao Organizador
+                      <span>🏦</span> Dados da Conta para Repasse via PIX ao Organizador
                     </h3>
                     {bankAccount ? (
                       <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '1rem', color: '#166534' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
                           <div>
                             <strong style={{ fontSize: '0.95rem', color: '#15803d' }}>{bankAccount.bank_name} ({bankAccount.bank_code})</strong>
-                            <div style={{ fontSize: '0.85rem', color: '#334155', marginTop: '0.2rem' }}>
-                              <strong>Titular:</strong> {bankAccount.holder_name} ({bankAccount.person_type.toUpperCase()}: {bankAccount.document})
+                            {bankAccount.person_type && (
+                              <span style={{ marginLeft: '0.5rem', background: bankAccount.person_type === 'pj' ? '#dbeafe' : '#ede9fe', color: bankAccount.person_type === 'pj' ? '#1d4ed8' : '#6d28d9', fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '999px' }}>
+                                {bankAccount.person_type === 'pj' ? 'PJ' : 'PF'}
+                              </span>
+                            )}
+                            <div style={{ fontSize: '0.85rem', color: '#334155', marginTop: '0.25rem' }}>
+                              <strong>Titular:</strong> {bankAccount.holder_name}
                             </div>
-                            <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '0.1rem' }}>
-                              <strong>Agência:</strong> {bankAccount.agency} | <strong>Conta:</strong> {bankAccount.account_number}-{bankAccount.account_digit} ({bankAccount.account_type === 'corrente' ? 'Conta Corrente' : 'Conta Poupança'})
+                            {bankAccount.document && (
+                              <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '0.1rem' }}>
+                                <strong>{bankAccount.person_type === 'pj' ? 'CNPJ' : 'CPF'}:</strong> {bankAccount.document}
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.85rem', color: '#15803d', marginTop: '0.1rem', fontWeight: 700 }}>
+                              <strong>Chave PIX:</strong> {bankAccount.pix_key || '—'}
                             </div>
+                            {bankAccount.contact_phone && (
+                              <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '0.1rem' }}>
+                                📞 <strong>Telefone:</strong> {bankAccount.contact_phone}
+                              </div>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const text = `Titular: ${bankAccount.holder_name}\nCPF/CNPJ: ${bankAccount.document}\nBanco: ${bankAccount.bank_name}\nAgência: ${bankAccount.agency}\nConta: ${bankAccount.account_number}-${bankAccount.account_digit}`
-                              navigator.clipboard.writeText(text)
-                              alert('Dados bancários copiados para a área de transferência!')
-                            }}
-                            style={{
-                              backgroundColor: '#059669',
-                              color: '#fff',
-                              border: 'none',
-                              padding: '0.55rem 0.95rem',
-                              borderRadius: '8px',
-                              fontWeight: 600,
-                              fontSize: '0.8rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)',
-                            }}
-                          >
-                            📋 Copiar Dados Bancários
-                          </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '170px' }}>
+                            {/* Botão: Copiar apenas a Chave PIX */}
+                            <button
+                              type="button"
+                              disabled={!bankAccount.pix_key}
+                              onClick={() => {
+                                navigator.clipboard.writeText(bankAccount.pix_key || '')
+                                setCopiedPixKey(true)
+                                setTimeout(() => setCopiedPixKey(false), 2500)
+                              }}
+                              style={{
+                                backgroundColor: copiedPixKey ? '#16a34a' : bankAccount.pix_key ? '#059669' : '#94a3b8',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '0.5rem 0.85rem',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                fontSize: '0.8rem',
+                                cursor: bankAccount.pix_key ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 4px rgba(5,150,105,0.2)',
+                              }}
+                            >
+                              {copiedPixKey ? <>✓ Chave Copiada!</> : <>🔑 Copiar Chave PIX</>}
+                            </button>
+                            {/* Botão: Copiar todos os dados */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const personLabel = bankAccount.person_type === 'pj' ? 'CNPJ' : 'CPF'
+                                const text = [
+                                  'DADOS PARA REPASSE VIA PIX - MYPASS360',
+                                  '---------------------------------------',
+                                  `Titular: ${bankAccount.holder_name}`,
+                                  `Tipo: ${bankAccount.person_type === 'pj' ? 'Pessoa Jurídica' : 'Pessoa Física'}`,
+                                  bankAccount.document ? `${personLabel}: ${bankAccount.document}` : null,
+                                  `Banco: ${bankAccount.bank_name} (${bankAccount.bank_code})`,
+                                  `Chave PIX: ${bankAccount.pix_key || 'Não informada'}`,
+                                  bankAccount.contact_phone ? `Telefone: ${bankAccount.contact_phone}` : null,
+                                  '---------------------------------------',
+                                ].filter(Boolean).join('\n')
+                                navigator.clipboard.writeText(text)
+                                setCopiedAll(true)
+                                setTimeout(() => setCopiedAll(false), 2500)
+                              }}
+                              style={{
+                                backgroundColor: copiedAll ? '#16a34a' : '#0f172a',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '0.5rem 0.85rem',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                fontSize: '0.8rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                              }}
+                            >
+                              {copiedAll ? <>✓ Dados Copiados!</> : <>📋 Copiar Tudo</>}
+                            </button>
+                            {/* Botão: Notificar organizador (quando não tem chave PIX) */}
+                            {!bankAccount.pix_key && (
+                              <button
+                                type="button"
+                                disabled={notifyingPix || notifiedPix}
+                                onClick={handleNotifyPix}
+                                style={{
+                                  backgroundColor: notifiedPix ? '#6d28d9' : notifyingPix ? '#94a3b8' : '#f59e0b',
+                                  color: '#fff',
+                                  border: 'none',
+                                  padding: '0.5rem 0.85rem',
+                                  borderRadius: '8px',
+                                  fontWeight: 600,
+                                  fontSize: '0.8rem',
+                                  cursor: notifyingPix || notifiedPix ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  transition: 'all 0.2s',
+                                  boxShadow: '0 2px 4px rgba(245,158,11,0.2)',
+                                }}
+                              >
+                                {notifiedPix ? <>✓ Notificado!</> : notifyingPix ? <>Enviando...</> : <>🔔 Notificar Organizador</>}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.85rem 1rem', color: '#b45309', fontSize: '0.85rem' }}>
-                        ⚠️ <strong>Pendente:</strong> O organizador deste evento ainda não cadastrou os dados da sua conta bancária para repasse.
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ color: '#b45309', fontSize: '0.85rem' }}>
+                          ⚠️ <strong>Pendente:</strong> O organizador deste evento ainda não cadastrou os dados da sua conta bancária para repasse.
+                        </div>
+                        <button
+                          type="button"
+                          disabled={notifyingPix || notifiedPix}
+                          onClick={handleNotifyPix}
+                          style={{
+                            backgroundColor: notifiedPix ? '#6d28d9' : notifyingPix ? '#94a3b8' : '#f59e0b',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '0.5rem 0.9rem',
+                            borderRadius: '8px',
+                            fontWeight: 600,
+                            fontSize: '0.8rem',
+                            cursor: notifyingPix || notifiedPix ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 4px rgba(245,158,11,0.25)',
+                          }}
+                        >
+                          {notifiedPix ? <>✓ Notificado!</> : notifyingPix ? <>Enviando...</> : <>🔔 Notificar Organizador</>}
+                        </button>
                       </div>
                     )}
                   </div>

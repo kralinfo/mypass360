@@ -23,13 +23,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await response.text()
     return text ? (JSON.parse(text) as T) : (undefined as unknown as T)
   } catch (error) {
-    console.error(`API request failed for ${path}:`, error)
     if (error instanceof TypeError) {
+      // Network failure — log prominently
+      console.error(`API network failure for ${path}:`, error)
       throw new Error(
         'Não foi possível conectar com a API. Inicie o backend em http://localhost:3001 e tente novamente.'
       )
     }
-
+    // HTTP errors (4xx/5xx) are controlled — re-throw without polluting console
     throw error
   }
 }

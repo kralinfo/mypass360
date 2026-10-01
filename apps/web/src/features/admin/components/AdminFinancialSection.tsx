@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import type { AdminDashboardData, Event } from '@mypass360/types'
 import { getAllOrganizerBankAccounts, type BankAccountData } from '@/features/events/services/bank-account.service'
 import { formatCurrency } from '@/features/admin/admin.utils'
+import { createClient } from '@/lib/supabase/client'
 
 interface AdminFinancialSectionProps {
   dashboard: AdminDashboardData | null
@@ -14,6 +15,8 @@ export function AdminFinancialSection({ dashboard }: AdminFinancialSectionProps)
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true)
   const [filterText, setFilterText] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [notifiedId, setNotifiedId] = useState<string | null>(null)
+  const [notifyingId, setNotifyingId] = useState<string | null>(null)
 
   useEffect(() => {
     setIsLoadingAccounts(true)
@@ -41,23 +44,38 @@ export function AdminFinancialSection({ dashboard }: AdminFinancialSectionProps)
     )
   })
 
-  // Copiar dados bancários para a área de transferência
-  const handleCopyAccountData = (bankAccount: BankAccountData, eventId: string) => {
-    const text = `
-DADOS PARA REPASSE BANCÁRIO - MYPASS360
----------------------------------------
-Titular: ${bankAccount.holder_name}
-Documento (CPF/CNPJ): ${bankAccount.document}
-Banco: ${bankAccount.bank_name} (${bankAccount.bank_code})
-Tipo de Conta: ${bankAccount.account_type === 'corrente' ? 'Conta Corrente' : 'Conta Poupança'}
-Agência: ${bankAccount.agency}
-Conta: ${bankAccount.account_number}-${bankAccount.account_digit}
----------------------------------------
-`.trim()
-
-    navigator.clipboard.writeText(text)
+  // Copiar apenas a Chave PIX para a área de transferência
+  const handleCopyPixKey = (pixKey: string, eventId: string) => {
+    navigator.clipboard.writeText(pixKey)
     setCopiedId(eventId)
     setTimeout(() => setCopiedId(null), 2500)
+  }
+
+  // Enviar notificação ao organizador pedindo o cadastro da Chave PIX
+  const handleNotifyOrganizer = async (ev: Event) => {
+    if (!ev.organizer_id) return
+    setNotifyingId(ev.id)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('notifications').insert({
+        user_id: ev.organizer_id,
+        type: 'pix_key_missing',
+        title: '⚠️ Chave PIX não cadastrada',
+        message: `O repasse das vendas do evento "${ev.title}" está pendente. Por favor, acesse o painel do seu evento e cadastre sua Chave PIX para receber o valor apurado.`,
+        entity_type: 'event',
+        entity_id: ev.id,
+        action_url: `/meus-eventos`,
+        metadata: { event_title: ev.title },
+      })
+      if (error) throw error
+      setNotifiedId(ev.id)
+      setTimeout(() => setNotifiedId(null), 4000)
+    } catch (err) {
+      console.error('Erro ao enviar notificação ao organizador:', err)
+      alert('Não foi possível enviar a notificação. Tente novamente.')
+    } finally {
+      setNotifyingId(null)
+    }
   }
 
   // Totais globais
@@ -161,11 +179,10 @@ Conta: ${bankAccount.account_number}-${bankAccount.account_digit}
                   // Localiza a conta por event_id ou por user_id (organizer_id)
                   const bankAccount = bankAccountsMap[ev.id] || bankAccountsMap[ev.organizer_id] || null
 
-                  // Cálculo estimado de valores
+                  // Cálculo estimado de valores (PIX é isento de taxa de transferência)
                   const gross = ev.price * (ev.capacity > 0 ? Math.min(ev.capacity, 50) : 10)
                   const platformFee = gross * 0.125
-                  const transferFee = gross > 0 ? 7.50 : 0
-                  const netPayout = Math.max(0, gross - platformFee - transferFee)
+                  const netPayout = Math.max(0, gross - platformFee)
 
                   const formattedDate = new Date(ev.date).toLocaleDateString('pt-BR', {
                     day: '2-digit',
@@ -201,27 +218,40 @@ Conta: ${bankAccount.account_number}-${bankAccount.account_digit}
                           {formatCurrency(netPayout)}
                         </div>
                         <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                          Taxa retida: -{formatCurrency(platformFee + transferFee)}
+                          Taxa retida: -{formatCurrency(platformFee)}
                         </div>
                       </td>
 
-                      {/* Conta Bancária */}
+                      {/* Chave PIX e Conta */}
                       <td style={{ padding: '1rem 1.25rem' }}>
                         {bankAccount ? (
                           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.65rem 0.85rem' }}>
                             <div style={{ fontWeight: 700, color: '#166534', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               <span>🏦</span> {bankAccount.bank_name}
+                              <span style={{ marginLeft: 'auto', background: bankAccount.person_type === 'pj' ? '#dbeafe' : '#ede9fe', color: bankAccount.person_type === 'pj' ? '#1d4ed8' : '#6d28d9', fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '999px' }}>
+                                {bankAccount.person_type === 'pj' ? 'PJ' : 'PF'}
+                              </span>
                             </div>
                             <div style={{ fontSize: '0.8rem', color: '#334155', marginTop: '0.2rem' }}>
-                              <strong>Titular:</strong> {bankAccount.holder_name} ({bankAccount.person_type.toUpperCase()}: {bankAccount.document})
+                              <strong>Titular:</strong> {bankAccount.holder_name}
                             </div>
-                            <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.1rem' }}>
-                              <strong>Ag:</strong> {bankAccount.agency} | <strong>Conta:</strong> {bankAccount.account_number}-{bankAccount.account_digit} ({bankAccount.account_type})
+                            {bankAccount.document && (
+                              <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '0.1rem' }}>
+                                <strong>{bankAccount.person_type === 'pj' ? 'CNPJ' : 'CPF'}:</strong> {bankAccount.document}
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.1rem', fontWeight: 600 }}>
+                              <strong>Chave PIX:</strong> {bankAccount.pix_key || '—'}
                             </div>
+                            {bankAccount.contact_phone && (
+                              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.1rem' }}>
+                                📞 {bankAccount.contact_phone}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.65rem 0.85rem', color: '#b45309', fontSize: '0.8rem' }}>
-                            ⚠️ <strong>Pendente:</strong> O organizador ainda não cadastrou a conta bancária no painel.
+                            ⚠️ <strong>Pendente:</strong> O organizador ainda não cadastrou a Chave PIX no painel.
                           </div>
                         )}
                       </td>
@@ -231,33 +261,61 @@ Conta: ${bankAccount.account_number}-${bankAccount.account_digit}
                         {bankAccount ? (
                           <button
                             type="button"
-                            onClick={() => handleCopyAccountData(bankAccount, ev.id)}
+                            onClick={() => handleCopyPixKey(bankAccount.pix_key || '', ev.id)}
+                            disabled={!bankAccount.pix_key}
                             style={{
-                              backgroundColor: copiedId === ev.id ? '#16a34a' : '#059669',
+                              backgroundColor: copiedId === ev.id ? '#16a34a' : bankAccount.pix_key ? '#059669' : '#94a3b8',
                               color: '#ffffff',
                               border: 'none',
-                              padding: '0.5rem 0.85rem',
+                              padding: '0.5rem 0.9rem',
                               borderRadius: '8px',
                               fontWeight: 600,
                               fontSize: '0.8rem',
-                              cursor: 'pointer',
+                              cursor: bankAccount.pix_key ? 'pointer' : 'not-allowed',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.35rem',
-                              boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)',
+                              boxShadow: bankAccount.pix_key ? '0 2px 4px rgba(5, 150, 105, 0.2)' : 'none',
                               transition: 'all 0.2s',
+                              whiteSpace: 'nowrap',
                             }}
                           >
                             {copiedId === ev.id ? (
-                              <>✓ Dados Copiados!</>
+                              <>✓ Chave Copiada!</>
                             ) : (
-                              <>📋 Copiar Dados de Repasse</>
+                              <>🔑 Copiar Chave PIX</>
                             )}
                           </button>
                         ) : (
-                          <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                            Aguardando cadastro
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleNotifyOrganizer(ev)}
+                            disabled={notifyingId === ev.id || notifiedId === ev.id}
+                            style={{
+                              backgroundColor: notifiedId === ev.id ? '#6d28d9' : notifyingId === ev.id ? '#94a3b8' : '#f59e0b',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '0.5rem 0.9rem',
+                              borderRadius: '8px',
+                              fontWeight: 600,
+                              fontSize: '0.8rem',
+                              cursor: notifyingId === ev.id || notifiedId === ev.id ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {notifiedId === ev.id ? (
+                              <>✓ Notificado!</>
+                            ) : notifyingId === ev.id ? (
+                              <>Enviando...</>
+                            ) : (
+                              <>🔔 Notificar Organizador</>
+                            )}
+                          </button>
                         )}
                       </td>
                     </tr>
