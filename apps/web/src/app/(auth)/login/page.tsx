@@ -2,7 +2,15 @@ import Link from 'next/link'
 import { GoogleSignInButton } from '@/features/auth/components/GoogleSignInButton'
 import { BackButton } from '@/components/BackButton'
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams: Promise<{ next?: string }>
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { next } = await searchParams
+  const registerHref = next ? `/cadastro?next=${encodeURIComponent(next)}` : '/cadastro'
+  const backHref = next && next.startsWith('/') && !next.startsWith('//') ? next : '/eventos'
+
   return (
     <main
       style={{
@@ -13,7 +21,7 @@ export default function LoginPage() {
       }}
     >
       <BackButton
-        href="/eventos"
+        href={backHref}
         style={{ position: 'absolute', top: 'calc(6rem + env(safe-area-inset-top))', left: 'max(2rem, env(safe-area-inset-left))' }}
       />
       <section
@@ -32,10 +40,10 @@ export default function LoginPage() {
           Acesse sua conta para comprar e gerenciar seus ingressos.
         </p>
 
-        <GoogleSignInButton />
+        <GoogleSignInButton nextUrl={next} />
 
         <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.9rem' }}>
-          Não tem conta? <Link href="/cadastro">Criar conta</Link>
+          Não tem conta? <Link href={registerHref}>Criar conta</Link>
         </p>
       </section>
     </main>

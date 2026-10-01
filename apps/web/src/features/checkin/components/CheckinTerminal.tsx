@@ -77,6 +77,7 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
   const scanThrottleRef = useRef<number>(0)
   const usbBufferRef = useRef<string>('')
   const usbLastKeyTimeRef = useRef<number>(0)
+  const cameraEnabledRef = useRef<boolean>(false)
 
   // Controla se o scanner está processando (evita duplo scan)
   const isProcessingRef = useRef(false)
@@ -209,12 +210,8 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           setManualCode('')
           loadRecent()
 
-          // Verificar se todos os check-ins foram realizados (REQ-26)
-          if (res.allCheckedIn) {
-            setTerminalState('TODOS_CHECKINS_REALIZADOS')
-          } else {
-            setTerminalState('CHECKIN_REALIZADO')
-          }
+          // Mantém o estado CHECKIN_REALIZADO para que o operador visualize os dados do participante (REQ-26/UI)
+          setTerminalState('CHECKIN_REALIZADO')
         } else {
           setTerminalState('CHECKIN_INVALIDO')
         }
@@ -238,18 +235,11 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
     [access.code, terminalState, loadRecent, stopCamera]
   )
 
-  // ── Nova leitura (REQ-25) ───────────────────────────────────────────────────
-  const handleNovaLeitura = useCallback(async () => {
-    // Garante que o scanner anterior foi encerrado antes de iniciar outro
-    await stopCamera()
-    setResult(null)
-    setManualCode('')
-    lastScannedCodeRef.current = null
-    setTerminalState('AGUARDANDO_LEITURA')
-  }, [stopCamera])
-
   // ── Iniciar câmera ──────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
+    // Marca que a câmera foi ativada pelo operador
+    cameraEnabledRef.current = true
+
     // Garante encerramento de eventual scanner anterior
     await stopCamera()
 
@@ -308,6 +298,37 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
       )
     }
   }, [handleValidate, stopCamera])
+
+  // ── Concluir check-in ou Nova leitura (REQ-25 / REQ-26) ───────────────────
+  const handleNovaLeitura = useCallback(async () => {
+    // Garante que o scanner anterior foi encerrado antes de iniciar outro
+    await stopCamera()
+    setResult(null)
+    setManualCode('')
+    lastScannedCodeRef.current = null
+
+    if (totalTickets > 0 && checkedInCount >= totalTickets) {
+      cameraEnabledRef.current = false
+      setTerminalState('TODOS_CHECKINS_REALIZADOS')
+    } else {
+      setTerminalState('AGUARDANDO_LEITURA')
+      // Se a câmera já estava ativada pelo operador, reativa automaticamente sem exigir clique manual
+      if (cameraEnabledRef.current) {
+        setTimeout(() => {
+          void startCamera()
+        }, 60)
+      }
+    }
+  }, [stopCamera, totalTickets, checkedInCount, startCamera])
+
+  const handleConcluirCheckin = useCallback(async () => {
+    cameraEnabledRef.current = false
+    await stopCamera()
+    setResult(null)
+    setManualCode('')
+    lastScannedCodeRef.current = null
+    setTerminalState('TODOS_CHECKINS_REALIZADOS')
+  }, [stopCamera])
 
   // ── Listener para leitor físico USB / Bluetooth ─────────────────────────────
   useEffect(() => {
@@ -713,28 +734,37 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                   </div>
                 </div>
 
-                {/* Botão "Nova leitura" CENTRALIZADO ABAIXO do card do participante */}
+                {/* Botão "Nova leitura" ou "Concluir check-in" CENTRALIZADO ABAIXO do card do participante */}
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '0.1rem' }}>
-                  <button
-                    type="button"
-                    onClick={handleNovaLeitura}
-                    style={{
-                      padding: '0.5rem 1.25rem',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: '#4f46e5',
-                      color: '#fff',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                    }}
-                  >
-                    📷 Nova leitura
-                  </button>
+                  {(() => {
+                    const isLastCheckin = Boolean(
+                      result.allCheckedIn || (totalTickets > 0 && checkedInCount >= totalTickets)
+                    )
+                    return (
+                      <button
+                        type="button"
+                        onClick={isLastCheckin ? handleConcluirCheckin : handleNovaLeitura}
+                        style={{
+                          padding: '0.5rem 1.25rem',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: isLastCheckin ? '#16a34a' : '#4f46e5',
+                          color: '#fff',
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          boxShadow: isLastCheckin
+                            ? '0 2px 8px rgba(22, 163, 74, 0.35)'
+                            : '0 2px 8px rgba(79, 70, 229, 0.3)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                        }}
+                      >
+                        {isLastCheckin ? 'Concluir check-in' : '📷 Nova leitura'}
+                      </button>
+                    )
+                  })()}
                 </div>
               </div>
             ) : (
@@ -909,7 +939,10 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
           {cameraActive && !hasResult && (
             <button
               type="button"
-              onClick={stopCamera}
+              onClick={() => {
+                cameraEnabledRef.current = false
+                void stopCamera()
+              }}
               style={{
                 padding: '0.45rem',
                 borderRadius: '7px',

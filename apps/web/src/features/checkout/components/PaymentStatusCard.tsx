@@ -6,11 +6,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Payment } from '@mypass360/types'
 import { createClient } from '@/lib/supabase/client'
 import {
-  confirmPayment,
   createCheckoutPreference,
   fetchPaymentById,
   fetchPaymentByOrderId,
-  manualConfirmPayment,
   syncPaymentStatus,
 } from '../services/payment.service'
 import { useCart } from '@/features/cart/cart-context'
@@ -114,10 +112,21 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
-  const [manualCode, setManualCode] = useState('')
-  const [isManualConfirming, setIsManualConfirming] = useState(false)
-  const [manualError, setManualError] = useState<string | null>(null)
+
+  // Aviso mobile antes de ir para o Mercado Pago
+  const [showMobileWarning, setShowMobileWarning] = useState(false)
+
+  const isMobileDevice = () =>
+    typeof window !== 'undefined' &&
+    ('ontouchstart' in window || window.innerWidth < 768)
+
+  const handlePayClick = () => {
+    if (isMobileDevice()) {
+      setShowMobileWarning(true)
+    } else {
+      void handleCreateCheckoutPreference()
+    }
+  }
 
   // Ref for polling interval cleanup
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -291,21 +300,6 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
     }
   }
 
-  // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
-  async function handleManualConfirm() {
-    setIsManualConfirming(true)
-    setManualError(null)
-
-    try {
-      const updated = await manualConfirmPayment(orderId, manualCode)
-      setManualCode('')
-      handleApproved(updated)
-    } catch (err) {
-      setManualError(err instanceof Error ? err.message : 'Erro na confirmação manual')
-    } finally {
-      setIsManualConfirming(false)
-    }
-  }
 
   // ── Loading ───────────────────────────────────────────────────────────────
   if (isLoading) return <LoadingState />
@@ -349,7 +343,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
 
           <button
             type="button"
-            onClick={handleCreateCheckoutPreference}
+            onClick={handlePayClick}
             disabled={isCreating}
             style={{
               padding: '0.875rem 1rem',
@@ -367,15 +361,124 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
           </button>
         </div>
 
-        {/* Resgate de Cupom de Desconto */}
-        <CouponConfirmationBox
-          orderId={orderId}
-          manualCode={manualCode}
-          setManualCode={setManualCode}
-          isManualConfirming={isManualConfirming}
-          manualError={manualError}
-          onConfirm={handleManualConfirm}
-        />
+        {/* Modal de aviso mobile — exibido antes de sair para o Mercado Pago */}
+        {showMobileWarning && (
+          <div
+            onClick={() => setShowMobileWarning(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 99999,
+              backgroundColor: 'rgba(10, 15, 28, 0.72)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              padding: '0',
+              animation: 'fadeIn 0.2s ease',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '480px',
+                backgroundColor: '#ffffff',
+                borderRadius: '20px 20px 0 0',
+                padding: '2rem 1.5rem 2.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
+                animation: 'slideUp 0.3s cubic-bezier(0.4,0,0.2,1)',
+              }}
+            >
+              {/* Handle visual */}
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: '#e2e8f0', margin: '0 auto -0.5rem' }} />
+
+              {/* Título */}
+              <div>
+                <h3 style={{
+                  margin: '0 0 0.5rem',
+                  fontSize: '1.15rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.3,
+                }}>
+                  Antes de prosseguir
+                </h3>
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.9rem',
+                  color: '#475569',
+                  lineHeight: 1.65,
+                }}>
+                  O pagamento será processado pelo <strong style={{ color: '#0f172a' }}>Mercado Pago</strong>.
+                  Em alguns celulares, o sistema pode tentar abrir o aplicativo do Mercado Pago ou Mercado Livre.
+                </p>
+              </div>
+
+              {/* Destaque da recomendação */}
+              <div style={{
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '12px',
+                padding: '1rem 1.1rem',
+              }}>
+                <p style={{ margin: '0 0 0.3rem', fontWeight: 700, fontSize: '0.88rem', color: '#0369a1' }}>
+                  Recomendamos permanecer no navegador
+                </p>
+                <p style={{ margin: 0, fontSize: '0.83rem', color: '#334155', lineHeight: 1.55 }}>
+                  Pagar pelo navegador garante que a confirmação do PIX aconteça automaticamente
+                  e seu ingresso seja gerado sem precisar de nenhuma ação extra.
+                </p>
+              </div>
+
+              {/* Botão principal */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileWarning(false)
+                  void handleCreateCheckoutPreference()
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.9rem',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Continuar para pagamento
+              </button>
+
+              {/* Link de dispensa */}
+              <button
+                type="button"
+                onClick={() => setShowMobileWarning(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                }}
+              >
+                Cancelar e revisar pedido
+              </button>
+            </div>
+          </div>
+        )}
+
       </section>
     )
   }
@@ -420,17 +523,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
       {isApproved && <SuccessBanner />}
 
       {isPending && (
-        <>
-          <CouponConfirmationBox
-            orderId={orderId}
-            manualCode={manualCode}
-            setManualCode={setManualCode}
-            isManualConfirming={isManualConfirming}
-            manualError={manualError}
-            onConfirm={handleManualConfirm}
-          />
-          <FeeRefundDisclaimer variant="card" style={{ marginTop: '0.5rem' }} />
-        </>
+        <FeeRefundDisclaimer variant="card" style={{ marginTop: '0.5rem' }} />
       )}
 
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -467,145 +560,4 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   )
 }
 
-// ─── Componente de Resgate de Cupom de Desconto (Accordion) ─────────────────────
-function CouponConfirmationBox({
-  orderId: _orderId,
-  manualCode,
-  setManualCode,
-  isManualConfirming,
-  manualError,
-  onConfirm,
-}: {
-  orderId: string
-  manualCode: string
-  setManualCode: (v: string) => void
-  isManualConfirming: boolean
-  manualError: string | null
-  onConfirm: () => void
-}) {
-  const [open, setOpen] = useState(false)
 
-  return (
-    <div
-      style={{
-        border: '1px solid #e2e8f0',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        background: '#fff',
-        marginTop: '1rem',
-      }}
-    >
-      {/* Cabeçalho clicável */}
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.9rem 1.1rem',
-          background: open ? '#f8fafc' : '#fff',
-          border: 'none',
-          cursor: 'pointer',
-          gap: '0.5rem',
-          transition: 'background 0.15s',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.05rem' }}>🎟️</span>
-          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
-            Tenho um cupom de desconto
-          </span>
-        </div>
-        {/* Seta animada */}
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#64748b"
-          strokeWidth="2.5"
-          style={{
-            flexShrink: 0,
-            transition: 'transform 0.22s ease',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-          }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {/* Conteúdo do accordion */}
-      <div
-        style={{
-          maxHeight: open ? '240px' : '0',
-          overflow: 'hidden',
-          transition: 'max-height 0.28s ease',
-        }}
-      >
-        <div
-          style={{
-            padding: '0.25rem 1.1rem 1.1rem',
-            display: 'grid',
-            gap: '0.65rem',
-            borderTop: '1px solid #f1f5f9',
-          }}
-        >
-          <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: '0.65rem 0 0' }}>
-            Possui um cupom de desconto ou código de cortesia? Digite o código abaixo para resgatar.
-          </p>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Digite o código do cupom"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              style={{
-                flex: 1,
-                minWidth: '180px',
-                padding: '0.6rem 0.85rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                letterSpacing: '0.5px',
-                outline: 'none',
-                color: '#0f172a',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = '#4f46e5')}
-              onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-            />
-            <button
-              type="button"
-              onClick={onConfirm}
-              disabled={isManualConfirming || !manualCode.trim()}
-              style={{
-                padding: '0.6rem 1.1rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#4f46e5',
-                color: '#ffffff',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
-                opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
-                whiteSpace: 'nowrap',
-                transition: 'background 0.15s',
-              }}
-            >
-              {isManualConfirming ? 'Aplicando...' : 'Aplicar'}
-            </button>
-          </div>
-          {manualError && (
-            <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
-              {manualError.includes('manual') ? 'Código de cupom inválido ou expirado.' : manualError}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}

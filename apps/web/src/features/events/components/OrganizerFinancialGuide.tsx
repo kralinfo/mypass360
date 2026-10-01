@@ -13,15 +13,15 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
 
   const ticketPrice = Math.max(0, parseFloat(ticketPriceInput.replace(/\D/g, '')) || 0)
   const ticketQty = Math.max(1, parseInt(ticketQtyInput.replace(/\D/g, ''), 10) || 1)
-  
+
   // Taxa de serviço da plataforma repassada ao comprador (ex: 5% a 10%)
   const feePercent = 0.05 // 5%
   const feePerTicket = ticketPrice * feePercent
   const totalPricePerTicket = ticketPrice + feePerTicket
 
   const totalGrossRevenue = ticketPrice * ticketQty
-  const transferFee = totalGrossRevenue > 0 ? 7.50 : 0
-  const netPayout = Math.max(0, totalGrossRevenue - transferFee)
+  const transferFee = 0 // Repasse via PIX sem taxa
+  const netPayout = totalGrossRevenue
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
@@ -49,10 +49,10 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
             <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Atualizado recentemente</span>
           </div>
           <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
-            Como Receber Suas Vendas na Conta Bancária
+            Como Receber Suas Vendas por PIX
           </h3>
           <p style={{ margin: '0.3rem 0 0', fontSize: '0.9rem', color: '#475569' }}>
-            O repasse das suas vendas é feito por transferência bancária (TED/PIX) após a conclusão do seu evento.
+            O repasse das suas vendas é realizado via <strong>PIX</strong> diretamente na sua conta após a conclusão do evento.
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#047857')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#059669')}
           >
-            Cadastrar Conta para Repasse →
+            Cadastrar Chave PIX para Repasse →
           </button>
         )}
       </div>
@@ -120,14 +120,14 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
         </div>
       </div>
 
-      {/* Cronograma de Repasse e Tarifas Bancárias */}
+      {/* Cronograma de Repasse via PIX */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
         <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.25rem' }}>
           <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
             Prazo de Recebimento
           </h4>
           <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
-            Após o encerramento do evento, o valor total apurado das vendas é depositado na sua conta cadastrada em <strong>até 3 dias úteis, até às 18h</strong>.
+            Após o encerramento do evento, o valor total apurado das vendas é transferido via <strong>PIX</strong> para sua chave cadastrada em <strong>até 3 dias úteis</strong>.
           </p>
           <span style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.78rem', color: '#64748b' }}>
             * Prazos sujeitos a alterações em feriados bancários e nacionais.
@@ -136,10 +136,10 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
 
         <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.25rem' }}>
           <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
-            Tarifas de Transferência Bancária
+            Isenção de Tarifas de Transferência
           </h4>
           <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
-            Para a realização do repasse bancário, é deduzida uma taxa de <strong>R$ 7,50 por evento</strong> para todas as instituições financeiras.
+            O repasse via <strong>PIX é 100% isento de taxas de transferência</strong>. Você recebe o valor integral apurado nas vendas.
           </p>
         </div>
       </div>
@@ -150,7 +150,7 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
           Simulador de Repasse do Organizador
         </h4>
         <p style={{ margin: '0 0 1rem', fontSize: '0.83rem', color: '#64748b' }}>
-          Simule o valor que seu comprador pagará e o valor exato a ser transferido para sua conta.
+          Simule o valor que seu comprador pagará e o valor exato a ser transferido via PIX para sua conta.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
@@ -196,7 +196,7 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.3rem' }}>
-              Banco da Conta de Repasse
+              Banco da Chave PIX
             </label>
             <select
               value={selectedBank}
@@ -211,13 +211,14 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
                 boxSizing: 'border-box',
               }}
             >
-              <option value="bb">Banco do Brasil (R$ 7,50)</option>
-              <option value="bradesco">Bradesco (R$ 7,50)</option>
-              <option value="itau">Itaú (R$ 7,50)</option>
-              <option value="santander">Santander (R$ 7,50)</option>
-              <option value="nubank">Nubank (R$ 7,50)</option>
-              <option value="inter">Banco Inter (R$ 7,50)</option>
-              <option value="outros">Outros Bancos (R$ 7,50)</option>
+              <option value="bb">Banco do Brasil</option>
+              <option value="bradesco">Bradesco</option>
+              <option value="itau">Itaú</option>
+              <option value="santander">Santander</option>
+              <option value="nubank">Nubank</option>
+              <option value="inter">Banco Inter</option>
+              <option value="caixa">Caixa Econômica</option>
+              <option value="outros">Outro Banco</option>
             </select>
           </div>
         </div>
@@ -233,26 +234,26 @@ export function OrganizerFinancialGuide({ onOpenBankAccountModal }: OrganizerFin
             <strong style={{ color: '#0f172a' }}>{formatCurrency(totalGrossRevenue)}</strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#475569' }}>
-            <span>Tarifa de transferência bancária:</span>
-            <span style={{ color: '#dc2626', fontWeight: 600 }}>
-              - {formatCurrency(transferFee)}
+            <span>Taxa de transferência (PIX):</span>
+            <span style={{ color: '#059669', fontWeight: 600 }}>
+              Isento (R$ 0,00)
             </span>
           </div>
           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.5rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Valor Líquido Depositado na sua Conta:</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Valor Líquido Transferido via PIX:</span>
             <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#059669' }}>{formatCurrency(netPayout)}</span>
           </div>
         </div>
       </div>
 
-      {/* Regras de Validação de CPF/CNPJ */}
+      {/* Requisitos dos Dados */}
       <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.25rem' }}>
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#0f172a', fontWeight: 700 }}>
-          Requisitos da Conta Bancária
+          Requisitos para Recebimento via PIX
         </h4>
         <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          <li>A conta pode ser de <strong>Pessoa Física (CPF)</strong> ou <strong>Pessoa Jurídica (CNPJ)</strong>.</li>
-          <li>O CPF ou CNPJ do titular da conta deve obrigatoriamente corresponder ao documento registrado no perfil <strong>“Minha Conta”</strong>.</li>
+          <li>A chave PIX cadastrada deve ser válida e ativa na sua instituição financeira.</li>
+          <li>Certifique-se de preencher corretamente o <strong>Banco, Nome Completo do Titular, Chave PIX e Telefone para contato</strong>.</li>
         </ul>
       </div>
     </div>

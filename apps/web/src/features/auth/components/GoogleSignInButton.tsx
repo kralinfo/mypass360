@@ -6,9 +6,18 @@ import { useState } from 'react'
 
 interface GoogleSignInButtonProps {
   label?: string
+  nextUrl?: string
 }
 
-export function GoogleSignInButton({ label = 'Continuar com Google' }: GoogleSignInButtonProps) {
+function getSafeNextUrl(rawNext: string | null): string | null {
+  if (!rawNext) return null
+  if (rawNext.startsWith('/') && !rawNext.startsWith('//')) {
+    return rawNext
+  }
+  return null
+}
+
+export function GoogleSignInButton({ label = 'Continuar com Google', nextUrl }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
@@ -16,8 +25,31 @@ export function GoogleSignInButton({ label = 'Continuar com Google' }: GoogleSig
     setIsLoading(true)
 
     const supabase = createClient()
-    const next = new URLSearchParams(window.location.search).get('next') ?? '/eventos'
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+
+    // Hierarquia para determinar a rota de retorno pós-login:
+    // 1. Prop explicita `nextUrl`
+    // 2. Query param `?next=` na URL atual (incluindo parâmetros de query codificados)
+    // 3. Referrer (se for da mesma aplicação e não for página de auth)
+    // 4. Fallback padrão: `/eventos`
+    const searchNext = getSafeNextUrl(new URLSearchParams(window.location.search).get('next'))
+
+    let referrerNext: string | null = null
+    if (typeof window !== 'undefined' && document.referrer) {
+      try {
+        const refUrl = new URL(document.referrer)
+        if (refUrl.origin === window.location.origin) {
+          const path = refUrl.pathname + refUrl.search
+          if (!path.startsWith('/login') && !path.startsWith('/cadastro') && !path.startsWith('/admin-login')) {
+            referrerNext = getSafeNextUrl(path)
+          }
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+
+    const targetNext = nextUrl ?? searchNext ?? referrerNext ?? '/eventos'
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(targetNext)}`
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',

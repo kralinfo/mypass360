@@ -76,14 +76,16 @@ export async function updateSession(request: NextRequest) {
   if (!session && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('next', pathname)
+    // Preserva a rota inteira incluindo os parâmetros de busca (ex: ?eventId=...&from=event&slug=...)
+    const fullPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
+    url.searchParams.set('next', fullPath)
     return NextResponse.redirect(url)
   }
 
   if (session && isAuthRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/eventos'
-    return NextResponse.redirect(url)
+    const rawNext = request.nextUrl.searchParams.get('next')
+    const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/eventos'
+    return NextResponse.redirect(new URL(next, request.nextUrl.origin))
   }
 
   return supabaseResponse

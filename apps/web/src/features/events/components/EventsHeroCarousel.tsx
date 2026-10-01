@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Event } from '@mypass360/types'
 
 interface EventsHeroCarouselProps {
@@ -13,6 +14,7 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
   const [isAnimating, setIsAnimating] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const touchStartX = useRef(0)
+  const router = useRouter()
 
   const total = events.length
 
@@ -92,7 +94,7 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
       zIndex,
       opacity,
       transition: 'all 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
-      cursor: offset !== 0 ? 'pointer' : 'default',
+      cursor: 'pointer',
       boxShadow: abs === 0
         ? '0 16px 36px -8px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)'
         : '0 6px 16px -4px rgba(0,0,0,0.1)',
@@ -145,7 +147,13 @@ export function EventsHeroCarousel({ events }: EventsHeroCarouselProps) {
               key={`${idx}-${offset}`}
               style={getCardStyle(offset)}
               onClick={() => {
-                if (offset !== 0) go(offset > 0 ? 1 : -1)
+                if (offset === 0) {
+                  // Card central: navega para o evento
+                  router.push(`/eventos/${ev.slug}`)
+                } else {
+                  // Cards laterais: navega o carrossel
+                  go(offset > 0 ? 1 : -1)
+                }
               }}
             >
               <div style={{ width: '100%', height: '100%', position: 'relative' }}>

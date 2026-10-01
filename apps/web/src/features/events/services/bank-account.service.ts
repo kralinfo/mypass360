@@ -4,15 +4,17 @@ export interface BankAccountData {
   id?: string
   user_id?: string
   event_id?: string
-  person_type: 'pf' | 'pj'
+  person_type?: 'pf' | 'pj'
   holder_name: string
-  document: string
+  document?: string
   bank_code: string
   bank_name: string
-  account_type: 'corrente' | 'poupanca'
-  agency: string
-  account_number: string
-  account_digit: string
+  account_type?: 'corrente' | 'poupanca'
+  agency?: string
+  account_number?: string
+  account_digit?: string
+  pix_key?: string
+  contact_phone?: string
   created_at?: string
   updated_at?: string
 }
