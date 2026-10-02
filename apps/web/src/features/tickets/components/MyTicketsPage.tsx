@@ -52,17 +52,40 @@ export function MyTicketsPage() {
           grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
           gap: 1.25rem;
         }
-        @media (max-width: 520px) {
-          .my-tickets-grid {
-            grid-template-columns: 1fr;
-          }
-        }
         .events-tabs-container::-webkit-scrollbar {
           display: none;
+        }
+        @media (max-width: 640px) {
+          .my-tickets-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+          }
+          .my-tickets-container {
+            padding: 0.85rem 0.65rem !important;
+          }
+          .my-tickets-header {
+            margin-bottom: 0.85rem !important;
+          }
+          .my-tickets-title {
+            font-size: 1.35rem !important;
+            margin-bottom: 0.15rem !important;
+          }
+          .my-tickets-subtitle {
+            font-size: 0.82rem !important;
+          }
+          .my-tickets-tabs {
+            margin-bottom: 0.85rem !important;
+            padding-bottom: 0.4rem !important;
+          }
+          .my-tickets-count {
+            margin-bottom: 0.75rem !important;
+            font-size: 0.8rem !important;
+          }
         }
       `}</style>
 
       <main
+        className="my-tickets-container"
         style={{
           maxWidth: '1100px',
           margin: '0 auto',
@@ -70,9 +93,10 @@ export function MyTicketsPage() {
         }}
       >
         {/* Cabeçalho da página */}
-        <div style={{ marginBottom: '1.75rem' }}>
+        <div className="my-tickets-header" style={{ marginBottom: '1.75rem' }}>
 
           <h1
+            className="my-tickets-title"
             style={{
               fontSize: '1.75rem',
               fontWeight: 800,
@@ -83,7 +107,7 @@ export function MyTicketsPage() {
           >
             Meus Ingressos
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
+          <p className="my-tickets-subtitle" style={{ color: '#64748b', fontSize: '0.95rem' }}>
             Gerencie e baixe todos os seus ingressos comprados.
           </p>
         </div>
@@ -211,7 +235,7 @@ export function MyTicketsPage() {
         {!isLoading && !error && tickets.length > 0 && (
           <>
             <div
-              className="events-tabs-container"
+              className="events-tabs-container my-tickets-tabs"
               style={{
                 display: 'flex',
                 gap: '0.75rem',
@@ -245,7 +269,7 @@ export function MyTicketsPage() {
               ))}
             </div>
 
-            <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+            <p className="my-tickets-count" style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
               {filteredTickets.length} {filteredTickets.length === 1 ? 'ingresso' : 'ingressos'} neste evento
             </p>
             <div className="my-tickets-grid">

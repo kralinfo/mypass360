@@ -19,6 +19,8 @@ interface PaymentStatusCardProps {
   orderId: string
   eventId: string
   amount: number
+  from?: string
+  slug?: string
 }
 
 // ─── Loading skeleton ──────────────────────────────────────────────────────────
@@ -103,7 +105,7 @@ function SuccessBanner() {
   )
 }
 
-export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: PaymentStatusCardProps) {
+export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, slug }: PaymentStatusCardProps) {
   const router = useRouter()
   const { clearCart } = useCart()
 
@@ -112,6 +114,36 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [resolvedEventId, setResolvedEventId] = useState(eventId)
+  const [resolvedSlug, setResolvedSlug] = useState(slug)
+  const [resolvedFrom, setResolvedFrom] = useState(from)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      if (orderId) {
+        const storedMeta = window.sessionStorage.getItem(`mypass360-order-meta:${orderId}`)
+        if (storedMeta) {
+          const meta = JSON.parse(storedMeta)
+          if (meta.eventId) setResolvedEventId(meta.eventId)
+          if (meta.slug) setResolvedSlug(meta.slug)
+          if (meta.from) setResolvedFrom(meta.from)
+          return
+        }
+      }
+
+      const pending = window.sessionStorage.getItem('mypass360-pending-payment')
+      if (pending) {
+        const parsed = JSON.parse(pending)
+        if (parsed.eventId) setResolvedEventId(parsed.eventId)
+        if (parsed.slug) setResolvedSlug(parsed.slug)
+        if (parsed.from) setResolvedFrom(parsed.from)
+      }
+    } catch {
+      // ignore
+    }
+  }, [orderId, eventId, slug, from])
 
   // Aviso mobile antes de ir para o Mercado Pago
   const [showMobileWarning, setShowMobileWarning] = useState(false)
@@ -271,10 +303,17 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         payerEmail: user.email,
       })
 
+      const effectiveEvId = resolvedEventId || eventId
+      const effectiveSlg = resolvedSlug || slug
+      const effectiveFrm = resolvedFrom || from
+
       // Salvar orderId — permite detectar o pagamento caso o usuário feche a aba
       // e volte manualmente, ou em caso de fallback para redirecionamento.
       window.sessionStorage.setItem('mypass360-pending-payment', JSON.stringify({
         orderId,
+        eventId: effectiveEvId,
+        slug: effectiveSlg,
+        from: effectiveFrm,
         initiatedAt: new Date().toISOString(),
       }))
 
@@ -526,36 +565,50 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount }: Payme
         <FeeRefundDisclaimer variant="card" style={{ marginTop: '0.5rem' }} />
       )}
 
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        {!isApproved && (
-          <Link
-            href={`/checkout?eventId=${eventId}`}
-            style={{
-              padding: '0.65rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              color: '#374151',
-              textDecoration: 'none',
-              fontSize: '0.875rem',
-            }}
-          >
-            Voltar para confirmar pedido
-          </Link>
-        )}
-        <Link
-          href="/eventos"
-          style={{
-            padding: '0.65rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            color: '#374151',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-          }}
-        >
-          Ver eventos
-        </Link>
-      </div>
+      {(() => {
+        const targetEventId = resolvedEventId || eventId
+        const targetSlug = resolvedSlug || slug
+        const targetFrom = resolvedFrom || from
+
+        const backToCheckoutHref = targetEventId
+          ? `/checkout?eventId=${targetEventId}${targetFrom ? `&from=${targetFrom}` : ''}${targetSlug ? `&slug=${targetSlug}` : ''}`
+          : targetSlug
+            ? `/eventos/${targetSlug}`
+            : '/carrinho'
+
+        return (
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {!isApproved && (
+              <Link
+                href={backToCheckoutHref}
+                style={{
+                  padding: '0.65rem 1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  color: '#374151',
+                  textDecoration: 'none',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Voltar para confirmar pedido
+              </Link>
+            )}
+            <Link
+              href="/eventos"
+              style={{
+                padding: '0.65rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                color: '#374151',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+              }}
+            >
+              Ver eventos
+            </Link>
+          </div>
+        )
+      })()}
     </section>
   )
 }
