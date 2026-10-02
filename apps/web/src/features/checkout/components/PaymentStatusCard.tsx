@@ -121,11 +121,16 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    // If eventId was already passed via URL props, nothing to resolve
+    if (eventId) return
+
     try {
+      // 1. Order-specific meta keyed by orderId (most precise)
       if (orderId) {
-        const storedMeta = window.sessionStorage.getItem(`mypass360-order-meta:${orderId}`)
-        if (storedMeta) {
-          const meta = JSON.parse(storedMeta)
+        const sessionMeta = window.sessionStorage.getItem(`mypass360-order-meta:${orderId}`)
+          ?? window.localStorage.getItem(`mypass360-order-meta:${orderId}`)
+        if (sessionMeta) {
+          const meta = JSON.parse(sessionMeta)
           if (meta.eventId) setResolvedEventId(meta.eventId)
           if (meta.slug) setResolvedSlug(meta.slug)
           if (meta.from) setResolvedFrom(meta.from)
@@ -133,12 +138,30 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
         }
       }
 
-      const pending = window.sessionStorage.getItem('mypass360-pending-payment')
+      // 2. Generic pending-payment bucket (written just before opening MP)
+      const pending =
+        window.sessionStorage.getItem('mypass360-pending-payment')
+        ?? window.localStorage.getItem('mypass360-pending-payment')
       if (pending) {
         const parsed = JSON.parse(pending)
-        if (parsed.eventId) setResolvedEventId(parsed.eventId)
-        if (parsed.slug) setResolvedSlug(parsed.slug)
-        if (parsed.from) setResolvedFrom(parsed.from)
+        // Only use if it matches the current orderId (or orderId is unknown)
+        if (!orderId || !parsed.orderId || parsed.orderId === orderId) {
+          if (parsed.eventId) setResolvedEventId(parsed.eventId)
+          if (parsed.slug) setResolvedSlug(parsed.slug)
+          if (parsed.from) setResolvedFrom(parsed.from)
+          return
+        }
+      }
+
+      // 3. Fallback: scan any checkout snapshot to extract eventId
+      for (const key of Object.keys(window.sessionStorage)) {
+        if (key.startsWith('mypass360-checkout-snapshot:')) {
+          const extractedId = key.split(':')[1]
+          if (extractedId) {
+            setResolvedEventId(extractedId)
+            return
+          }
+        }
       }
     } catch {
       // ignore
@@ -185,6 +208,9 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
           sessionStorage.removeItem(key)
         }
       }
+      // Limpar também entradas de pending-payment do localStorage
+      localStorage.removeItem('mypass360-pending-payment')
+      sessionStorage.removeItem('mypass360-pending-payment')
     } catch { /* silencioso */ }
     setTimeout(() => router.push('/meus-ingressos'), 1200)
   }, [clearCart, router])
@@ -307,15 +333,25 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
       const effectiveSlg = resolvedSlug || slug
       const effectiveFrm = resolvedFrom || from
 
-      // Salvar orderId — permite detectar o pagamento caso o usuário feche a aba
-      // e volte manualmente, ou em caso de fallback para redirecionamento.
-      window.sessionStorage.setItem('mypass360-pending-payment', JSON.stringify({
+      // Persistir metadados do pedido em session + localStorage para sobreviver
+      // ao fechamento de aba / retorno do app externo (Mercado Pago)
+      const paymentMeta = JSON.stringify({
         orderId,
         eventId: effectiveEvId,
         slug: effectiveSlg,
         from: effectiveFrm,
         initiatedAt: new Date().toISOString(),
-      }))
+      })
+      window.sessionStorage.setItem('mypass360-pending-payment', paymentMeta)
+      window.localStorage.setItem('mypass360-pending-payment', paymentMeta)
+      // Também indexar pelo orderId para lookup direto
+      const orderMeta = JSON.stringify({
+        eventId: effectiveEvId,
+        slug: effectiveSlg,
+        from: effectiveFrm,
+      })
+      window.sessionStorage.setItem(`mypass360-order-meta:${orderId}`, orderMeta)
+      window.localStorage.setItem(`mypass360-order-meta:${orderId}`, orderMeta)
 
       if (popup && !popup.closed) {
         // Fluxo principal: MP abre em nova aba, nossa aba continua monitorando o status
