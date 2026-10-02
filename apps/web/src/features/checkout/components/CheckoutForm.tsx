@@ -122,7 +122,10 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   useEffect(() => {
     if (!event || ticketTypes.length === 0 || hydratedFromSnapshotRef.current) return
 
-    const stored = window.sessionStorage.getItem(snapshotKey)
+    // Checar sessionStorage primeiro (mais fresco), depois localStorage (mais persistente)
+    const stored =
+      window.sessionStorage.getItem(snapshotKey)
+      ?? window.localStorage.getItem(snapshotKey)
     if (!stored) return
 
     try {
@@ -144,17 +147,21 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
       }
     } catch {
       window.sessionStorage.removeItem(snapshotKey)
+      window.localStorage.removeItem(snapshotKey)
     }
   }, [event, ticketTypes, snapshotKey, hydrateSelectedItems])
 
-  // Auto-salvar seleção no sessionStorage a cada mudança (persiste mesmo antes de confirmar)
+  // Auto-salvar seleção no sessionStorage + localStorage a cada mudança
   useEffect(() => {
     if (!event) return
     if (selectedItems.length > 0) {
-      window.sessionStorage.setItem(snapshotKey, JSON.stringify(selectedItems))
+      const serialized = JSON.stringify(selectedItems)
+      window.sessionStorage.setItem(snapshotKey, serialized)
+      window.localStorage.setItem(snapshotKey, serialized)
     } else if (hydratedFromSnapshotRef.current || hydratedFromCartRef.current || hydratedFromDirectCheckoutRef.current) {
       // Usuário removeu todos os itens manualmente após hidratação — limpar snapshot
       window.sessionStorage.removeItem(snapshotKey)
+      window.localStorage.removeItem(snapshotKey)
     }
   }, [selectedItems, snapshotKey, event])
 
@@ -217,7 +224,9 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
 
     // Salvar snapshot final antes de navegar (garante dados frescos)
     if (selectedItems.length > 0) {
-      window.sessionStorage.setItem(snapshotKey, JSON.stringify(selectedItems))
+      const finalSnapshot = JSON.stringify(selectedItems)
+      window.sessionStorage.setItem(snapshotKey, finalSnapshot)
+      window.localStorage.setItem(snapshotKey, finalSnapshot)
     }
 
     const result = await handleSubmit(eventId)

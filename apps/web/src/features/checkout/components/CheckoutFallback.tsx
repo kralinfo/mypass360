@@ -12,10 +12,13 @@ export function CheckoutFallback() {
     try {
       if (typeof window === 'undefined') return
 
-      // 1. Verificar se há algum pagamento pendente recente com eventId no sessionStorage
-      const pending = window.sessionStorage.getItem('mypass360-pending-payment')
-      if (pending) {
-        const parsed = JSON.parse(pending)
+      // 1. Verificar se há algum pagamento pendente recente com eventId
+      //    Checar sessionStorage primeiro, depois localStorage (persiste entre abas/apps)
+      const pendingRaw =
+        window.sessionStorage.getItem('mypass360-pending-payment')
+        ?? window.localStorage.getItem('mypass360-pending-payment')
+      if (pendingRaw) {
+        const parsed = JSON.parse(pendingRaw)
         if (parsed.eventId) {
           const params = new URLSearchParams({ eventId: parsed.eventId })
           if (parsed.slug) params.append('slug', parsed.slug)
@@ -25,10 +28,16 @@ export function CheckoutFallback() {
         }
       }
 
-      // 2. Procurar por qualquer order-meta recente
-      for (const key of Object.keys(window.sessionStorage)) {
+      // 2. Procurar por qualquer order-meta recente (session + local)
+      const allKeys = [
+        ...Object.keys(window.sessionStorage),
+        ...Object.keys(window.localStorage),
+      ]
+      for (const key of allKeys) {
         if (key.startsWith('mypass360-order-meta:')) {
-          const raw = window.sessionStorage.getItem(key)
+          const raw =
+            window.sessionStorage.getItem(key)
+            ?? window.localStorage.getItem(key)
           if (raw) {
             const meta = JSON.parse(raw)
             if (meta.eventId) {
