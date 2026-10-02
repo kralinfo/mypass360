@@ -117,187 +117,282 @@ export function TicketCard({ ticket, buyerName, onNameUpdated }: TicketCardProps
   })
 
   return (
-    <article
-      style={{
-        borderRadius: '16px',
-        overflow: 'hidden',
-        border: '1px solid #e2e8f0',
-        background: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-          padding: '1.25rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-        }}
-      >
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span>{ticket.ticketType?.name?.toUpperCase() ?? (ticket.registrationType === 'FREE' ? 'CONFIRMAÇÃO DE PRESENÇA' : 'INGRESSO')}</span>
-            {ticket.registrationType === 'FREE' && (
-              <span style={{ background: '#16a34a', color: '#ffffff', fontSize: '0.65rem', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 800 }}>
-                GRATUITO
-              </span>
+    <>
+      <style>{`
+        .ticket-card-box {
+          border-radius: 16px;
+          overflow: hidden;
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .ticket-card-header {
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+          padding: 1.1rem 1.25rem;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 0.6rem;
+        }
+        .ticket-card-title {
+          font-size: 1.1rem;
+          font-weight: 800;
+          color: #fff;
+          margin: 0;
+          line-height: 1.2;
+          overflow-wrap: break-word;
+          word-break: break-word;
+        }
+        .ticket-card-body {
+          padding: 1.15rem 1.25rem;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0.85rem;
+        }
+        .ticket-code-box {
+          background: #f8fafc;
+          border-radius: 10px;
+          padding: 0.75rem 1rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .ticket-actions-section {
+          border-top: 1px solid #f1f5f9;
+          padding-top: 0.85rem;
+        }
+
+        @media (max-width: 640px) {
+          .ticket-card-box {
+            border-radius: 12px;
+          }
+          .ticket-card-header {
+            padding: 0.65rem 0.85rem;
+            gap: 0.4rem;
+          }
+          .ticket-card-type {
+            font-size: 0.62rem !important;
+            margin-bottom: 0.15rem !important;
+          }
+          .ticket-card-title {
+            font-size: 0.95rem;
+          }
+          .ticket-card-status {
+            padding: 0.15rem 0.55rem !important;
+            font-size: 0.68rem !important;
+          }
+          .ticket-card-body {
+            padding: 0.65rem 0.85rem;
+            gap: 0.45rem;
+          }
+          .ticket-event-info {
+            gap: 0.35rem !important;
+          }
+          .ticket-info-item {
+            font-size: 0.8rem !important;
+            gap: 0.35rem !important;
+          }
+          .ticket-info-item svg {
+            width: 13px !important;
+            height: 13px !important;
+          }
+          .ticket-divider-container {
+            margin: 0.1rem 0 !important;
+          }
+          .ticket-portador-section {
+            gap: 0.15rem !important;
+          }
+          .ticket-portador-title {
+            font-size: 0.62rem !important;
+          }
+          .ticket-portador-name {
+            font-size: 0.85rem !important;
+          }
+          .ticket-code-box {
+            padding: 0.45rem 0.75rem;
+            border-radius: 8px;
+          }
+          .ticket-code-val {
+            font-size: 0.88rem !important;
+          }
+          .ticket-code-label {
+            font-size: 0.62rem !important;
+            margin-bottom: 0.05rem !important;
+          }
+          .ticket-issued-val {
+            font-size: 0.75rem !important;
+          }
+          .ticket-issued-sub {
+            font-size: 0.68rem !important;
+          }
+          .ticket-actions-section {
+            padding-top: 0.45rem;
+          }
+          .ticket-actions-section button {
+            padding: 0.35rem 0.45rem !important;
+            font-size: 0.72rem !important;
+          }
+        }
+      `}</style>
+
+      <article className="ticket-card-box">
+        {/* Header */}
+        <div className="ticket-card-header">
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p className="ticket-card-type" style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.08em', margin: '0 0 0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span>{ticket.ticketType?.name?.toUpperCase() ?? (ticket.registrationType === 'FREE' ? 'CONFIRMAÇÃO DE PRESENÇA' : 'INGRESSO')}</span>
+              {ticket.registrationType === 'FREE' && (
+                <span style={{ background: '#16a34a', color: '#ffffff', fontSize: '0.65rem', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 800 }}>
+                  GRATUITO
+                </span>
+              )}
+            </p>
+            <p className="ticket-card-title">
+              {ticket.event?.title ?? 'Evento'}
+            </p>
+          </div>
+          <div
+            className="ticket-card-status"
+            style={{
+              background: status.bg,
+              color: status.color,
+              border: `1px solid ${status.border}`,
+              borderRadius: '20px',
+              padding: '0.25rem 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {status.label}
+          </div>
+        </div>
+
+        {/* Corpo */}
+        <div className="ticket-card-body">
+          {/* Infos do evento */}
+          <div className="ticket-event-info" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {eventDate && (
+              <div className="ticket-info-item" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#475569' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{eventDate}{eventTime && ` às ${eventTime}`}</span>
+              </div>
             )}
-          </p>
-          <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0, lineHeight: 1.2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-            {ticket.event?.title ?? 'Evento'}
-          </p>
-        </div>
-        <div
-          style={{
-            background: status.bg,
-            color: status.color,
-            border: `1px solid ${status.border}`,
-            borderRadius: '20px',
-            padding: '0.25rem 0.75rem',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-        >
-          {status.label}
-        </div>
-      </div>
 
-      {/* Corpo */}
-      <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* Infos do evento */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {eventDate && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#475569' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              <span style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{eventDate}{eventTime && ` às ${eventTime}`}</span>
-            </div>
-          )}
+            {ticket.event?.location && (
+              <div className="ticket-info-item" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#475569' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                </svg>
+                <span style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{ticket.event.location}</span>
+              </div>
+            )}
+          </div>
 
-          {ticket.event?.location && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#475569' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-              </svg>
-              <span style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{ticket.event.location}</span>
-            </div>
-          )}
-        </div>
+          {/* Divisor com estilo de ticket */}
+          <div className="ticket-divider-container" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e2e8f0', flexShrink: 0 }} />
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+          </div>
 
-        {/* Divisor com estilo de ticket */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e2e8f0', flexShrink: 0 }} />
-          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-        </div>
+          {/* Portador do ingresso - Ocultar se o tipo de identificação for 'none' */}
+          {ticket.event?.participant_id_type !== 'none' ? (
+            <div className="ticket-portador-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p className="ticket-portador-title" style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
+                  PORTADOR
+                </p>
+                {canEditName && !isEditingName && (
+                  <button
+                    onClick={() => { setEditNameValue(ticket.buyerName ?? buyerName ?? ''); setIsEditingName(true); setNameError(null) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.1rem 0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6366f1', fontSize: '0.75rem', fontWeight: 600 }}
+                    title="Editar nome do portador"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Editar
+                  </button>
+                )}
+              </div>
 
-        {/* Portador do ingresso - Ocultar se o tipo de identificação for 'none' */}
-        {ticket.event?.participant_id_type !== 'none' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
-                PORTADOR
-              </p>
-              {canEditName && !isEditingName && (
-                <button
-                  onClick={() => { setEditNameValue(ticket.buyerName ?? buyerName ?? ''); setIsEditingName(true); setNameError(null) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.1rem 0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#6366f1', fontSize: '0.75rem', fontWeight: 600 }}
-                  title="Editar nome do portador"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                  Editar
-                </button>
+              {isEditingName ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <input
+                      type="text"
+                      value={editNameValue}
+                      onChange={(e) => setEditNameValue(e.target.value)}
+                      placeholder="Nome do portador"
+                      style={inputStyle}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveName(); if (e.key === 'Escape') setIsEditingName(false) }}
+                    />
+                    <button onClick={() => void handleSaveName()} disabled={isSavingName} style={btnSmall('#6366f1', '#fff')}>
+                      {isSavingName ? '...' : 'Salvar'}
+                    </button>
+                    <button onClick={() => setIsEditingName(false)} style={btnSmall('#f1f5f9', '#475569')}>
+                      ✕
+                    </button>
+                  </div>
+                  {nameError && <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: 0 }}>{nameError}</p>}
+                </div>
+              ) : (
+                <p className="ticket-portador-name" style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: 700, margin: 0 }}>
+                  {displayName}
+                </p>
               )}
             </div>
-
-            {isEditingName ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <input
-                    type="text"
-                    value={editNameValue}
-                    onChange={(e) => setEditNameValue(e.target.value)}
-                    placeholder="Nome do portador"
-                    style={inputStyle}
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveName(); if (e.key === 'Escape') setIsEditingName(false) }}
-                  />
-                  <button onClick={() => void handleSaveName()} disabled={isSavingName} style={btnSmall('#6366f1', '#fff')}>
-                    {isSavingName ? '...' : 'Salvar'}
-                  </button>
-                  <button onClick={() => setIsEditingName(false)} style={btnSmall('#f1f5f9', '#475569')}>
-                    ✕
-                  </button>
-                </div>
-                {nameError && <p style={{ fontSize: '0.75rem', color: '#ef4444', margin: 0 }}>{nameError}</p>}
-              </div>
-            ) : (
-              <p style={{ fontSize: '0.95rem', color: '#0f172a', fontWeight: 700, margin: 0 }}>
-                {displayName}
+          ) : (
+            <div className="ticket-portador-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <p className="ticket-portador-title" style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
+                PORTADOR
               </p>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
-              PORTADOR
-            </p>
-            <div style={{ display: 'inline-flex', alignSelf: 'flex-start', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.3rem 0.55rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
-                🎫 Ingresso ao Portador / Transferível
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Código público */}
-        <div
-          style={{
-            background: '#f8fafc',
-            borderRadius: '10px',
-            padding: '0.75rem 1rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.15rem' }}>
-              CÓDIGO DO INGRESSO
-            </p>
-            <p style={{ fontSize: '1rem', color: '#0f172a', fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.1em' }}>
-              {ticket.publicCode}
-            </p>
-          </div>
-          {issuedDateStr && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <p style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.15rem' }}>
-                EMITIDO EM
-              </p>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.1rem' }}>{issuedDateStr}</p>
-                <p style={{ fontSize: '0.75rem', color: '#64748b' }}>às {issuedTimeStr}</p>
+              <div style={{ display: 'inline-flex', alignSelf: 'flex-start', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.25rem 0.5rem' }}>
+                <span className="ticket-portador-name" style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
+                  🎫 Ingresso ao Portador / Transferível
+                </span>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Ações PDF */}
-        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-          <TicketPdfGenerator ticket={ticket} buyerName={displayName} buyerCpf={ticket.buyerCpf} />
+          {/* Código público */}
+          <div className="ticket-code-box">
+            <div>
+              <p className="ticket-code-label" style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.15rem' }}>
+                CÓDIGO DO INGRESSO
+              </p>
+              <p className="ticket-code-val" style={{ fontSize: '1rem', color: '#0f172a', fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.1em', margin: 0 }}>
+                {ticket.publicCode}
+              </p>
+            </div>
+            {issuedDateStr && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <p className="ticket-code-label" style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.15rem' }}>
+                  EMITIDO EM
+                </p>
+                <div style={{ textAlign: 'right' }}>
+                  <p className="ticket-issued-val" style={{ fontSize: '0.85rem', color: '#475569', margin: '0 0 0.1rem' }}>{issuedDateStr}</p>
+                  <p className="ticket-issued-sub" style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>às {issuedTimeStr}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Ações PDF */}
+          <div className="ticket-actions-section">
+            <TicketPdfGenerator ticket={ticket} buyerName={displayName} buyerCpf={ticket.buyerCpf} />
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </>
   )
 }

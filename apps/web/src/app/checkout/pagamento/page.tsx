@@ -36,6 +36,8 @@ export default async function CheckoutPaymentPage({ searchParams }: CheckoutPaym
         orderId={orderId}
         eventId={eventId ?? ''}
         amount={Number(amount ?? 0)}
+        from={from}
+        slug={slug}
       />
     </main>
   )
