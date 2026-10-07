@@ -158,6 +158,13 @@ export class EventsController {
     return this.eventsService.getEventDetails(id, user.id)
   }
 
+  /** GET /events/:id/attendees — ingressos emitidos do evento (protegido) */
+  @Get(':id/attendees')
+  @UseGuards(AuthGuard)
+  getEventAttendees(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.getEventAttendees(id, user.id)
+  }
+
   /** GET /events/:id/checkin-accesses — credenciais de portaria do evento (protegido) */
   @Get(':id/checkin-accesses')
   @UseGuards(AuthGuard)

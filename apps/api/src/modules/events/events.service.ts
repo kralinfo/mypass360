@@ -276,6 +276,12 @@ export class EventsService {
     return this.adminRepository.getEventDetails(id)
   }
 
+  /** Lista de ingressos emitidos do evento (valida acesso de dono/sócio). */
+  async getEventAttendees(id: string, userId: string) {
+    await this.assertAccess(id, userId)
+    return this.adminRepository.getEventAttendees(id)
+  }
+
   /** Credenciais de portaria do evento (valida acesso de dono/sócio). */
   async getCheckinAccesses(id: string, userId: string) {
     await this.assertAccess(id, userId)

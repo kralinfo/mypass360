@@ -6,10 +6,12 @@ import {
   deleteEventCheckinAccess,
   fetchEventCheckinAccesses,
   fetchEventCheckins,
+  fetchEventAttendees,
   fetchEventDetails,
   resetEventCheckins,
   updateEventCheckinAccess,
   updateEventCheckinStatus,
+  type AdminAttendee,
   type AdminEventDetails,
 } from '../admin.service'
 
@@ -29,7 +31,7 @@ interface EventDetailsModalProps {
   onUpdated?: () => void
 }
 
-type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'partners'
+type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'tickets' | 'partners'
 
 function formatCpf(cpf: string | null): string {
   if (!cpf) return '—'
@@ -86,6 +88,16 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchCheckin, setSearchCheckin] = useState('')
+  const [attendees, setAttendees] = useState<AdminAttendee[] | null>(null)
+  const [attendeesError, setAttendeesError] = useState<string | null>(null)
+  const [searchTicket, setSearchTicket] = useState('')
+
+  useEffect(() => {
+    if (activeTab !== 'tickets' || attendees !== null) return
+    fetchEventAttendees(event.id)
+      .then(setAttendees)
+      .catch((e) => setAttendeesError(e instanceof Error ? e.message : 'Erro ao carregar ingressos.'))
+  }, [activeTab, attendees, event.id])
 
   // Formulário de novo acesso
   const [showNewAccessForm, setShowNewAccessForm] = useState(false)
@@ -796,6 +808,24 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
             }}
           >
             Check-ins Realizados ({checkins.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('tickets')}
+            style={{
+              padding: '0.75rem 1rem',
+              border: 'none',
+              background: 'transparent',
+              fontSize: '0.85rem',
+              fontWeight: activeTab === 'tickets' ? 700 : 500,
+              color: activeTab === 'tickets' ? '#4f46e5' : '#64748b',
+              borderBottom: activeTab === 'tickets' ? '2px solid #4f46e5' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            Ingressos{attendees ? ` (${attendees.length})` : ''}
           </button>
           {isOwner && (
             <button
@@ -1511,6 +1541,61 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                   )}
                 </div>
               )}
+
+              {/* ── TAB: INGRESSOS EMITIDOS ── */}
+              {activeTab === 'tickets' && (() => {
+                const q = searchTicket.trim().toLowerCase()
+                const list = (attendees ?? []).filter((a) =>
+                  !q ||
+                  (a.name?.toLowerCase().includes(q) ?? false) ||
+                  a.publicCode.toLowerCase().includes(q) ||
+                  a.ticketId.toLowerCase().includes(q) ||
+                  a.ticketTypeName.toLowerCase().includes(q)
+                )
+                const cell = { padding: '0.6rem 0.75rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem', color: '#0f172a' } as const
+                const head = { ...cell, fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textAlign: 'left', background: '#f8fafc' } as const
+                return (
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    <input
+                      type="text"
+                      placeholder="Buscar por nome, código ou tipo de ingresso..."
+                      value={searchTicket}
+                      onChange={(e) => setSearchTicket(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    />
+                    {attendeesError ? (
+                      <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c' }}>{attendeesError}</div>
+                    ) : attendees === null ? (
+                      <p style={{ textAlign: 'center', color: '#64748b', padding: '1.5rem 0' }}>Carregando ingressos...</p>
+                    ) : list.length === 0 ? (
+                      <p style={{ textAlign: 'center', color: '#64748b', padding: '1.5rem 0' }}>
+                        {attendees.length === 0 ? 'Nenhum ingresso emitido ainda.' : 'Nenhum ingresso encontrado.'}
+                      </p>
+                    ) : (
+                      <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '480px' }}>
+                          <thead>
+                            <tr>
+                              <th style={head}>Nome</th>
+                              <th style={head}>Código</th>
+                              <th style={head}>Tipo de ingresso</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {list.map((a) => (
+                              <tr key={a.ticketId}>
+                                <td style={cell}>{a.name || <span style={{ color: '#94a3b8' }}>Sem nome</span>}</td>
+                                <td style={{ ...cell, fontFamily: 'monospace' }}>{a.publicCode || a.ticketId}</td>
+                                <td style={cell}>{a.ticketTypeName}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* ── TAB 3: CHECK-INS REALIZADOS ── */}
               {activeTab === 'checkins' && (
