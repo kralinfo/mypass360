@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer'
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsNumber,
@@ -22,6 +23,10 @@ export class CreateEventTicketTypeDto {
   @IsNumber()
   @Min(0)
   quantity!: number
+
+  @IsBoolean()
+  @IsOptional()
+  is_unlimited?: boolean
 
   @ValidateIf((_, v) => v != null)
   @IsString()
@@ -77,8 +82,12 @@ export class CreateEventDto {
   place_id?: string | null
 
   @IsNumber()
-  @Min(1)
+  @Min(0)
   capacity!: number
+
+  @IsBoolean()
+  @IsOptional()
+  is_capacity_unlimited?: boolean
 
   @IsNumber()
   @IsOptional()

@@ -8,6 +8,7 @@ export interface CheckoutTicketType {
   name: string
   price: number
   quantity: number
+  is_unlimited?: boolean
   sold: number
   description?: string | null
 }

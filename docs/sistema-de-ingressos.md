@@ -6,14 +6,14 @@ Documentação técnica e funcional do sistema de ingressos da plataforma MyPass
 
 ## Visão Geral
 
-O sistema de ingressos possui **dois eixos de configuração independentes** definidos pelo dono do evento:
+Na criação de eventos, o ingresso é sempre do tipo **Ticket**. O organizador escolhe se os ingressos serão sem identificação ou com nome obrigatório:
 
 | Eixo | Campo no banco | O que controla |
 |---|---|---|
-| **Modelo do ingresso** | `events.ticket_layout` | Layout visual e nível de formalidade do PDF |
-| **Identificação do participante** | `events.participant_id_type` | Se o portador precisa ser identificado e como |
+| **Modelo do ingresso** | `events.ticket_layout` | Formato do ingresso (Ticket nas novas criações) |
+| **Identificação do participante** | `events.participant_id_type` | Se o nome do portador é exigido |
 
-Cada combinação resulta em uma experiência de checkout e de ingresso distinta para o comprador.
+Eventos antigos com `ticket_layout = 'formal_pdf'` continuam compatíveis, mas esse modelo não é mais oferecido ao criar eventos.
 
 ---
 
@@ -52,10 +52,10 @@ Cada combinação resulta em uma experiência de checkout e de ingresso distinta
 - O portador **não pode editar o nome** (não há campo de edição)
 - Ideal para eventos onde o ingresso pode ser repassado livremente
 
-#### 👤 Com nome *(opcional)*
+#### 👤 Com nome *(obrigatório)*
 - `participant_id_type = 'name'`
-- Durante o checkout, o comprador **pode** informar o nome do portador de cada ingresso
-- Se não preencher: o ingresso é gerado no nome do comprador (nome da conta)
+- Durante o checkout, é obrigatório informar o nome do portador de cada ingresso
+- A compra não pode continuar se algum nome estiver vazio, inclusive pela API
 - Após a compra, o portador **pode editar o nome** diretamente em "Meus Ingressos"
 - A edição é permitida somente no modelo `ticket` — nunca no `formal_pdf`
 
@@ -85,18 +85,18 @@ No PDF baixado:
   → Seção PORTADOR mostra "🎫 INGRESSO AO PORTADOR / TRANSFERÍVEL" (em itálico)
 ```
 
-### Combinação B: Ticket + Com nome (opcional)
+### Combinação B: Ticket + Com nome (obrigatório)
 ```
 Dono do evento configura:
   ticket_layout = 'ticket'
   participant_id_type = 'name'
 
 Comprador no checkout:
-  → Pode preencher o nome do portador para cada ingresso
-  → Se não preencher: nome da conta é usado automaticamente
+  → Deve preencher o nome do portador para cada ingresso
+  → A validação impede a finalização sem todos os nomes
 
 Ingresso gerado:
-  buyer_name = nome informado OU nome da conta
+  buyer_name = nome informado
 
 Em "Meus Ingressos":
   → Card exibe o nome do portador
@@ -144,6 +144,7 @@ O dono pode:
 - **Editar** qualquer tipo existente (nome, preço, quantidade)
 - **Adicionar** novos tipos (ex: VIP, Cortesia, Estudante)
 - **Remover** tipos que não possuem vendas associadas
+- Marcar cada tipo como **sem limite de quantidade**; eventos gratuitos também podem não ter limite de vagas
 
 > ⚠️ Tipos com pedidos vinculados não podem ser removidos (proteção de chave estrangeira no banco).
 
@@ -159,15 +160,21 @@ A tabela `ticket_types` possui constraint `UNIQUE (event_id, name)` — dois tip
 |---|---|---|---|
 | `ticket_layout` | `TEXT` | `'ticket'`, `'formal_pdf'` | `'ticket'` |
 | `participant_id_type` | `TEXT` | `'none'`, `'name'`, `'name_cpf'` | `'name'` |
+| `is_capacity_unlimited` | `BOOLEAN` | Capacidade gratuita ilimitada | `false` |
 
-> `'name_cpf'` está reservado para uso futuro no modelo Ticket (nome + CPF opcionais). Atualmente não é exposto na UI.
+> `'formal_pdf'` e `'name_cpf'` permanecem por compatibilidade com eventos antigos; não são oferecidos na criação.
+
+### Tabela `ticket_types`
+| Campo | Tipo | Uso |
+|---|---|---|
+| `is_unlimited` | `BOOLEAN` | Quando `true`, o tipo de ingresso não tem limite de quantidade |
 
 ### Tabela `tickets`
 | Campo | Tipo | Preenchimento |
 |---|---|---|
 | `buyer_name` | `TEXT` | `null` se `participant_id_type = 'none'`; nome do portador nos demais casos |
 | `buyer_email` | `TEXT` | Sempre o e-mail da conta do comprador |
-| `buyer_cpf` | `TEXT` | Obrigatório apenas em `ticket_layout = 'formal_pdf'` |
+| `buyer_cpf` | `TEXT` | Utilizado apenas em eventos antigos com `ticket_layout = 'formal_pdf'` |
 | `public_code` | `TEXT` | Código amigável gerado automaticamente (ex: `MP360-ABCD1234`) |
 | `qr_code` | `TEXT` | Data URL da imagem QR Code (contém apenas o UUID do ticket) |
 
@@ -183,7 +190,7 @@ A tabela `ticket_types` possui constraint `UNIQUE (event_id, name)` — dois tip
 
 1. **Ingresso transferível é permanente**: Uma vez criado com `buyer_name = null`, o nome nunca pode ser adicionado — nem pelo comprador, nem pelo sistema.
 
-2. **PDF Formal é imutável**: O nome e CPF gravados no checkout do PDF Formal não podem ser editados. A tela de "Meus Ingressos" não exibe o campo de edição para esse modelo.
+2. **Nome obrigatório**: Em eventos configurados com `participant_id_type = 'name'`, o nome de cada portador é obrigatório no checkout e validado também no backend.
 
 3. **Sincronização de tipos de ingresso**: Ao editar um evento, o sistema faz merge inteligente:
    - Tipos existentes com o mesmo nome recebem `UPDATE`
@@ -200,7 +207,7 @@ A tabela `ticket_types` possui constraint `UNIQUE (event_id, name)` — dois tip
 
 | Componente | Localização | Função |
 |---|---|---|
-| `CadastrarEventoForm` | `apps/web/src/app/eventos/cadastrar/page.tsx` | Formulário de criação/edição com seleção de modelo de ingresso |
+| `CadastrarEventoForm` | `apps/web/src/app/eventos/cadastrar/page.tsx` | Formulário de criação/edição com identificação e limite de ingressos |
 | `TicketCard` | `apps/web/src/features/tickets/components/TicketCard.tsx` | Card em "Meus Ingressos" com edição inline de nome |
 | `TicketPdfGenerator` | `apps/web/src/features/tickets/components/TicketPdfGenerator.tsx` | Gerador de PDF compacto e formal, com modal de preview |
 | `MyTicketsPage` | `apps/web/src/features/tickets/components/MyTicketsPage.tsx` | Página principal de ingressos do usuário |

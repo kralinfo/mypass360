@@ -41,6 +41,14 @@ export class EventsService {
 
   /** Cria evento — organizer_id preenchido com userId autenticado. */
   async create(dto: CreateEventDto, userId: string) {
+    if (dto.capacity < 1 && dto.is_capacity_unlimited !== true) {
+      throw new BadRequestException('Informe a capacidade do evento ou marque a opção sem limite.')
+    }
+
+    if (dto.ticket_types?.some((ticketType) => ticketType.quantity < 1 && ticketType.is_unlimited !== true)) {
+      throw new BadRequestException('Informe uma quantidade válida para cada ingresso ou marque a opção sem limite.')
+    }
+
     const event = await this.eventsRepository.create(dto, userId)
     if (event && (dto.status === 'pending' || event.approval_status === 'pending')) {
       void this.notificationsService.notifyApprovalRequested({

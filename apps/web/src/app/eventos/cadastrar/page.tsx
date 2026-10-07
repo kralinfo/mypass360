@@ -67,10 +67,11 @@ function CadastrarEventoForm() {
     visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',
     enableFreePassword: false,
     accessPassword: '',
-    ticketLayout: '' as '' | 'ticket' | 'formal_pdf',
+    ticketLayout: 'ticket' as 'ticket' | 'formal_pdf',
     participantIdType: '' as '' | 'none' | 'name',
+    isCapacityUnlimited: false,
     ticketTypes: [
-      { name: 'Inteira', price: '', quantity: '', description: '' },
+      { name: 'Inteira', price: '', quantity: '', description: '', isUnlimited: false },
     ],
   })
 
@@ -100,14 +101,15 @@ function CadastrarEventoForm() {
 
         // Se o evento já tiver ticket_types, carrega do banco. Caso contrário, inicia vazios/padrão
         const mappedTicketTypes = event.ticket_types && event.ticket_types.length > 0
-          ? event.ticket_types.map((tt: { name: string; price: number; quantity: number; description?: string }) => ({
+          ? event.ticket_types.map((tt: { name: string; price: number; quantity: number; description?: string; is_unlimited?: boolean }) => ({
               name: tt.name,
               price: String(tt.price),
               quantity: String(tt.quantity),
               description: tt.description ?? '',
+              isUnlimited: Boolean(tt.is_unlimited),
             }))
           : [
-              { name: 'Inteira', price: event.price ? String(event.price) : '', quantity: '', description: '' },
+              { name: 'Inteira', price: event.price ? String(event.price) : '', quantity: '', description: '', isUnlimited: false },
             ]
 
         const isCancelledOrDeleted = event.deletion_status === 'approved' || event.status === 'cancelled'
@@ -147,8 +149,9 @@ function CadastrarEventoForm() {
           visibility: (event.visibility ?? 'PUBLIC') as 'PUBLIC' | 'PRIVATE',
           enableFreePassword: Boolean(event.has_password),
           accessPassword: '',
-          ticketLayout: (event.ticket_layout ?? '') as '' | 'ticket' | 'formal_pdf',
+          ticketLayout: (event.ticket_layout ?? 'ticket') as 'ticket' | 'formal_pdf',
           participantIdType: (event.participant_id_type === 'name_cpf' ? '' : (event.participant_id_type ?? '')) as '' | 'none' | 'name',
+          isCapacityUnlimited: event.event_type === 'FREE' && Boolean(event.is_capacity_unlimited),
           ticketTypes: mappedTicketTypes,
         })
       } catch (err: unknown) {
@@ -166,11 +169,11 @@ function CadastrarEventoForm() {
     if (formData.eventType !== 'PAID') return
 
     const totalCapacity = formData.ticketTypes.reduce(
-      (acc, item) => acc + (parseInt(item.quantity, 10) || 0),
+      (acc, item) => acc + (item.isUnlimited ? 0 : (parseInt(item.quantity, 10) || 0)),
       0
     )
     const totalRevenue = formData.ticketTypes.reduce(
-      (acc, item) => acc + ((parseFloat(item.price) || 0) * (parseInt(item.quantity, 10) || 0)),
+      (acc, item) => acc + ((parseFloat(item.price) || 0) * (item.isUnlimited ? 0 : (parseInt(item.quantity, 10) || 0))),
       0
     )
     const avgPrice = totalCapacity > 0 ? totalRevenue / totalCapacity : 0
@@ -225,7 +228,7 @@ function CadastrarEventoForm() {
   const addTicketType = () => {
     setFormData((prev) => ({
       ...prev,
-      ticketTypes: [...prev.ticketTypes, { name: '', price: '', quantity: '0', description: '' }],
+      ticketTypes: [...prev.ticketTypes, { name: '', price: '', quantity: '', description: '', isUnlimited: false }],
     }))
   }
 
@@ -286,7 +289,12 @@ function CadastrarEventoForm() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         place_id: formData.placeId,
-        capacity: isNaN(capacityNum) ? 0 : capacityNum,
+        capacity: formData.eventType === 'FREE'
+          ? (formData.isCapacityUnlimited ? 0 : (isNaN(capacityNum) ? 0 : capacityNum))
+          : (formData.ticketTypes.some((ticketType) => ticketType.isUnlimited) ? 0 : (isNaN(capacityNum) ? 0 : capacityNum)),
+        is_capacity_unlimited: formData.eventType === 'FREE'
+          ? formData.isCapacityUnlimited
+          : formData.ticketTypes.some((ticketType) => ticketType.isUnlimited),
         price: isNaN(priceNum) ? 0 : priceNum,
         event_type: formData.eventType,
         visibility: formData.visibility,
@@ -299,14 +307,15 @@ function CadastrarEventoForm() {
                 name: ticketType.name.trim(),
                 price: parseFloat(ticketType.price) || 0,
                 quantity: parseInt(ticketType.quantity, 10) || 0,
+                is_unlimited: ticketType.isUnlimited,
                 description: ticketType.description?.trim() || null,
               })),
       }
 
       // ticket_layout e participant_id_type são imutáveis após a criação
       if (!isEditMode) {
-        basePayload.ticket_layout = formData.ticketLayout
-        basePayload.participant_id_type = formData.ticketLayout === 'formal_pdf' ? 'name_cpf' : formData.participantIdType
+        basePayload.ticket_layout = 'ticket'
+        basePayload.participant_id_type = formData.participantIdType
       } else {
         if (formData.ticketLayout) {
           basePayload.ticket_layout = formData.ticketLayout
@@ -355,12 +364,8 @@ function CadastrarEventoForm() {
       setError('Informe o local/endereço do evento.')
       return false
     }
-    if (!formData.ticketLayout) {
-      setError('Selecione o modelo de ingresso (Ticket ou PDF Formal).')
-      return false
-    }
     if (formData.ticketLayout === 'ticket' && !formData.participantIdType) {
-      setError('Selecione o tipo de identificação do participante (Sem nome ou Com nome).')
+      setError('Selecione a identificação do participante (Sem nome ou Com nome obrigatório).')
       return false
     }
     if (formData.eventType === 'PAID') {
@@ -373,14 +378,14 @@ function CadastrarEventoForm() {
         const tt = activeTickets[i]
         const priceNum = parseFloat(tt.price)
         const qtyNum = parseInt(tt.quantity, 10)
-        if (!tt.name.trim() || isNaN(priceNum) || priceNum < 0 || isNaN(qtyNum) || qtyNum <= 0) {
+        if (!tt.name.trim() || isNaN(priceNum) || priceNum < 0 || (!tt.isUnlimited && (isNaN(qtyNum) || qtyNum <= 0))) {
           setError(`Preencha corretamente os campos do ingresso #${i + 1} (${tt.name || 'Sem nome'}).`)
           return false
         }
       }
     } else {
       const capNum = parseInt(formData.capacity, 10)
-      if (isNaN(capNum) || capNum <= 0) {
+      if (!formData.isCapacityUnlimited && (isNaN(capNum) || capNum <= 0)) {
         setError('Informe a capacidade máxima de ingressos para o evento gratuito.')
         return false
       }
@@ -1017,17 +1022,17 @@ function CadastrarEventoForm() {
           <div style={{ display: 'grid', gridTemplateColumns: formData.eventType === 'FREE' ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
             <div>
               <label htmlFor="capacity" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
-                {formData.eventType === 'FREE' ? 'Limite de Vagas / Capacidade *' : 'Capacidade Total *'}
+                {formData.eventType === 'FREE' ? 'Limite de Vagas / Capacidade' : 'Capacidade Total'}
               </label>
               <input
                 type="number"
                 id="capacity"
                 name="capacity"
-                value={formData.capacity}
+                value={formData.eventType === 'PAID' && formData.ticketTypes.some((ticketType) => ticketType.isUnlimited) ? '' : formData.capacity}
                 onChange={handleChange}
-                required
+                required={formData.eventType === 'FREE' && !formData.isCapacityUnlimited}
                 readOnly={formData.eventType === 'PAID'}
-                disabled={formData.eventType === 'PAID'}
+                disabled={formData.eventType === 'PAID' || formData.isCapacityUnlimited}
                 min="1"
                 style={{
                   width: '100%',
@@ -1036,16 +1041,28 @@ function CadastrarEventoForm() {
                   borderRadius: '8px',
                   fontSize: '0.95rem',
                   boxSizing: 'border-box',
-                  backgroundColor: formData.eventType === 'PAID' ? '#f1f5f9' : '#ffffff',
-                  cursor: formData.eventType === 'PAID' ? 'not-allowed' : 'text',
-                  color: formData.eventType === 'PAID' ? '#475569' : '#0f172a',
+                  backgroundColor: formData.eventType === 'PAID' || formData.isCapacityUnlimited ? '#f1f5f9' : '#ffffff',
+                  cursor: formData.eventType === 'PAID' || formData.isCapacityUnlimited ? 'not-allowed' : 'text',
+                  color: formData.eventType === 'PAID' || formData.isCapacityUnlimited ? '#475569' : '#0f172a',
                   fontWeight: formData.eventType === 'PAID' ? '600' : 'normal',
                 }}
-                placeholder="1000"
+                placeholder={formData.isCapacityUnlimited || (formData.eventType === 'PAID' && formData.ticketTypes.some((ticketType) => ticketType.isUnlimited)) ? 'Sem limite' : '1000'}
               />
+              {formData.eventType === 'FREE' && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.5rem', fontSize: '0.82rem', color: '#475569' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.isCapacityUnlimited}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, isCapacityUnlimited: event.target.checked }))}
+                  />
+                  Sem limite de quantidade
+                </label>
+              )}
               {formData.eventType === 'PAID' && (
                 <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
-                  Calculado automaticamente pela soma das quantidades dos ingressos
+                  {formData.ticketTypes.some((ticketType) => ticketType.isUnlimited)
+                    ? 'Sem limite: pelo menos um tipo de ingresso tem quantidade ilimitada.'
+                    : 'Calculado automaticamente pela soma das quantidades dos ingressos.'}
                 </span>
               )}
             </div>
@@ -1084,8 +1101,8 @@ function CadastrarEventoForm() {
 
           {formData.eventType === 'PAID' && (
             <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                 <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Tipos de ingresso</h2>
                 <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.95rem' }}>
                   Adicione os ingressos disponíveis para o evento. Inclua meia entrada se houver.
@@ -1108,6 +1125,8 @@ function CadastrarEventoForm() {
                   border: 'none',
                   cursor: 'pointer',
                   fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                 }}
               >
                 + Novo tipo
@@ -1149,7 +1168,7 @@ function CadastrarEventoForm() {
                   </button>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
                       Nome do tipo <span style={{ color: '#ef4444' }}>*</span>
@@ -1204,16 +1223,17 @@ function CadastrarEventoForm() {
                   </div>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
-                      Quantidade <span style={{ color: '#ef4444' }}>*</span>
+                      Quantidade {!ticketType.isUnlimited && <span style={{ color: '#ef4444' }}>*</span>}
                       {isEventTypeLocked && <span style={{ color: '#16a34a', fontWeight: 400, marginLeft: '0.35rem' }}>(editável)</span>}
                     </label>
                     <input
                       type="number"
-                      required
-                      value={ticketType.quantity}
+                      required={!ticketType.isUnlimited}
+                      disabled={ticketType.isUnlimited}
+                      value={ticketType.isUnlimited ? '' : ticketType.quantity}
                       onChange={(event) => handleTicketTypeChange(index, 'quantity', event.target.value)}
                       min="1"
-                      placeholder="0"
+                      placeholder={ticketType.isUnlimited ? 'Sem limite' : '0'}
                       style={{
                         width: '100%',
                         padding: '0.6rem 0.75rem',
@@ -1221,9 +1241,27 @@ function CadastrarEventoForm() {
                         borderRadius: '8px',
                         fontSize: '0.9rem',
                         boxSizing: 'border-box',
-                        backgroundColor: isEventTypeLocked ? '#f0fdf4' : '#fff',
+                        backgroundColor: ticketType.isUnlimited ? '#f1f5f9' : (isEventTypeLocked ? '#f0fdf4' : '#fff'),
                       }}
                     />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                      <input
+                        type="checkbox"
+                        checked={ticketType.isUnlimited}
+                        onChange={(event) => {
+                          setFormData((prev) => {
+                            const ticketTypes = [...prev.ticketTypes]
+                            ticketTypes[index] = {
+                              ...ticketTypes[index],
+                              isUnlimited: event.target.checked,
+                              quantity: event.target.checked ? '' : ticketTypes[index].quantity,
+                            }
+                            return { ...prev, ticketTypes }
+                          })
+                        }}
+                      />
+                      Sem limite de quantidade
+                    </label>
                   </div>
                 </div>
                 <div>
@@ -1251,114 +1289,36 @@ function CadastrarEventoForm() {
           </section>
           )}
 
-          {/* Seção: Modelo do Ingresso */}
           <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0', opacity: isEditMode ? 0.8 : 1 }}>
             <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
-              Modelo do Ingresso <span style={{ color: '#ef4444' }}>*</span>
+              Identificação do participante <span style={{ color: '#ef4444' }}>*</span>
             </h2>
-            <p style={{ margin: '0 0 1rem', color: '#64748b', fontSize: '0.95rem' }}>
-              Define a aparência e as informações exigidas do participante na compra.
-              {isEditMode && (
-                <span style={{ display: 'block', color: '#b45309', fontWeight: 600, marginTop: '0.25rem' }}>
-                  ⚠️ O modelo do ingresso não pode ser alterado após a criação do evento.
-                </span>
-              )}
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Ticket */}
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.75rem',
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  border: `2px solid ${formData.ticketLayout === 'ticket' ? '#0f172a' : '#e2e8f0'}`,
-                  background: formData.ticketLayout === 'ticket' ? '#f8fafc' : '#fff',
-                  cursor: isEditMode ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="ticketLayout"
-                  value="ticket"
-                  checked={formData.ticketLayout === 'ticket'}
-                  disabled={isEditMode}
-                  onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'ticket', participantIdType: '' }))}
-                  style={{ marginTop: '3px' }}
-                />
-                <div>
-                  <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 0.2rem' }}>🎫 Ticket</p>
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-                    Ingresso compacto no estilo ticket físico com QR Code. Modelo padrão.
-                  </p>
-                  {/* Sub-opção de identificação */}
-                  {formData.ticketLayout === 'ticket' && (
-                    <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '0.5rem', borderLeft: '3px solid #e2e8f0' }}>
-                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
-                        Identificação do Participante <span style={{ color: '#ef4444' }}>*</span>
-                      </p>
-                      {[
-                        { value: 'none', label: 'Sem nome', desc: 'Ingresso transferível, sem identificação' },
-                        { value: 'name', label: 'Com nome (opcional)', desc: 'Comprador pode informar o nome do portador' },
-                      ].map(opt => (
-                        <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: isEditMode ? 'not-allowed' : 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', background: formData.participantIdType === opt.value ? '#f0fdf4' : '#fff', border: `1px solid ${formData.participantIdType === opt.value ? '#bbf7d0' : '#e2e8f0'}` }}>
-                          <input
-                            type="radio"
-                            name="participantIdType"
-                            value={opt.value}
-                            checked={formData.participantIdType === opt.value}
-                            disabled={isEditMode}
-                            onChange={() => setFormData(prev => ({ ...prev, participantIdType: opt.value as 'none' | 'name' }))}
-                            style={{ marginTop: '2px' }}
-                          />
-                          <div>
-                            <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>{opt.label}</p>
-                            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>{opt.desc}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </label>
-
-              {/* PDF Formal */}
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.75rem',
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  border: `2px solid ${formData.ticketLayout === 'formal_pdf' ? '#0369a1' : '#e2e8f0'}`,
-                  background: formData.ticketLayout === 'formal_pdf' ? '#f0f9ff' : '#fff',
-                  cursor: isEditMode ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="ticketLayout"
-                  value="formal_pdf"
-                  checked={formData.ticketLayout === 'formal_pdf'}
-                  disabled={isEditMode}
-                  onChange={() => setFormData(prev => ({ ...prev, ticketLayout: 'formal_pdf', participantIdType: '' }))}
-                  style={{ marginTop: '3px' }}
-                />
-                <div>
-                  <p style={{ fontWeight: 700, color: '#0369a1', margin: '0 0 0.2rem' }}>📄 PDF Formal</p>
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-                    PDF A4 profissional com nome e CPF obrigatórios por ingresso. Ideal para eventos corporativos e seminários.
-                  </p>
-                  {formData.ticketLayout === 'formal_pdf' && (
-                    <p style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: 600, margin: '0.5rem 0 0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                      Nome completo e CPF serão solicitados para cada ingresso no checkout
-                    </p>
-                  )}
-                </div>
-              </label>
+            {isEditMode && (
+              <p style={{ margin: '0 0 1rem', color: '#b45309', fontSize: '0.85rem', fontWeight: 600 }}>
+                A identificação não pode ser alterada após a criação do evento.
+              </p>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {[
+                { value: 'none', label: 'Ticket sem nome', desc: 'Ingresso transferível, sem identificação do participante.' },
+                { value: 'name', label: 'Ticket com nome (obrigatório)', desc: 'O nome do portador será obrigatório para cada ingresso.' },
+              ].map((option) => (
+                <label key={option.value} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: isEditMode ? 'not-allowed' : 'pointer', padding: '0.65rem 0.75rem', borderRadius: '8px', background: formData.participantIdType === option.value ? '#f0fdf4' : '#fff', border: `1px solid ${formData.participantIdType === option.value ? '#bbf7d0' : '#e2e8f0'}` }}>
+                  <input
+                    type="radio"
+                    name="participantIdType"
+                    value={option.value}
+                    checked={formData.participantIdType === option.value}
+                    disabled={isEditMode}
+                    onChange={() => setFormData((prev) => ({ ...prev, participantIdType: option.value as 'none' | 'name' }))}
+                    style={{ marginTop: '2px' }}
+                  />
+                  <div>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>{option.label}</p>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0 }}>{option.desc}</p>
+                  </div>
+                </label>
+              ))}
             </div>
           </section>
           </fieldset>
@@ -1547,7 +1507,7 @@ function CadastrarEventoForm() {
                   </span>
                   {formData.eventType === 'FREE' ? (
                     <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#059669', marginTop: '4px' }}>
-                      Entradas Gratuitas (Capacidade: {formData.capacity} ingressos)
+                      Entradas Gratuitas (Capacidade: {formData.isCapacityUnlimited ? 'Sem limite' : `${formData.capacity} ingressos`})
                     </div>
                   ) : (
                     <div style={{ marginTop: '6px', display: 'grid', gap: '5px' }}>
@@ -1565,7 +1525,7 @@ function CadastrarEventoForm() {
                           }}>
                             <span style={{ fontWeight: 600, color: '#0f172a' }}>{ticket.name}</span>
                             <span style={{ color: '#334155', fontWeight: 700 }}>
-                              R$ {parseFloat(ticket.price || '0').toFixed(2)} &bull; {ticket.quantity} uni.
+                              R$ {parseFloat(ticket.price || '0').toFixed(2)} &bull; {ticket.isUnlimited ? 'Sem limite' : `${ticket.quantity} uni.`}
                             </span>
                           </div>
                         ))}

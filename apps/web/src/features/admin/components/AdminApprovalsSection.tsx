@@ -281,7 +281,7 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <InfoCard icon={<CalendarIcon />} label="Data do evento" value={formattedEventDate} />
               <InfoCard icon={<MapPinIcon />} label="Local" value={event.location} />
-              <InfoCard icon={<UsersIcon />} label="Capacidade" value={`${event.capacity.toLocaleString('pt-BR')} pessoas`} />
+              <InfoCard icon={<UsersIcon />} label="Capacidade" value={event.is_capacity_unlimited ? 'Sem limite' : `${event.capacity.toLocaleString('pt-BR')} pessoas`} />
               <InfoCard icon={<TicketIcon />} label="Preço base" value={event.price === 0 ? 'Gratuito' : formatCurrency(event.price)} />
             </div>
 
@@ -326,7 +326,7 @@ function ReviewModal({ event, onApprove, onReject, onClose }: ReviewModalProps) 
                           {tt.price === 0 ? 'Gratuito' : formatCurrency(tt.price)}
                         </span>
                         <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8' }}>
-                          {tt.quantity.toLocaleString('pt-BR')} disponíveis
+                          {tt.is_unlimited ? 'Sem limite de quantidade' : `${tt.quantity.toLocaleString('pt-BR')} disponíveis`}
                         </span>
                       </div>
                     </div>

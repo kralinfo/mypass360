@@ -1078,7 +1078,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', marginBottom: '4px' }}>
                                 <span>
-                                  Vendidos: <strong>{tt.sold}</strong> {tt.quantity > 0 ? `de ${tt.quantity}` : '(Lote Aberto)'}
+                                  Vendidos: <strong>{tt.sold}</strong> {tt.is_unlimited ? '(Sem limite)' : (tt.quantity > 0 ? `de ${tt.quantity}` : '(Lote Aberto)')}
                                 </span>
                                 {tt.quantity > 0 && (
                                   <span style={{ fontWeight: 700, color: tt.percentageSold >= 90 ? '#dc2626' : '#4f46e5' }}>

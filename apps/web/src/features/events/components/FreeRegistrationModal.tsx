@@ -262,48 +262,52 @@ export function FreeRegistrationModal({
 
             </div>
 
-            <div>
-              <label htmlFor="participant_name" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                Nome do Participante *
-              </label>
-              <input
-                type="text"
-                id="participant_name"
-                value={participantName}
-                onChange={(e) => setParticipantName(e.target.value)}
-                placeholder="Seu nome completo"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.95rem',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+            {event.participant_id_type !== 'none' && (
+              <div>
+                <label htmlFor="participant_name" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                  Nome do Participante *
+                </label>
+                <input
+                  type="text"
+                  id="participant_name"
+                  value={participantName}
+                  onChange={(e) => setParticipantName(e.target.value)}
+                  placeholder="Seu nome completo"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
 
-            <div>
-              <label htmlFor="participant_cpf" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                CPF (Opcional)
-              </label>
-              <input
-                type="text"
-                id="participant_cpf"
-                value={participantCpf}
-                onChange={(e) => setParticipantCpf(e.target.value)}
-                placeholder="000.000.000-00"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.95rem',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+            {(event.ticket_layout === 'formal_pdf' || event.participant_id_type === 'name_cpf') && (
+              <div>
+                <label htmlFor="participant_cpf" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                  CPF (Opcional)
+                </label>
+                <input
+                  type="text"
+                  id="participant_cpf"
+                  value={participantCpf}
+                  onChange={(e) => setParticipantCpf(e.target.value)}
+                  placeholder="000.000.000-00"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
 
             <button
               type="submit"

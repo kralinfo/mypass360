@@ -295,6 +295,7 @@ export class AdminRepository {
         location,
         organizer_id,
         capacity,
+        is_capacity_unlimited,
         price,
         image_url,
         genre,
@@ -305,6 +306,7 @@ export class AdminRepository {
           name,
           price,
           quantity,
+          is_unlimited,
           description
         )
       `)
@@ -424,6 +426,7 @@ export class AdminRepository {
         status,
         organizer_id,
         capacity,
+        is_capacity_unlimited,
         price,
         image_url,
         genre,
@@ -435,6 +438,7 @@ export class AdminRepository {
           name,
           price,
           quantity,
+          is_unlimited,
           description
         )
       `)
@@ -710,7 +714,7 @@ export class AdminRepository {
     // Buscar tipos de ingresso com quantidades e vendas
     const { data: ticketTypes } = await client
       .from('ticket_types')
-      .select('id, name, price, quantity, sold, description')
+      .select('id, name, price, quantity, sold, description, is_unlimited')
       .eq('event_id', eventId)
       .order('price', { ascending: false })
 
@@ -752,6 +756,7 @@ export class AdminRepository {
         name: tt.name,
         price,
         quantity,
+        is_unlimited: Boolean(tt.is_unlimited),
         sold,
         description: tt.description ?? '',
         revenue: sold * price,

@@ -38,7 +38,7 @@ export class OrdersRepository {
     // Validar se o evento existe, está publicado e NÃO está com exclusão pendente
     const { data: event, error: eventErrorFetch } = await client
       .from('events')
-      .select('id, status, deletion_status')
+      .select('id, status, deletion_status, ticket_layout, participant_id_type')
       .eq('id', dto.eventId)
       .single()
 
@@ -48,6 +48,17 @@ export class OrdersRepository {
 
     if (event.status !== 'published' || event.deletion_status === 'pending') {
       throw new Error('UNAVAILABLE_EVENT: Este evento está temporariamente indisponível para compras.')
+    }
+
+    const requiresNomineeName =
+      event.ticket_layout === 'formal_pdf' || event.participant_id_type !== 'none'
+    if (
+      requiresNomineeName &&
+      dto.items.some((item) =>
+        Array.from({ length: item.quantity }, (_, index) => item.nomineeNames?.[index]?.trim()).some((name) => !name)
+      )
+    ) {
+      throw new Error('MISSING_NOMINEE_NAME: Informe o nome de cada participante.')
     }
 
     const total = dto.items.reduce<number>(

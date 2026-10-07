@@ -10,6 +10,7 @@ type TicketTypeEdit = {
   price: string
   quantity: string
   description: string
+  isUnlimited: boolean
 }
 
 type FullEventData = {
@@ -26,7 +27,8 @@ type FullEventData = {
   visibility?: string
   price?: number
   capacity?: number
-  ticket_types?: Array<{ name: string; price: number; quantity: number; description?: string }>
+  ticket_types?: Array<{ name: string; price: number; quantity: number; description?: string; is_unlimited?: boolean }>
+  is_capacity_unlimited?: boolean
   organizer_id?: string
   access_password_hash?: string | null
   has_password?: boolean
@@ -88,6 +90,7 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
     visibility: 'PUBLIC',
     price: String(event.price ?? 0),
     capacity: String(event.capacity ?? 0),
+    isCapacityUnlimited: false,
     ticketTypes: [] as TicketTypeEdit[],
   })
 
@@ -130,11 +133,13 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
           visibility: full.visibility ?? 'PUBLIC',
           price: String(full.price ?? 0),
           capacity: String(full.capacity ?? 0),
+          isCapacityUnlimited: full.event_type === 'FREE' && Boolean(full.is_capacity_unlimited),
           ticketTypes: rawTicketTypes.map((t) => ({
             name: String(t.name ?? ''),
             price: String(t.price ?? 0),
             quantity: String(t.quantity ?? 0),
             description: String(t.description ?? ''),
+            isUnlimited: Boolean(t.is_unlimited),
           })),
         })
         setStep('edit')
@@ -151,14 +156,14 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
     setForm(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleTicketChange = (index: number, field: keyof TicketTypeEdit, value: string) => {
+  const handleTicketChange = (index: number, field: keyof TicketTypeEdit, value: string | boolean) => {
     setForm(prev => {
       const tts = [...prev.ticketTypes]
       tts[index] = { ...tts[index], [field]: value }
 
-      if (field === 'price' || field === 'quantity') {
-        const totalCap = tts.reduce((acc, t) => acc + (parseInt(t.quantity, 10) || 0), 0)
-        const totalRev = tts.reduce((acc, t) => acc + ((parseFloat(t.price) || 0) * (parseInt(t.quantity, 10) || 0)), 0)
+      if (field === 'price' || field === 'quantity' || field === 'isUnlimited') {
+        const totalCap = tts.reduce((acc, t) => acc + (t.isUnlimited ? 0 : (parseInt(t.quantity, 10) || 0)), 0)
+        const totalRev = tts.reduce((acc, t) => acc + ((parseFloat(t.price) || 0) * (t.isUnlimited ? 0 : (parseInt(t.quantity, 10) || 0))), 0)
         const avg = totalCap > 0 ? totalRev / totalCap : 0
         return { ...prev, ticketTypes: tts, capacity: String(totalCap), price: avg.toFixed(2) }
       }
@@ -168,7 +173,7 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
 
   const addTicket = () => setForm(prev => ({
     ...prev,
-    ticketTypes: [...prev.ticketTypes, { name: '', price: '0', quantity: '0', description: '' }],
+    ticketTypes: [...prev.ticketTypes, { name: '', price: '0', quantity: '0', description: '', isUnlimited: false }],
   }))
 
   const removeTicket = (i: number) => setForm(prev => ({
@@ -199,7 +204,12 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
         event_type: form.event_type,
         visibility: form.visibility,
         price: parseFloat(form.price) || 0,
-        capacity: parseInt(form.capacity, 10) || 0,
+        capacity: form.event_type === 'FREE'
+          ? (form.isCapacityUnlimited ? 0 : parseInt(form.capacity, 10) || 0)
+          : (form.ticketTypes.some((ticketType) => ticketType.isUnlimited) ? 0 : parseInt(form.capacity, 10) || 0),
+        is_capacity_unlimited: form.event_type === 'FREE'
+          ? form.isCapacityUnlimited
+          : form.ticketTypes.some((ticketType) => ticketType.isUnlimited),
         ticket_types: form.event_type === 'FREE'
           ? []
           : form.ticketTypes
@@ -208,6 +218,7 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
                 name: t.name.trim(),
                 price: parseFloat(t.price) || 0,
                 quantity: parseInt(t.quantity, 10) || 0,
+                is_unlimited: t.isUnlimited,
                 description: t.description?.trim() || null,
               })),
       }
@@ -447,8 +458,12 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
                         <input type="number" min="0" step="0.01" value={tt.price} onChange={(e) => handleTicketChange(i, 'price', e.target.value)} style={inputStyle} />
                       </div>
                       <div>
-                        <label style={labelStyle}>Quantidade *</label>
-                        <input type="number" min="0" value={tt.quantity} onChange={(e) => handleTicketChange(i, 'quantity', e.target.value)} style={inputStyle} />
+                        <label style={labelStyle}>Quantidade {!tt.isUnlimited && '*'}</label>
+                        <input type="number" min="1" disabled={tt.isUnlimited} value={tt.isUnlimited ? '' : tt.quantity} onChange={(e) => handleTicketChange(i, 'quantity', e.target.value)} placeholder={tt.isUnlimited ? 'Sem limite' : ''} style={inputStyle} />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem', fontSize: '0.75rem', color: '#475569' }}>
+                          <input type="checkbox" checked={tt.isUnlimited} onChange={(e) => handleTicketChange(i, 'isUnlimited', e.target.checked)} />
+                          Sem limite
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -457,7 +472,7 @@ export function AdminEditEventModal({ event, onClose, onSaved }: AdminEditEventM
                 {form.ticketTypes.length > 0 && (
                   <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      Capacidade total: <strong style={{ color: '#0f172a' }}>{form.capacity}</strong>
+                      Capacidade total: <strong style={{ color: '#0f172a' }}>{form.ticketTypes.some((ticketType) => ticketType.isUnlimited) ? 'Sem limite' : form.capacity}</strong>
                     </span>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
                       Preço médio: <strong style={{ color: '#0f172a' }}>R$ {Number(form.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>

@@ -22,6 +22,9 @@ export class OrdersService {
       if (err instanceof Error && err.message.startsWith('UNAVAILABLE_EVENT')) {
         throw new BadRequestException('Este evento está temporariamente indisponível para compras.')
       }
+      if (err instanceof Error && err.message.startsWith('MISSING_NOMINEE_NAME')) {
+        throw new BadRequestException('Informe o nome de cada participante para este evento.')
+      }
       throw err
     }
   }

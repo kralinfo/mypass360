@@ -31,6 +31,7 @@ export interface EventTicketTypeSummary {
   name: string
   price: number
   quantity: number
+  is_unlimited?: boolean
   sold: number
   description?: string
   revenue: number

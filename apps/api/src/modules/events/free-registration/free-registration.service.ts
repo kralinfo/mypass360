@@ -58,7 +58,7 @@ export class FreeRegistrationService {
     const { data: event, error: eventError } = await this.supabase
       .getClient()
       .from('events')
-      .select('id, title, status, event_type, capacity, access_password_hash')
+      .select('id, title, status, event_type, capacity, is_capacity_unlimited, participant_id_type, ticket_layout, access_password_hash')
       .eq('id', eventId)
       .single()
 
@@ -72,6 +72,13 @@ export class FreeRegistrationService {
 
     if (event.event_type !== 'FREE') {
       throw new BadRequestException('Este evento não é um evento gratuito.')
+    }
+
+    if (
+      (event.participant_id_type !== 'none' || event.ticket_layout === 'formal_pdf') &&
+      !dto.participant_name?.trim()
+    ) {
+      throw new BadRequestException('Informe o nome do participante para este evento.')
     }
 
     // 2. Validação de senha de acesso (se configurada no evento)
@@ -116,7 +123,7 @@ export class FreeRegistrationService {
     }
 
     const currentRegistrations = count ?? 0
-    if (currentRegistrations >= event.capacity) {
+    if (!event.is_capacity_unlimited && currentRegistrations >= event.capacity) {
       throw new BadRequestException('As vagas para este evento gratuito estão esgotadas.')
     }
 

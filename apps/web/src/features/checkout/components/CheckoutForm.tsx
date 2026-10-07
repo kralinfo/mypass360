@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCheckout } from '../hooks/useCheckout'
 import { useCart } from '@/features/cart/cart-context'
@@ -64,6 +64,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   } = useCheckout()
   const router = useRouter()
   const { getItemsForEvent } = useCart()
+  const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
   const hydratedFromCartRef = useRef(false)
   const hydratedFromDirectCheckoutRef = useRef(false)
   const hydratedFromSnapshotRef = useRef(false)
@@ -75,7 +76,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   const ticketLayout = event?.ticket_layout ?? 'ticket'
   const participantIdType = event?.participant_id_type ?? 'name'
   // formal_pdf → nome + CPF obrigatórios
-  // ticket 'name' → campo de nome opcional (se vazio → usa nome do comprador)
+  // ticket 'name' → nome do portador obrigatório
   // ticket 'none' → sem campos de identificação (ingresso transferível)
   const requiresName = ticketLayout === 'formal_pdf' || participantIdType === 'name' || participantIdType === 'name_cpf'
   const requiresCpf = ticketLayout === 'formal_pdf'
@@ -209,8 +210,8 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
       }
     }
 
-    // Validação de nome obrigatório para formal_pdf
-    if (requiresCpf) {
+    // Validação de nome obrigatório para eventos configurados com identificação.
+    if (requiresName) {
       for (const item of selectedItems) {
         const names = item.nomineeNames ?? []
         for (let i = 0; i < item.quantity; i++) {
@@ -320,7 +321,9 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
         <section style={{ display: 'grid', gap: '0.75rem' }}>
           {visibleTicketTypes.map((ticketType) => {
             const quantity = selectedById.get(ticketType.id) ?? 0
-            const available = Math.max(ticketType.quantity - ticketType.sold, 0)
+            const available = ticketType.is_unlimited
+              ? Number.MAX_SAFE_INTEGER
+              : Math.max(ticketType.quantity - ticketType.sold, 0)
             const itemState = selectedItems.find((item) => item.ticketTypeId === ticketType.id)
             const nomineeNames = itemState?.nomineeNames ?? []
             const nomineeCpfs = itemState?.nomineeCpfs ?? []
@@ -344,8 +347,8 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                       {ticketType.price.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
-                      })}{' '}
-                      • {available} disponíveis
+                      })}
+                      {available <= 0 ? ' • Sem vagas disponíveis' : ''}
                     </p>
                   </div>
 
@@ -360,7 +363,10 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                     <span style={{ minWidth: '24px', textAlign: 'center' }}>{quantity}</span>
                     <button
                       type="button"
-                      onClick={() => setTicketQuantity(ticketType, Math.min(quantity + 1, available))}
+                      onClick={() => {
+                        setUnavailableTickets((current) => ({ ...current, [ticketType.id]: quantity + 1 > available }))
+                        setTicketQuantity(ticketType, Math.min(quantity + 1, available))
+                      }}
                       style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
                     >
                       +
@@ -368,11 +374,17 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                   </div>
                 </div>
 
+                {unavailableTickets[ticketType.id] && (
+                  <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
+                    Não há ingressos suficientes para essa quantidade.
+                  </p>
+                )}
+
                 {/* Campos de identificação do participante */}
                 {quantity > 0 && requiresName && (
                   <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
                     <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
-                      {requiresCpf ? '🪪 Identificação do Participante (obrigatória)' : 'Nome do Portador (Opcional)'}
+                      {requiresCpf ? '🪪 Identificação do Participante (obrigatória)' : 'Nome do Portador (obrigatório)'}
                     </p>
                     {Array.from({ length: quantity }).map((_, idx) => (
                       <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: requiresCpf ? '#f8fafc' : 'transparent', borderRadius: '8px', padding: requiresCpf ? '0.75rem' : '0' }}>
@@ -383,7 +395,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                           {/* Nome */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <label htmlFor={`nominee-name-${ticketType.id}-${idx}`} style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>
-                              NOME COMPLETO{requiresCpf ? ' *' : ''}
+                              NOME COMPLETO{requiresName ? ' *' : ''}
                             </label>
                             <input
                               id={`nominee-name-${ticketType.id}-${idx}`}
@@ -391,7 +403,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                               value={nomineeNames[idx] ?? ''}
                               onChange={(e) => updateNomineeName(ticketType.id, idx, e.target.value)}
                               placeholder="Nome completo"
-                              required={requiresCpf}
+                              required={requiresName}
                               style={inputStyle}
                             />
                           </div>

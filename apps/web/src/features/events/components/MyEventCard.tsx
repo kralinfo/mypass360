@@ -1201,7 +1201,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                 </span>
                 {event.event_type === 'FREE' ? (
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#059669', marginTop: '3px' }}>
-                    Entradas Gratuitas (Capacidade: {event.capacity} uni.)
+                    Entradas Gratuitas (Capacidade: {event.is_capacity_unlimited ? 'Sem limite' : `${event.capacity} uni.`})
                   </div>
                 ) : event.ticket_types && event.ticket_types.length > 0 ? (
                   <div style={{ marginTop: '5px', display: 'grid', gap: '4px' }}>
@@ -1213,14 +1213,14 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
                       }}>
                         <span style={{ fontWeight: 600, color: '#0f172a' }}>{t.name}</span>
                         <span style={{ fontWeight: 700, color: '#334155' }}>
-                          R$ {Number(t.price).toFixed(2)} &bull; {t.quantity} uni.
+                          R$ {Number(t.price).toFixed(2)} &bull; {Number(t.sold ?? 0)} vendidos &bull; {t.is_unlimited ? 'Sem limite' : `${t.quantity} no lote`}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginTop: '3px' }}>
-                    R$ {Number(event.price).toFixed(2)} &bull; {event.capacity} uni.
+                    R$ {Number(event.price).toFixed(2)} &bull; {event.is_capacity_unlimited ? 'Sem limite' : `${event.capacity} uni.`}
                   </div>
                 )}
               </div>
