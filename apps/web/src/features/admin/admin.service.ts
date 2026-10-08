@@ -22,6 +22,7 @@ export interface AdminAttendee {
   cpf: string | null
   email: string | null
   ticketTypeName: string
+  price?: number
   status: string
   issuedAt: string | null
 }

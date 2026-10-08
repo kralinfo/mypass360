@@ -17,6 +17,7 @@ export interface AdminAttendee {
   cpf: string | null
   email: string | null
   ticketTypeName: string
+  price: number
   status: string
   issuedAt: string | null
 }
@@ -666,11 +667,24 @@ export class AdminRepository {
     // Buscar todos os tickets do evento com tipo de ingresso
     const { data: tickets, error } = await client
       .from('tickets')
-      .select('id, public_code, buyer_name, buyer_cpf, buyer_email, status, issued_at, ticket_type_id, ticket_types(name)')
+      .select('id, order_id, public_code, buyer_name, buyer_cpf, buyer_email, status, issued_at, ticket_type_id, ticket_types(name, price)')
       .eq('event_id', eventId)
       .order('issued_at', { ascending: true })
 
     if (error) throw new Error(error.message)
+
+    // Preço efetivamente pago: unit_price do item do pedido (por pedido + tipo)
+    const orderIds = [...new Set((tickets ?? []).map((t: any) => t.order_id).filter(Boolean))]
+    const paidPrice = new Map<string, number>()
+    if (orderIds.length > 0) {
+      const { data: items } = await client
+        .from('order_items')
+        .select('order_id, ticket_type_id, unit_price')
+        .in('order_id', orderIds)
+      for (const item of items ?? []) {
+        paidPrice.set(`${(item as any).order_id}:${(item as any).ticket_type_id}`, Number((item as any).unit_price) || 0)
+      }
+    }
 
     return (tickets ?? []).map((t: any) => ({
       ticketId: t.id,
@@ -679,6 +693,7 @@ export class AdminRepository {
       cpf: t.buyer_cpf ?? null,
       email: t.buyer_email ?? null,
       ticketTypeName: t.ticket_types?.name ?? 'Ingresso',
+      price: paidPrice.get(`${t.order_id}:${t.ticket_type_id}`) ?? Number(t.ticket_types?.price ?? 0),
       status: t.status ?? 'VALID',
       issuedAt: t.issued_at ?? null,
     }))

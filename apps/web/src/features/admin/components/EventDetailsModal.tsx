@@ -33,6 +33,19 @@ interface EventDetailsModalProps {
 
 type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'tickets' | 'partners'
 
+type TicketColumnKey = 'name' | 'code' | 'type' | 'price' | 'cpf' | 'email' | 'status' | 'issuedAt'
+
+const TICKET_COLUMNS: { key: TicketColumnKey; label: string }[] = [
+  { key: 'name', label: 'Nome' },
+  { key: 'code', label: 'Código' },
+  { key: 'type', label: 'Tipo de ingresso' },
+  { key: 'price', label: 'Preço pago' },
+  { key: 'cpf', label: 'CPF' },
+  { key: 'email', label: 'E-mail' },
+  { key: 'status', label: 'Status' },
+  { key: 'issuedAt', label: 'Emitido em' },
+]
+
 function formatCpf(cpf: string | null): string {
   if (!cpf) return '—'
   const d = cpf.replace(/\D/g, '')
@@ -91,6 +104,72 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [attendees, setAttendees] = useState<AdminAttendee[] | null>(null)
   const [attendeesError, setAttendeesError] = useState<string | null>(null)
   const [searchTicket, setSearchTicket] = useState('')
+  const [ticketColumns, setTicketColumns] = useState<TicketColumnKey[]>(['name', 'code', 'type'])
+  const [showColumnPicker, setShowColumnPicker] = useState(false)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mypass360:ticket-columns')
+      if (saved) {
+        const parsed = (JSON.parse(saved) as string[]).filter((k): k is TicketColumnKey =>
+          TICKET_COLUMNS.some((c) => c.key === k)
+        )
+        if (parsed.length > 0) setTicketColumns(parsed)
+      }
+    } catch {
+      // preferência inválida: mantém o padrão
+    }
+  }, [])
+
+  function handleExportPdf(list: AdminAttendee[]) {
+    const cols = TICKET_COLUMNS.filter((c) => ticketColumns.includes(c.key))
+    const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
+    const value = (a: AdminAttendee, key: TicketColumnKey): string => {
+      switch (key) {
+        case 'name': return a.name || 'Sem nome'
+        case 'code': return a.publicCode || a.ticketId
+        case 'type': return a.ticketTypeName
+        case 'price': return a.price ? formatCurrency(a.price) : 'Gratuito'
+        case 'cpf': return formatCpf(a.cpf)
+        case 'email': return a.email || '—'
+        case 'status': return a.status
+        case 'issuedAt': return formatDateTime(a.issuedAt)
+      }
+    }
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return
+    const title = `Lista de Ingressos — ${event.title}`
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><title>${esc(title)}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 32px; color: #0f172a; }
+        h1 { font-size: 1.2rem; margin-bottom: 4px; }
+        p { font-size: 0.85rem; color: #64748b; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        th { background: #f1f5f9; padding: 8px 10px; text-align: left; border: 1px solid #e2e8f0; }
+        td { padding: 7px 10px; border: 1px solid #e2e8f0; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        thead { display: table-header-group; } tr { page-break-inside: avoid; }
+      </style></head><body>
+      <h1>${esc(title)}</h1>
+      <p>Total: ${list.length} ingresso(s) &nbsp;|&nbsp; Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+      <table><thead><tr>${cols.map((c) => `<th>${c.label}</th>`).join('')}</tr></thead>
+      <tbody>${list.map((a) => `<tr>${cols.map((c) => `<td>${esc(value(a, c.key))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 400)
+  }
+
+  function toggleTicketColumn(key: TicketColumnKey) {
+    setTicketColumns((current) => {
+      const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key]
+      if (next.length === 0) return current
+      const ordered = TICKET_COLUMNS.map((c) => c.key).filter((k) => next.includes(k))
+      localStorage.setItem('mypass360:ticket-columns', JSON.stringify(ordered))
+      return ordered
+    })
+  }
 
   useEffect(() => {
     if (activeTab !== 'tickets' || attendees !== null) return
@@ -1556,13 +1635,44 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                 const head = { ...cell, fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textAlign: 'left', background: '#f8fafc' } as const
                 return (
                   <div style={{ display: 'grid', gap: '1rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Buscar por nome, código ou tipo de ingresso..."
-                      value={searchTicket}
-                      onChange={(e) => setSearchTicket(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nome, código ou tipo de ingresso..."
+                        value={searchTicket}
+                        onChange={(e) => setSearchTicket(e.target.value)}
+                        style={{ flex: 1, minWidth: '200px', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowColumnPicker((v) => !v)}
+                        style={{ padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: showColumnPicker ? '#eef2ff' : '#fff', color: '#334155', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        Colunas ({ticketColumns.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExportPdf(list)}
+                        disabled={list.length === 0}
+                        style={{ padding: '0.55rem 0.9rem', borderRadius: '8px', border: 'none', background: list.length === 0 ? '#c7d2fe' : '#4f46e5', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: list.length === 0 ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        Gerar PDF
+                      </button>
+                    </div>
+                    {showColumnPicker && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
+                        {TICKET_COLUMNS.map((c) => (
+                          <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ticketColumns.includes(c.key)}
+                              onChange={() => toggleTicketColumn(c.key)}
+                            />
+                            {c.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     {attendeesError ? (
                       <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c' }}>{attendeesError}</div>
                     ) : attendees === null ? (
@@ -1573,20 +1683,31 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                       </p>
                     ) : (
                       <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '480px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${ticketColumns.length * 140}px` }}>
                           <thead>
                             <tr>
-                              <th style={head}>Nome</th>
-                              <th style={head}>Código</th>
-                              <th style={head}>Tipo de ingresso</th>
+                              {TICKET_COLUMNS.filter((c) => ticketColumns.includes(c.key)).map((c) => (
+                                <th key={c.key} style={head}>{c.label}</th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody>
                             {list.map((a) => (
                               <tr key={a.ticketId}>
-                                <td style={cell}>{a.name || <span style={{ color: '#94a3b8' }}>Sem nome</span>}</td>
-                                <td style={{ ...cell, fontFamily: 'monospace' }}>{a.publicCode || a.ticketId}</td>
-                                <td style={cell}>{a.ticketTypeName}</td>
+                                {ticketColumns.includes('name') && (
+                                  <td style={cell}>{a.name || <span style={{ color: '#94a3b8' }}>Sem nome</span>}</td>
+                                )}
+                                {ticketColumns.includes('code') && (
+                                  <td style={{ ...cell, fontFamily: 'monospace' }}>{a.publicCode || a.ticketId}</td>
+                                )}
+                                {ticketColumns.includes('type') && <td style={cell}>{a.ticketTypeName}</td>}
+                                {ticketColumns.includes('price') && (
+                                  <td style={cell}>{a.price ? formatCurrency(a.price) : 'Gratuito'}</td>
+                                )}
+                                {ticketColumns.includes('cpf') && <td style={cell}>{formatCpf(a.cpf)}</td>}
+                                {ticketColumns.includes('email') && <td style={cell}>{a.email || '—'}</td>}
+                                {ticketColumns.includes('status') && <td style={cell}>{a.status}</td>}
+                                {ticketColumns.includes('issuedAt') && <td style={cell}>{formatDateTime(a.issuedAt)}</td>}
                               </tr>
                             ))}
                           </tbody>
