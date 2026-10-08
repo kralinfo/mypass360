@@ -17,8 +17,10 @@ export interface AdminAttendee {
   cpf: string | null
   email: string | null
   ticketTypeName: string
+  price: number
   status: string
   issuedAt: string | null
+  customAnswers: Record<string, string>
 }
 
 type EventRow = {
@@ -295,6 +297,7 @@ export class AdminRepository {
         location,
         organizer_id,
         capacity,
+        is_capacity_unlimited,
         price,
         image_url,
         genre,
@@ -305,6 +308,7 @@ export class AdminRepository {
           name,
           price,
           quantity,
+          is_unlimited,
           description
         )
       `)
@@ -424,6 +428,7 @@ export class AdminRepository {
         status,
         organizer_id,
         capacity,
+        is_capacity_unlimited,
         price,
         image_url,
         genre,
@@ -435,6 +440,7 @@ export class AdminRepository {
           name,
           price,
           quantity,
+          is_unlimited,
           description
         )
       `)
@@ -662,19 +668,48 @@ export class AdminRepository {
     // Buscar todos os tickets do evento com tipo de ingresso
     const { data: tickets, error } = await client
       .from('tickets')
-      .select('id, public_code, buyer_name, buyer_cpf, buyer_email, status, issued_at, ticket_type_id, ticket_types(name)')
+      .select('id, order_id, public_code, buyer_name, buyer_cpf, buyer_email, status, issued_at, ticket_type_id, ticket_types(name, price)')
       .eq('event_id', eventId)
       .order('issued_at', { ascending: true })
 
     if (error) throw new Error(error.message)
 
+    // Preço efetivamente pago: unit_price do item do pedido (por pedido + tipo)
+    const orderIds = [...new Set((tickets ?? []).map((t: any) => t.order_id).filter(Boolean))]
+    const paidPrice = new Map<string, number>()
+    if (orderIds.length > 0) {
+      const { data: items } = await client
+        .from('order_items')
+        .select('order_id, ticket_type_id, unit_price')
+        .in('order_id', orderIds)
+      for (const item of items ?? []) {
+        paidPrice.set(`${(item as any).order_id}:${(item as any).ticket_type_id}`, Number((item as any).unit_price) || 0)
+      }
+    }
+
+    const ticketIds = (tickets ?? []).map((t: any) => t.id)
+    const answersByTicket = new Map<string, Record<string, string>>()
+    if (ticketIds.length > 0) {
+      const { data: values } = await client
+        .from('ticket_custom_field_values')
+        .select('ticket_id, field_id, value')
+        .in('ticket_id', ticketIds)
+      for (const row of values ?? []) {
+        const current = answersByTicket.get((row as any).ticket_id) ?? {}
+        current[(row as any).field_id] = (row as any).value
+        answersByTicket.set((row as any).ticket_id, current)
+      }
+    }
+
     return (tickets ?? []).map((t: any) => ({
       ticketId: t.id,
+      customAnswers: answersByTicket.get(t.id) ?? {},
       publicCode: t.public_code ?? '',
       name: t.buyer_name ?? null,
       cpf: t.buyer_cpf ?? null,
       email: t.buyer_email ?? null,
       ticketTypeName: t.ticket_types?.name ?? 'Ingresso',
+      price: paidPrice.get(`${t.order_id}:${t.ticket_type_id}`) ?? Number(t.ticket_types?.price ?? 0),
       status: t.status ?? 'VALID',
       issuedAt: t.issued_at ?? null,
     }))
@@ -710,7 +745,7 @@ export class AdminRepository {
     // Buscar tipos de ingresso com quantidades e vendas
     const { data: ticketTypes } = await client
       .from('ticket_types')
-      .select('id, name, price, quantity, sold, description')
+      .select('id, name, price, quantity, sold, description, is_unlimited')
       .eq('event_id', eventId)
       .order('price', { ascending: false })
 
@@ -752,6 +787,7 @@ export class AdminRepository {
         name: tt.name,
         price,
         quantity,
+        is_unlimited: Boolean(tt.is_unlimited),
         sold,
         description: tt.description ?? '',
         revenue: sold * price,

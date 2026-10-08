@@ -22,6 +22,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [ticketTypes, setTicketTypes] = useState<CheckoutTicketType[]>([])
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [expandedTickets, setExpandedTickets] = useState<Record<string, boolean>>({})
+  const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -94,6 +95,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   }
 
   function setTicketQuantity(ticketTypeId: string, quantity: number, available: number) {
+    setUnavailableTickets((current) => ({ ...current, [ticketTypeId]: quantity > available }))
     setQuantities((current) => ({
       ...current,
       [ticketTypeId]: Math.max(0, Math.min(quantity, available)),
@@ -115,7 +117,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
         ticketTypeId: ticketType.id,
         ticketTypeName: ticketType.name,
         unitPrice: ticketType.price,
-        available: Math.max(ticketType.quantity - ticketType.sold, 0),
+        available: ticketType.is_unlimited
+          ? Number.MAX_SAFE_INTEGER
+          : Math.max(ticketType.quantity - ticketType.sold, 0),
         quantity: quantities[ticketType.id] ?? 0,
       }))
 
@@ -612,10 +616,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
               <span>—</span>
             )}
           </div>
-          <div className="detail-info-item">
-            <span>👥</span>
-            <span>{event.capacity.toLocaleString('pt-BR')} lugares</span>
-          </div>
         </div>
 
         <p style={{ color: '#475569', lineHeight: '1.6', fontSize: '0.92rem', marginBottom: '1.5rem', padding: '0 0.25rem', opacity: event.deletion_status === 'pending' ? 0.6 : 1 }}>
@@ -726,7 +726,9 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
             ) : (
               <>
                 {ticketTypes.map((ticketType) => {
-                  const available = Math.max(ticketType.quantity - ticketType.sold, 0)
+                  const available = ticketType.is_unlimited
+                    ? Number.MAX_SAFE_INTEGER
+                    : Math.max(ticketType.quantity - ticketType.sold, 0)
                   const quantity = quantities[ticketType.id] ?? 0
                   const isExpanded = !!expandedTickets[ticketType.id]
 
@@ -739,7 +741,11 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                       >
                         <div>
                           <h3 className="ticket-header-title">{ticketType.name}</h3>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{available} disponíveis</span>
+                          {available <= 0 && (
+                            <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>
+                              Sem vagas disponíveis
+                            </span>
+                          )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                           <span className="ticket-header-price">
@@ -811,17 +817,17 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                               <button
                                 type="button"
                                 onClick={() => setTicketQuantity(ticketType.id, quantity + 1, available)}
-                                disabled={available <= 0 || quantity >= available}
+                                disabled={available <= 0}
                                 style={{
                                   width: '36px',
                                   height: '36px',
                                   border: 'none',
                                   borderRadius: '8px',
-                                  background: available > 0 && quantity < available ? '#f1f5f9' : '#f8fafc',
-                                  cursor: available > 0 && quantity < available ? 'pointer' : 'not-allowed',
+                                  background: available > 0 ? '#f1f5f9' : '#f8fafc',
+                                  cursor: available > 0 ? 'pointer' : 'not-allowed',
                                   fontWeight: 700,
                                   fontSize: '1.2rem',
-                                  color: available > 0 && quantity < available ? '#0f172a' : '#cbd5e1',
+                                  color: available > 0 ? '#0f172a' : '#cbd5e1',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -833,6 +839,12 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                                 +
                               </button>
                             </div>
+
+                            {unavailableTickets[ticketType.id] && (
+                              <div style={{ width: '100%', fontSize: '0.82rem', color: '#dc2626', fontWeight: 600 }}>
+                                Não há ingressos suficientes para essa quantidade. Reduza a quantidade para continuar.
+                              </div>
+                            )}
 
                             {quantity > 0 && (
                               <div style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>

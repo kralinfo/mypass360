@@ -109,6 +109,13 @@ export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const popoverRef = useRef<HTMLDivElement>(null)
+  const [popTop, setPopTop] = useState(64)
+
+  useEffect(() => {
+    if (isOpen && popoverRef.current) {
+      setPopTop(popoverRef.current.getBoundingClientRect().bottom + 8)
+    }
+  }, [isOpen])
 
   // Fechar ao clicar fora
   useEffect(() => {
@@ -196,6 +203,31 @@ export function NotificationCenter() {
           from { opacity: 0; transform: translateY(-8px) scale(0.97); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        .notif-arrow {
+          position: absolute;
+          top: calc(100% + 2px);
+          left: 50%;
+          width: 12px;
+          height: 12px;
+          margin-left: -6px;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
+          border-left: 1px solid #e2e8f0;
+          transform: rotate(45deg);
+          z-index: 10000;
+          animation: popoverSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @media (max-width: 480px) {
+          .notif-popover {
+            position: fixed;
+            top: var(--notif-top, 64px);
+            right: 12px;
+            left: 12px;
+            width: auto;
+            max-width: none;
+            max-height: calc(100vh - 80px);
+          }
+        }
         .notif-item {
           display: flex;
           align-items: flex-start;
@@ -246,7 +278,9 @@ export function NotificationCenter() {
 
       {/* ── POPOVER DROPDOWN ── */}
       {isOpen && (
-        <div className="notif-popover">
+        <>
+        <span className="notif-arrow" aria-hidden="true" />
+        <div className="notif-popover" style={{ ['--notif-top' as string]: `${popTop}px` }}>
           {/* Header */}
           <div
             style={{
@@ -418,6 +452,7 @@ export function NotificationCenter() {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   )

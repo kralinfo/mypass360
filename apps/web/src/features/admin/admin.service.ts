@@ -22,8 +22,10 @@ export interface AdminAttendee {
   cpf: string | null
   email: string | null
   ticketTypeName: string
+  price?: number
   status: string
   issuedAt: string | null
+  customAnswers?: Record<string, string>
 }
 
 export interface EventTicketTypeSummary {
@@ -31,6 +33,7 @@ export interface EventTicketTypeSummary {
   name: string
   price: number
   quantity: number
+  is_unlimited?: boolean
   sold: number
   description?: string
   revenue: number
@@ -180,10 +183,6 @@ export async function fetchEventMessages(eventId: string): Promise<EventMessageI
   return api.get<EventMessageItem[]>(`/admin/events/${eventId}/messages`)
 }
 
-export async function fetchEventAttendees(eventId: string): Promise<AdminAttendee[]> {
-  return api.get<AdminAttendee[]>(`/admin/events/${eventId}/attendees`)
-}
-
 function isAdminContext(): boolean {
   if (typeof window !== 'undefined') {
     return window.location.pathname.startsWith('/admin')
@@ -197,6 +196,18 @@ async function getAuthApi() {
     data: { session },
   } = await supabase.auth.getSession()
   return apiWithAuth(session?.access_token ?? '')
+}
+
+export async function fetchEventAttendees(eventId: string): Promise<AdminAttendee[]> {
+  if (isAdminContext()) {
+    return api.get<AdminAttendee[]>(`/admin/events/${eventId}/attendees`)
+  }
+  try {
+    const authApi = await getAuthApi()
+    return await authApi.get<AdminAttendee[]>(`/events/${eventId}/attendees`)
+  } catch {
+    return api.get<AdminAttendee[]>(`/admin/events/${eventId}/attendees`)
+  }
 }
 
 export async function fetchEventDetails(eventId: string): Promise<AdminEventDetails> {

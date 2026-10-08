@@ -200,6 +200,7 @@ export class EventsRepository {
         location: dto.location,
         organizer_id: userId, // sempre do JWT, nunca do body
         capacity: dto.capacity,
+        is_capacity_unlimited: dto.is_capacity_unlimited ?? false,
         price: eventType === 'FREE' ? 0 : (dto.price ?? 0),
         status: (dto.status === 'pending' || !dto.status) ? 'draft' : dto.status,
         approval_status: dto.status === 'pending' ? 'pending' : 'none',
@@ -223,6 +224,7 @@ export class EventsRepository {
         name: ticketType.name,
         price: eventType === 'FREE' ? 0 : ticketType.price,
         quantity: ticketType.quantity,
+        is_unlimited: ticketType.is_unlimited ?? false,
         description: ticketType.description ?? null,
         sold: ticketType.sold ?? 0,
       }))
@@ -352,6 +354,7 @@ export class EventsRepository {
             name: tt.name.trim(),
             price: tt.price,
             quantity: tt.quantity,
+            is_unlimited: tt.is_unlimited ?? false,
             description: tt.description ?? null,
           })
         } else {
@@ -361,6 +364,7 @@ export class EventsRepository {
             name: tt.name.trim(),
             price: tt.price,
             quantity: tt.quantity,
+            is_unlimited: tt.is_unlimited ?? false,
             description: tt.description ?? null,
             sold: 0,
           })
@@ -376,6 +380,7 @@ export class EventsRepository {
             name: item.name,
             price: item.price,
             quantity: item.quantity,
+            is_unlimited: item.is_unlimited,
             description: item.description,
           })
           .eq('id', item.id)
@@ -673,4 +678,3 @@ export class EventsRepository {
     }
   }
 }
-

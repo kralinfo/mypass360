@@ -10,11 +10,13 @@ import { TicketsModule } from './modules/tickets/tickets.module'
 import { CheckinModule } from './modules/checkin/checkin.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EventMembersModule } from './modules/event-members/event-members.module'
+import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     SupabaseModule,
+    CustomFieldsModule,
     AuthModule,
     AdminModule,
     EventsModule,

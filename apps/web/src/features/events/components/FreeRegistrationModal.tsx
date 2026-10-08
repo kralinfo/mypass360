@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import type { Event, Ticket } from '@mypass360/types'
+import type { Event, EventCustomField, Ticket } from '@mypass360/types'
+import { CustomFieldInputs } from '@/features/custom-fields/CustomFieldInputs'
+import { fetchActiveCustomFields, findMissingRequiredField } from '@/features/custom-fields/custom-fields.service'
 import { validateAccessPassword, registerFreeAttendance } from '../services/free-registration.service'
 
 interface FreeRegistrationModalProps {
@@ -33,6 +35,18 @@ export function FreeRegistrationModal({
 
   const [participantName, setParticipantName] = useState('')
   const [participantCpf, setParticipantCpf] = useState('')
+  const [customFields, setCustomFields] = useState<EventCustomField[]>([])
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let active = true
+    fetchActiveCustomFields(event.id)
+      .then((fields) => active && setCustomFields(fields))
+      .catch(() => active && setCustomFields([]))
+    return () => {
+      active = false
+    }
+  }, [event.id])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,6 +113,13 @@ export function FreeRegistrationModal({
     setLoading(true)
     setError(null)
 
+    const missing = findMissingRequiredField(customFields, customAnswers)
+    if (missing) {
+      setError(missing)
+      setLoading(false)
+      return
+    }
+
     try {
       const supabase = createClient()
       const {
@@ -114,6 +135,7 @@ export function FreeRegistrationModal({
         participant_name: participantName.trim() || undefined,
         participant_cpf: participantCpf.trim() || undefined,
         registration_token: registrationToken,
+        custom_answers: customAnswers,
       })
 
       setIssuedTicket(ticket)
@@ -262,48 +284,59 @@ export function FreeRegistrationModal({
 
             </div>
 
-            <div>
-              <label htmlFor="participant_name" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                Nome do Participante *
-              </label>
-              <input
-                type="text"
-                id="participant_name"
-                value={participantName}
-                onChange={(e) => setParticipantName(e.target.value)}
-                placeholder="Seu nome completo"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.95rem',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+            {event.participant_id_type !== 'none' && (
+              <div>
+                <label htmlFor="participant_name" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                  Nome do Participante *
+                </label>
+                <input
+                  type="text"
+                  id="participant_name"
+                  value={participantName}
+                  onChange={(e) => setParticipantName(e.target.value)}
+                  placeholder="Seu nome completo"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
 
-            <div>
-              <label htmlFor="participant_cpf" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                CPF (Opcional)
-              </label>
-              <input
-                type="text"
-                id="participant_cpf"
-                value={participantCpf}
-                onChange={(e) => setParticipantCpf(e.target.value)}
-                placeholder="000.000.000-00"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.95rem',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+            {(event.ticket_layout === 'formal_pdf' || event.participant_id_type === 'name_cpf') && (
+              <div>
+                <label htmlFor="participant_cpf" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                  CPF (Opcional)
+                </label>
+                <input
+                  type="text"
+                  id="participant_cpf"
+                  value={participantCpf}
+                  onChange={(e) => setParticipantCpf(e.target.value)}
+                  placeholder="000.000.000-00"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
+
+            <CustomFieldInputs
+              fields={customFields}
+              values={customAnswers}
+              onChange={(fieldId, value) => setCustomAnswers((prev) => ({ ...prev, [fieldId]: value }))}
+              idPrefix="free-reg"
+            />
 
             <button
               type="submit"

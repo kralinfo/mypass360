@@ -11,13 +11,17 @@ import * as QRCode from 'qrcode'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { AuthenticatedUser } from '@/common/guards/auth.guard'
 import type { FreeRegistrationDto } from './dto/free-registration.dto'
+import { CustomFieldsService } from '@/modules/custom-fields/custom-fields.service'
 
 const TOKEN_SECRET = process.env.JWT_SECRET || 'mypass360_free_rsvp_token_secret_2026'
 const TOKEN_TTL_MS = 15 * 60 * 1000 // 15 minutos
 
 @Injectable()
 export class FreeRegistrationService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly customFields: CustomFieldsService
+  ) {}
 
   /**
    * Valida a senha de acesso de um evento gratuito e gera um registration_token temporário.
@@ -58,7 +62,7 @@ export class FreeRegistrationService {
     const { data: event, error: eventError } = await this.supabase
       .getClient()
       .from('events')
-      .select('id, title, status, event_type, capacity, access_password_hash')
+      .select('id, title, status, event_type, capacity, is_capacity_unlimited, participant_id_type, ticket_layout, access_password_hash')
       .eq('id', eventId)
       .single()
 
@@ -72,6 +76,13 @@ export class FreeRegistrationService {
 
     if (event.event_type !== 'FREE') {
       throw new BadRequestException('Este evento não é um evento gratuito.')
+    }
+
+    if (
+      (event.participant_id_type !== 'none' || event.ticket_layout === 'formal_pdf') &&
+      !dto.participant_name?.trim()
+    ) {
+      throw new BadRequestException('Informe o nome do participante para este evento.')
     }
 
     // 2. Validação de senha de acesso (se configurada no evento)
@@ -116,11 +127,12 @@ export class FreeRegistrationService {
     }
 
     const currentRegistrations = count ?? 0
-    if (currentRegistrations >= event.capacity) {
+    if (!event.is_capacity_unlimited && currentRegistrations >= event.capacity) {
       throw new BadRequestException('As vagas para este evento gratuito estão esgotadas.')
     }
 
     // 5. Gerar ingresso / comprovante de presença gratuito
+    const [validatedAnswers] = await this.customFields.validateAnswers(eventId, [dto.custom_answers ?? {}], 1)
     const ticketId = randomUUID()
     const publicCode = 'FR-' + randomUUID().substring(0, 6).toUpperCase()
 
@@ -164,6 +176,8 @@ export class FreeRegistrationService {
     if (insertError) {
       throw new BadRequestException(`Erro ao registrar presença: ${insertError.message}`)
     }
+
+    await this.customFields.saveForTickets([{ ticketId, answers: validatedAnswers }])
 
     return ticket
   }

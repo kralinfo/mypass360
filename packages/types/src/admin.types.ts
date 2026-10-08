@@ -31,6 +31,7 @@ export interface AdminEventItem {
   organizerName?: string
   organizerEmail?: string
   capacity: number
+  is_capacity_unlimited?: boolean
   price: number
   createdAt: string
   totalOrders: number
@@ -60,6 +61,7 @@ export interface PendingApprovalEventItem {
   organizerEmail?: string
   organizerName?: string
   capacity: number
+  is_capacity_unlimited?: boolean
   price: number
   imageUrl?: string | null
   genre?: string | null
@@ -69,6 +71,7 @@ export interface PendingApprovalEventItem {
     name: string
     price: number
     quantity: number
+    is_unlimited?: boolean
     description?: string
   }>
   createdAt: string
@@ -90,6 +93,7 @@ export interface PendingDeletionEventItem {
   organizerEmail?: string
   organizerName?: string
   capacity: number
+  is_capacity_unlimited?: boolean
   price: number
   imageUrl?: string | null
   genre?: string | null
@@ -104,6 +108,7 @@ export interface PendingDeletionEventItem {
     name: string
     price: number
     quantity: number
+    is_unlimited?: boolean
     description?: string
   }>
   createdAt: string

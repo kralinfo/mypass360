@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/features/cart/cart-context'
 import { BackButton } from '@/components/BackButton'
@@ -23,6 +24,7 @@ function formatDate(value: string) {
 export default function CartPage() {
   const router = useRouter()
   const { eventGroups, totalAmount, totalQuantity, setItemQuantity, removeItem, clearCart } = useCart()
+  const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
 
   const handleCheckout = (eventId: string) => {
     router.push(`/checkout?eventId=${eventId}&from=cart`)
@@ -128,8 +130,14 @@ export default function CartPage() {
                     <div>
                       <h3 style={{ marginBottom: '0.25rem', color: '#0f172a' }}>{item.ticketTypeName}</h3>
                       <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                        {formatCurrency(item.unitPrice)} • {item.available} disponíveis
+                        {formatCurrency(item.unitPrice)}
+                        {item.available <= 0 ? ' • Sem vagas disponíveis' : ''}
                       </p>
+                      {unavailableTickets[item.ticketTypeId] && (
+                        <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: '0.25rem 0 0' }}>
+                          Não há ingressos suficientes para essa quantidade.
+                        </p>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -153,7 +161,13 @@ export default function CartPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => setItemQuantity(item.eventId, item.ticketTypeId, item.quantity + 1)}
+                        onClick={() => {
+                          setUnavailableTickets((current) => ({
+                            ...current,
+                            [item.ticketTypeId]: item.quantity + 1 > item.available,
+                          }))
+                          setItemQuantity(item.eventId, item.ticketTypeId, item.quantity + 1)
+                        }}
                         style={{
                           width: '36px',
                           height: '36px',

@@ -59,6 +59,8 @@ export interface Event {
   place_id?: string | null
   organizer_id: string
   capacity: number
+  /** Indica que o evento não possui limite global de vagas. */
+  is_capacity_unlimited?: boolean
   price: number
   status: EventStatus
   /** Tipo de evento (PAID ou FREE) */
@@ -104,6 +106,8 @@ export interface Event {
     name: string
     price: number
     quantity: number
+    sold?: number
+    is_unlimited?: boolean
     description?: string
   }>
   /** Papel do usuário logado no evento: 'OWNER' (proprietário) ou 'PARTNER' (sócio/colaborador) */
@@ -128,6 +132,24 @@ export interface FreeRegistrationPayload {
   participant_name?: string
   participant_cpf?: string
   registration_token?: string
+  custom_answers?: Record<string, string>
+}
+
+export type EventCustomFieldType = 'text' | 'number' | 'select'
+
+export interface EventCustomFieldOption {
+  id?: string
+  label: string
+  is_active?: boolean
+}
+
+export interface EventCustomField {
+  id?: string
+  label: string
+  field_type: EventCustomFieldType
+  required: boolean
+  is_active?: boolean
+  options: EventCustomFieldOption[]
 }
 
 /**
@@ -228,4 +250,3 @@ export function canRequestDeletion(event: Event): boolean {
   if (event.deletion_status === 'pending' || event.deletion_status === 'approved') return false
   return requiresDeletionApproval(event)
 }
-

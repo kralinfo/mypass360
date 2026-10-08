@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { CreateOrderDto } from './dto/create-order.dto'
+import { CustomFieldsService } from '@/modules/custom-fields/custom-fields.service'
 
 type OrderItemInsert = {
   order_id: string
@@ -9,13 +10,17 @@ type OrderItemInsert = {
   unit_price: number
   nominee_names?: string[]
   nominee_cpfs?: string[]
+  custom_answers: Record<string, string>[]
 }
 
 @Injectable()
 export class OrdersRepository {
   private readonly table = 'orders'
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly customFields: CustomFieldsService
+  ) {}
 
   async findById(id: string) {
     const { data, error } = await this.supabase
@@ -38,7 +43,7 @@ export class OrdersRepository {
     // Validar se o evento existe, está publicado e NÃO está com exclusão pendente
     const { data: event, error: eventErrorFetch } = await client
       .from('events')
-      .select('id, status, deletion_status')
+      .select('id, status, deletion_status, ticket_layout, participant_id_type')
       .eq('id', dto.eventId)
       .single()
 
@@ -49,6 +54,21 @@ export class OrdersRepository {
     if (event.status !== 'published' || event.deletion_status === 'pending') {
       throw new Error('UNAVAILABLE_EVENT: Este evento está temporariamente indisponível para compras.')
     }
+
+    const requiresNomineeName =
+      event.ticket_layout === 'formal_pdf' || event.participant_id_type !== 'none'
+    if (
+      requiresNomineeName &&
+      dto.items.some((item) =>
+        Array.from({ length: item.quantity }, (_, index) => item.nomineeNames?.[index]?.trim()).some((name) => !name)
+      )
+    ) {
+      throw new Error('MISSING_NOMINEE_NAME: Informe o nome de cada participante.')
+    }
+
+    const validatedAnswers = await Promise.all(
+      dto.items.map((item) => this.customFields.validateAnswers(dto.eventId, item.customAnswers, item.quantity))
+    )
 
     const total = dto.items.reduce<number>(
       (accumulator, item) => accumulator + item.quantity * item.unitPrice,
@@ -70,13 +90,14 @@ export class OrdersRepository {
       throw new Error(orderError.message)
     }
 
-    const itemsToInsert: OrderItemInsert[] = dto.items.map((item) => ({
+    const itemsToInsert: OrderItemInsert[] = dto.items.map((item, index) => ({
       order_id: order.id,
       ticket_type_id: item.ticketTypeId,
       quantity: item.quantity,
       unit_price: item.unitPrice,
       nominee_names: item.nomineeNames ?? [],
       nominee_cpfs: item.nomineeCpfs ?? [],
+      custom_answers: validatedAnswers[index],
     }))
 
     const { error: itemsError } = await this.supabase.getClient().from('order_items').insert(itemsToInsert)

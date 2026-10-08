@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AdminEventItem } from '@mypass360/types'
+import type { AdminEventItem, EventCustomField } from '@mypass360/types'
 import type { AdminAttendee } from '../admin.service'
 import { fetchEventAttendees } from '../admin.service'
+import { fetchActiveCustomFields, fetchAllCustomFields } from '@/features/custom-fields/custom-fields.service'
+import { createClient } from '@/lib/supabase/client'
 
 type AttendeesModalProps = {
   event: AdminEventItem
@@ -43,6 +45,7 @@ export function AttendeesModal({ event, onClose }: AttendeesModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const printRef = useRef<HTMLDivElement>(null)
+  const [customFields, setCustomFields] = useState<EventCustomField[]>([])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -58,6 +61,18 @@ export function AttendeesModal({ event, onClose }: AttendeesModalProps) {
       .finally(() => setIsLoading(false))
   }, [event.id])
 
+  useEffect(() => {
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (!data.session) throw new Error('sem sessão')
+        return fetchAllCustomFields(event.id, data.session.access_token)
+      })
+      .catch(() => fetchActiveCustomFields(event.id))
+      .then(setCustomFields)
+      .catch(() => setCustomFields([]))
+  }, [event.id])
+
   const filtered = attendees.filter((a) => {
     const q = search.toLowerCase()
     return (
@@ -70,13 +85,14 @@ export function AttendeesModal({ event, onClose }: AttendeesModalProps) {
 
   const downloadCsv = useCallback(() => {
     const rows = [
-      ['#', 'Nome', 'CPF', 'E-mail', 'Tipo de Ingresso', 'Status', 'Emitido em'],
+      ['#', 'Nome', 'CPF', 'E-mail', 'Tipo de Ingresso', ...customFields.map((f) => f.label), 'Status', 'Emitido em'],
       ...attendees.map((a, i) => [
         String(i + 1),
         a.name ?? '',
         formatCpf(a.cpf),
         a.email ?? '',
         a.ticketTypeName,
+        ...customFields.map((f) => a.customAnswers?.[f.id ?? ''] ?? ''),
         statusLabel(a.status),
         formatDate(a.issuedAt),
       ]),
@@ -89,7 +105,7 @@ export function AttendeesModal({ event, onClose }: AttendeesModalProps) {
     a.download = `inscritos-${event.title.replace(/\s+/g, '-').toLowerCase()}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }, [attendees, event.title])
+  }, [attendees, customFields, event.title])
 
   const handlePrint = useCallback(() => {
     const content = printRef.current?.innerHTML ?? ''
@@ -282,7 +298,7 @@ export function AttendeesModal({ event, onClose }: AttendeesModalProps) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                    {['#', 'Nome completo', 'CPF', 'E-mail', 'Tipo', 'Status', 'Emitido em'].map((h) => (
+                    {['#', 'Nome completo', 'CPF', 'E-mail', 'Tipo', ...customFields.map((f) => f.label), 'Status', 'Emitido em'].map((h) => (
                       <th key={h} style={{
                         padding: '10px 14px', textAlign: 'left',
                         fontWeight: 700, fontSize: '0.75rem', color: '#64748b',
@@ -328,6 +344,11 @@ export function AttendeesModal({ event, onClose }: AttendeesModalProps) {
                           {a.ticketTypeName}
                         </span>
                       </td>
+                      {customFields.map((f) => (
+                        <td key={f.id} style={{ padding: '10px 14px', color: '#334155', fontSize: '0.82rem' }}>
+                          {a.customAnswers?.[f.id ?? ''] || '—'}
+                        </td>
+                      ))}
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: '4px',

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AdminEventItem, CheckinAccess, CheckinRecord, Event, EventInvitation, EventMember } from '@mypass360/types'
+import type { AdminEventItem, CheckinAccess, CheckinRecord, Event, EventCustomField, EventInvitation, EventMember } from '@mypass360/types'
+import { fetchActiveCustomFields, fetchAllCustomFields } from '@/features/custom-fields/custom-fields.service'
 import {
   createEventCheckinAccess,
   deleteEventCheckin,
   deleteEventCheckinAccess,
   fetchEventCheckinAccesses,
   fetchEventCheckins,
+  fetchEventAttendees,
   fetchEventDetails,
   resetEventCheckins,
   updateEventCheckinAccess,
   updateEventCheckinStatus,
+  type AdminAttendee,
   type AdminEventDetails,
 } from '../admin.service'
 
@@ -29,7 +32,20 @@ interface EventDetailsModalProps {
   onUpdated?: () => void
 }
 
-type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'partners'
+type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'tickets' | 'partners'
+
+type TicketColumnKey = string
+
+const TICKET_COLUMNS: { key: TicketColumnKey; label: string }[] = [
+  { key: 'name', label: 'Nome' },
+  { key: 'code', label: 'Código' },
+  { key: 'type', label: 'Tipo de ingresso' },
+  { key: 'price', label: 'Preço pago' },
+  { key: 'cpf', label: 'CPF' },
+  { key: 'email', label: 'E-mail' },
+  { key: 'status', label: 'Status' },
+  { key: 'issuedAt', label: 'Emitido em' },
+]
 
 function formatCpf(cpf: string | null): string {
   if (!cpf) return '—'
@@ -86,6 +102,104 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchCheckin, setSearchCheckin] = useState('')
+  const [attendees, setAttendees] = useState<AdminAttendee[] | null>(null)
+  const [attendeesError, setAttendeesError] = useState<string | null>(null)
+  const [searchTicket, setSearchTicket] = useState('')
+  const [ticketColumns, setTicketColumns] = useState<TicketColumnKey[]>(['name', 'code', 'type'])
+  const [showColumnPicker, setShowColumnPicker] = useState(false)
+  const [customFields, setCustomFields] = useState<EventCustomField[]>([])
+
+  const allColumns: { key: TicketColumnKey; label: string }[] = [
+    ...TICKET_COLUMNS,
+    ...customFields.map((f) => ({
+      key: `custom:${f.id}`,
+      label: f.is_active === false ? `${f.label} (desativado)` : f.label,
+    })),
+  ]
+  const visibleColumns = allColumns.filter((c) => ticketColumns.includes(c.key))
+  const columnValue = (a: AdminAttendee, key: TicketColumnKey): string => {
+    if (key.startsWith('custom:')) return a.customAnswers?.[key.slice(7)] || '—'
+    switch (key) {
+      case 'name': return a.name || 'Sem nome'
+      case 'code': return a.publicCode || a.ticketId
+      case 'type': return a.ticketTypeName
+      case 'price': return a.price ? formatCurrency(a.price) : 'Gratuito'
+      case 'cpf': return formatCpf(a.cpf)
+      case 'email': return a.email || '—'
+      case 'status': return a.status
+      case 'issuedAt': return formatDateTime(a.issuedAt)
+      default: return '—'
+    }
+  }
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('mypass360:ticket-columns')
+      if (saved) {
+        const parsed = (JSON.parse(saved) as string[]).filter(
+          (k) => TICKET_COLUMNS.some((c) => c.key === k) || k.startsWith('custom:')
+        )
+        if (parsed.length > 0) setTicketColumns(parsed)
+      }
+    } catch {
+      // preferência inválida: mantém o padrão
+    }
+  }, [])
+
+  function handleExportPdf(list: AdminAttendee[]) {
+    const cols = visibleColumns
+    const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
+    const value = columnValue
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return
+    const title = `Lista de Ingressos — ${event.title}`
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><title>${esc(title)}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 32px; color: #0f172a; }
+        h1 { font-size: 1.2rem; margin-bottom: 4px; }
+        p { font-size: 0.85rem; color: #64748b; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        th { background: #f1f5f9; padding: 8px 10px; text-align: left; border: 1px solid #e2e8f0; }
+        td { padding: 7px 10px; border: 1px solid #e2e8f0; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        thead { display: table-header-group; } tr { page-break-inside: avoid; }
+      </style></head><body>
+      <h1>${esc(title)}</h1>
+      <p>Total: ${list.length} ingresso(s) &nbsp;|&nbsp; Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+      <table><thead><tr>${cols.map((c) => `<th>${c.label}</th>`).join('')}</tr></thead>
+      <tbody>${list.map((a) => `<tr>${cols.map((c) => `<td>${esc(value(a, c.key))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 400)
+  }
+
+  function toggleTicketColumn(key: TicketColumnKey) {
+    setTicketColumns((current) => {
+      const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key]
+      if (next.length === 0) return current
+      const ordered = allColumns.map((c) => c.key).filter((k) => next.includes(k))
+      localStorage.setItem('mypass360:ticket-columns', JSON.stringify(ordered))
+      return ordered
+    })
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'tickets' || attendees !== null) return
+    fetchEventAttendees(event.id)
+      .then(setAttendees)
+      .catch((e) => setAttendeesError(e instanceof Error ? e.message : 'Erro ao carregar ingressos.'))
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (!data.session) throw new Error('sem sessão')
+        return fetchAllCustomFields(event.id, data.session.access_token)
+      })
+      .catch(() => fetchActiveCustomFields(event.id))
+      .then(setCustomFields)
+      .catch(() => setCustomFields([]))
+  }, [activeTab, attendees, event.id])
 
   // Formulário de novo acesso
   const [showNewAccessForm, setShowNewAccessForm] = useState(false)
@@ -797,6 +911,24 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
           >
             Check-ins Realizados ({checkins.length})
           </button>
+          <button
+            onClick={() => setActiveTab('tickets')}
+            style={{
+              padding: '0.75rem 1rem',
+              border: 'none',
+              background: 'transparent',
+              fontSize: '0.85rem',
+              fontWeight: activeTab === 'tickets' ? 700 : 500,
+              color: activeTab === 'tickets' ? '#4f46e5' : '#64748b',
+              borderBottom: activeTab === 'tickets' ? '2px solid #4f46e5' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            Ingressos{attendees ? ` (${attendees.length})` : ''}
+          </button>
           {isOwner && (
             <button
               onClick={() => setActiveTab('partners')}
@@ -1078,7 +1210,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', marginBottom: '4px' }}>
                                 <span>
-                                  Vendidos: <strong>{tt.sold}</strong> {tt.quantity > 0 ? `de ${tt.quantity}` : '(Lote Aberto)'}
+                                  Vendidos: <strong>{tt.sold}</strong> {tt.is_unlimited ? '(Sem limite)' : (tt.quantity > 0 ? `de ${tt.quantity}` : '(Lote Aberto)')}
                                 </span>
                                 {tt.quantity > 0 && (
                                   <span style={{ fontWeight: 700, color: tt.percentageSold >= 90 ? '#dc2626' : '#4f46e5' }}>
@@ -1511,6 +1643,98 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                   )}
                 </div>
               )}
+
+              {/* ── TAB: INGRESSOS EMITIDOS ── */}
+              {activeTab === 'tickets' && (() => {
+                const q = searchTicket.trim().toLowerCase()
+                const list = (attendees ?? []).filter((a) =>
+                  !q ||
+                  (a.name?.toLowerCase().includes(q) ?? false) ||
+                  a.publicCode.toLowerCase().includes(q) ||
+                  a.ticketId.toLowerCase().includes(q) ||
+                  a.ticketTypeName.toLowerCase().includes(q)
+                )
+                const cell = { padding: '0.6rem 0.75rem', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem', color: '#0f172a' } as const
+                const head = { ...cell, fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textAlign: 'left', background: '#f8fafc' } as const
+                return (
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nome, código ou tipo de ingresso..."
+                        value={searchTicket}
+                        onChange={(e) => setSearchTicket(e.target.value)}
+                        style={{ flex: 1, minWidth: '200px', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowColumnPicker((v) => !v)}
+                        style={{ padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: showColumnPicker ? '#eef2ff' : '#fff', color: '#334155', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        Colunas ({visibleColumns.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExportPdf(list)}
+                        disabled={list.length === 0}
+                        style={{ padding: '0.55rem 0.9rem', borderRadius: '8px', border: 'none', background: list.length === 0 ? '#c7d2fe' : '#4f46e5', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: list.length === 0 ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        Gerar PDF
+                      </button>
+                    </div>
+                    {showColumnPicker && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
+                        {allColumns.map((c) => (
+                          <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ticketColumns.includes(c.key)}
+                              onChange={() => toggleTicketColumn(c.key)}
+                            />
+                            {c.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {attendeesError ? (
+                      <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c' }}>{attendeesError}</div>
+                    ) : attendees === null ? (
+                      <p style={{ textAlign: 'center', color: '#64748b', padding: '1.5rem 0' }}>Carregando ingressos...</p>
+                    ) : list.length === 0 ? (
+                      <p style={{ textAlign: 'center', color: '#64748b', padding: '1.5rem 0' }}>
+                        {attendees.length === 0 ? 'Nenhum ingresso emitido ainda.' : 'Nenhum ingresso encontrado.'}
+                      </p>
+                    ) : (
+                      <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse',                         minWidth: `${visibleColumns.length * 140}px` }}>
+                                                  <thead>
+                                                    <tr>
+                                                      {visibleColumns.map((c) => (
+                                                        <th key={c.key} style={head}>{c.label}</th>
+                                                      ))}
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {list.map((a) => (
+                                                      <tr key={a.ticketId}>
+                                                        {visibleColumns.map((c) =>
+                                                          c.key === 'name' ? (
+                                                            <td key={c.key} style={cell}>{a.name || <span style={{ color: '#94a3b8' }}>Sem nome</span>}</td>
+                                                          ) : c.key === 'code' ? (
+                                                            <td key={c.key} style={{ ...cell, fontFamily: 'monospace' }}>{columnValue(a, c.key)}</td>
+                                                          ) : (
+                                                            <td key={c.key} style={cell}>{columnValue(a, c.key)}</td>
+                                                          )
+                                                        )}
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* ── TAB 3: CHECK-INS REALIZADOS ── */}
               {activeTab === 'checkins' && (
