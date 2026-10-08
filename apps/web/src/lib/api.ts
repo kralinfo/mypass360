@@ -88,5 +88,13 @@ export function apiWithAuth(token: string) {
         method: 'DELETE',
         headers: { ...authHeaders, ...init?.headers },
       }),
+
+    put: <T>(path: string, body: unknown, init?: RequestInit) =>
+      request<T>(path, {
+        ...init,
+        method: 'PUT',
+        body: JSON.stringify(body),
+        headers: { ...authHeaders, ...init?.headers },
+      }),
   }
 }

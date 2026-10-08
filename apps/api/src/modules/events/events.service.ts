@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { EventsRepository } from './events.repository'
 import { AdminRepository } from '@/modules/admin/admin.repository'
 import { NotificationsService } from '@/modules/notifications/notifications.service'
+import { CustomFieldsService, type CustomFieldInput } from '@/modules/custom-fields/custom-fields.service'
 import type { AuthenticatedUser } from '@/common/guards/auth.guard'
 import type { CreateEventDto } from './dto/create-event.dto'
 import type { UpdateEventDto } from './dto/update-event.dto'
@@ -12,8 +13,26 @@ export class EventsService {
   constructor(
     private readonly eventsRepository: EventsRepository,
     private readonly adminRepository: AdminRepository,
-    private readonly notificationsService: NotificationsService
+    private readonly notificationsService: NotificationsService,
+    private readonly customFieldsService: CustomFieldsService
   ) {}
+
+  /** Campos personalizados ativos (público: usados no checkout e na inscrição). */
+  getActiveCustomFields(eventId: string) {
+    return this.customFieldsService.listActive(eventId)
+  }
+
+  /** Todos os campos personalizados, inclusive desativados (dono/sócio). */
+  async getAllCustomFields(eventId: string, userId: string) {
+    await this.assertAccess(eventId, userId)
+    return this.customFieldsService.listAll(eventId)
+  }
+
+  /** Substitui a configuração de campos personalizados (apenas quem pode editar o evento). */
+  async syncCustomFields(eventId: string, user: AuthenticatedUser, fields: CustomFieldInput[]) {
+    await this.assertOwnership(eventId, user)
+    return this.customFieldsService.sync(eventId, fields)
+  }
 
   /** Lista eventos públicos (publicados + published_at já atingido). */
   findAll() {

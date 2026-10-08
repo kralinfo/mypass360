@@ -7,6 +7,9 @@ import { BackButton } from '@/components/BackButton'
 import { createEvent, updateEvent, fetchEventById, requestEventApproval } from '@/features/events/services/my-events.service'
 import { EventCoverUploader } from '@/features/events/components/EventCoverUploader'
 import { LocationAutocompleteInput } from '@/components/LocationAutocompleteInput'
+import type { EventCustomField } from '@mypass360/types'
+import { CustomFieldsEditor } from '@/features/custom-fields/CustomFieldsEditor'
+import { fetchAllCustomFields, saveCustomFields } from '@/features/custom-fields/custom-fields.service'
 
 const PREDEFINED_CATEGORIES = [
   'Música',
@@ -30,6 +33,18 @@ const PREDEFINED_CATEGORIES = [
   'Outro',
 ]
 
+function Card({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <header style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '0.6rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>{title}</h2>
+        <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.85rem' }}>{subtitle}</p>
+      </header>
+      {children}
+    </section>
+  )
+}
+
 function CadastrarEventoForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -45,6 +60,8 @@ function CadastrarEventoForm() {
   const [submitMode, setSubmitMode] = useState<'draft' | 'request_approval'>('draft')
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [isCustomCategory, setIsCustomCategory] = useState(false)
+  const [customFields, setCustomFields] = useState<EventCustomField[]>([])
+  const [customFieldsDirty, setCustomFieldsDirty] = useState(false)
   const [customCategoryText, setCustomCategoryText] = useState('')
 
   const [formData, setFormData] = useState({
@@ -94,6 +111,12 @@ function CadastrarEventoForm() {
 
         const event = await fetchEventById(editId!, session.access_token)
 
+        try {
+          const existingFields = await fetchAllCustomFields(editId!, session.access_token)
+          setCustomFields(existingFields.filter((field) => field.is_active !== false))
+        } catch {
+          setCustomFields([])
+        }
         // Extrair data e hora separadamente
         const eventDate = new Date(event.date)
         const dateStr = eventDate.toISOString().split('T')[0]
@@ -206,6 +229,11 @@ function CadastrarEventoForm() {
         .replace(/-+/g, '-')
         .trim()
 
+      // Em edição a URL já publicada nunca muda
+      if (isEditMode) {
+        setFormData((prev) => ({ ...prev, title: value }))
+        return
+      }
       setFormData((prev) => ({ ...prev, title: value, slug }))
       return
     }
@@ -328,6 +356,7 @@ function CadastrarEventoForm() {
 
       const payload = basePayload
 
+      let savedEventId = editId
       if (isEditMode && editId) {
         await updateEvent(editId, token, payload)
         if (targetMode === 'request_approval') {
@@ -339,7 +368,21 @@ function CadastrarEventoForm() {
         }
       } else {
         const statusToSet = targetMode === 'request_approval' ? 'pending' : 'draft'
-        await createEvent(token, { ...payload, status: statusToSet })
+        const created = await createEvent(token, { ...payload, status: statusToSet })
+        savedEventId = created.id
+      }
+
+      if (savedEventId && (customFieldsDirty || customFields.length > 0) && (customFieldsDirty || !isEditMode)) {
+        try {
+          await saveCustomFields(savedEventId, token, customFields)
+        } catch (fieldsError) {
+          setError(
+            `Evento salvo, mas os campos dos participantes não foram gravados: ${
+              fieldsError instanceof Error ? fieldsError.message : 'erro desconhecido'
+            }. Edite o evento para tentar novamente.`
+          )
+          return
+        }
       }
 
       router.push('/meus-eventos')
@@ -352,6 +395,16 @@ function CadastrarEventoForm() {
 
   const validateForm = (): boolean => {
     setError(null)
+    for (const field of customFields) {
+      if (!field.label.trim()) {
+        setError('Todo campo de informações dos participantes precisa de um nome.')
+        return false
+      }
+      if (field.field_type === 'select' && !field.options.some((o) => o.label.trim())) {
+        setError(`Adicione ao menos uma opção ao campo "${field.label}".`)
+        return false
+      }
+    }
     if (!formData.title.trim()) {
       setError('Preencha o título do evento.')
       return false
@@ -443,7 +496,6 @@ function CadastrarEventoForm() {
             padding: '1rem 1.25rem', marginBottom: '1.25rem', color: '#475569',
             display: 'flex', alignItems: 'center', gap: '0.65rem',
           }}>
-            <span style={{ fontSize: '1.5rem' }}>🚫</span>
             <div>
               <strong style={{ display: 'block', fontSize: '0.95rem', color: '#1e293b' }}>
                 Modo de Visualização Apenas (Evento Desativado / Cancelado)
@@ -457,6 +509,7 @@ function CadastrarEventoForm() {
 
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <fieldset disabled={isReadOnly} style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <Card title="Informações do evento" subtitle="Foto, nome e descrição que aparecem na página do evento.">
           {/* Uploader de Foto de Capa do Evento com Ajuste Interativo */}
           <EventCoverUploader
             value={formData.imageUrl}
@@ -488,32 +541,6 @@ function CadastrarEventoForm() {
           </div>
 
           <div>
-            <label htmlFor="slug" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#334155' }}>
-              URL (Slug) *
-            </label>
-            <input
-              type="text"
-              id="slug"
-              name="slug"
-              value={formData.slug}
-              onChange={handleChange}
-              required
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.75rem',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '0.95rem',
-                boxSizing: 'border-box',
-              }}
-              placeholder="festival-de-musica-2026"
-            />
-            <small style={{ color: '#64748b', fontSize: '0.85rem' }}>
-              URL amigável gerada automaticamente a partir do título
-            </small>
-          </div>
-
-          <div>
             <label htmlFor="description" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Descrição *
             </label>
@@ -537,84 +564,6 @@ function CadastrarEventoForm() {
             />
           </div>
 
-          {/* ── Visibilidade do Evento ── */}
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
-              Visibilidade do Evento *
-            </label>
-
-            {isEventTypeLocked && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                padding: '0.65rem 0.9rem', marginBottom: '0.75rem',
-                background: '#fffbeb', border: '1px solid #fde68a',
-                borderRadius: '8px', fontSize: '0.83rem', color: '#92400e',
-              }}>
-                <span>🔒</span>
-                <span>A visibilidade não pode ser alterada após publicação ou aprovação.</span>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <button
-                type="button"
-                disabled={isEventTypeLocked}
-                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, visibility: 'PUBLIC' }))}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: formData.visibility === 'PUBLIC' ? '2px solid #2563eb' : '1px solid #cbd5e1',
-                  background: formData.visibility === 'PUBLIC' ? '#eff6ff' : '#ffffff',
-                  color: formData.visibility === 'PUBLIC' ? '#1d4ed8' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
-                  fontWeight: formData.visibility === 'PUBLIC' ? 700 : 500,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: '0.2rem',
-                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
-                  textAlign: 'left',
-                  opacity: isEventTypeLocked && formData.visibility !== 'PUBLIC' ? 0.5 : 1,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
-                  <span>🌐</span> <strong>Público</strong>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 'normal' }}>
-                  O evento pode aparecer no site e no catálogo público.
-                </span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isEventTypeLocked}
-                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, visibility: 'PRIVATE' }))}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: formData.visibility === 'PRIVATE' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
-                  background: formData.visibility === 'PRIVATE' ? '#f5f3ff' : '#ffffff',
-                  color: formData.visibility === 'PRIVATE' ? '#6d28d9' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
-                  fontWeight: formData.visibility === 'PRIVATE' ? 700 : 500,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: '0.2rem',
-                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
-                  textAlign: 'left',
-                  opacity: isEventTypeLocked && formData.visibility !== 'PRIVATE' ? 0.5 : 1,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
-                  <span>🔒</span> <strong>Privado</strong>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 'normal' }}>
-                  Invisível no catálogo. Acesso apenas por link compartilhado.
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* ── Gênero / Categoria ── */}
           <div>
             <label htmlFor="genre" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
               Gênero / Categoria *
@@ -705,7 +654,9 @@ function CadastrarEventoForm() {
               </div>
             )}
           </div>
+          </Card>
 
+          <Card title="Data e local" subtitle="Quando e onde o evento acontece.">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div>
               <label htmlFor="date" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500', color: '#334155' }}>
@@ -770,11 +721,12 @@ function CadastrarEventoForm() {
             }
             required
           />
+          </Card>
 
-          {/* ── Tipo de Evento ── */}
+          <Card title="Visibilidade e acesso" subtitle="Defina quem pode encontrar e acessar o evento.">
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
-              Tipo de Evento *
+              Visibilidade do Evento *
             </label>
 
             {isEventTypeLocked && (
@@ -784,8 +736,8 @@ function CadastrarEventoForm() {
                 background: '#fffbeb', border: '1px solid #fde68a',
                 borderRadius: '8px', fontSize: '0.83rem', color: '#92400e',
               }}>
-                <span>🔒</span>
-                <span>O tipo de evento não pode ser alterado após publicação ou aprovação.</span>
+
+                <span>A visibilidade não pode ser alterada após publicação ou aprovação.</span>
               </div>
             )}
 
@@ -793,47 +745,57 @@ function CadastrarEventoForm() {
               <button
                 type="button"
                 disabled={isEventTypeLocked}
-                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, eventType: 'PAID' }))}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, visibility: 'PUBLIC' }))}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '10px',
-                  border: formData.eventType === 'PAID' ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                  background: formData.eventType === 'PAID' ? '#f0f9ff' : '#ffffff',
-                  color: formData.eventType === 'PAID' ? '#0369a1' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
-                  fontWeight: formData.eventType === 'PAID' ? 700 : 500,
+                  border: formData.visibility === 'PUBLIC' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                  background: formData.visibility === 'PUBLIC' ? '#eff6ff' : '#ffffff',
+                  color: formData.visibility === 'PUBLIC' ? '#1d4ed8' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
+                  fontWeight: formData.visibility === 'PUBLIC' ? 700 : 500,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '0.2rem',
                   cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
-                  fontSize: '0.95rem',
-                  opacity: isEventTypeLocked && formData.eventType !== 'PAID' ? 0.5 : 1,
+                  textAlign: 'left',
+                  opacity: isEventTypeLocked && formData.visibility !== 'PUBLIC' ? 0.5 : 1,
                 }}
               >
-                <span>💳</span> Evento Pago
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
+                  <strong>Público</strong>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 'normal' }}>
+                  O evento pode aparecer no site e no catálogo público.
+                </span>
               </button>
 
               <button
                 type="button"
                 disabled={isEventTypeLocked}
-                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, eventType: 'FREE', price: '0' }))}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, visibility: 'PRIVATE' }))}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: '10px',
-                  border: formData.eventType === 'FREE' ? '2px solid #16a34a' : '1px solid #cbd5e1',
-                  background: formData.eventType === 'FREE' ? '#f0fdf4' : '#ffffff',
-                  color: formData.eventType === 'FREE' ? '#15803d' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
-                  fontWeight: formData.eventType === 'FREE' ? 700 : 500,
+                  border: formData.visibility === 'PRIVATE' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                  background: formData.visibility === 'PRIVATE' ? '#f5f3ff' : '#ffffff',
+                  color: formData.visibility === 'PRIVATE' ? '#6d28d9' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
+                  fontWeight: formData.visibility === 'PRIVATE' ? 700 : 500,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '0.2rem',
                   cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
-                  fontSize: '0.95rem',
-                  opacity: isEventTypeLocked && formData.eventType !== 'FREE' ? 0.5 : 1,
+                  textAlign: 'left',
+                  opacity: isEventTypeLocked && formData.visibility !== 'PRIVATE' ? 0.5 : 1,
                 }}
               >
-                <span>🎟️</span> Evento Gratuito (RSVP)
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
+                  <strong>Privado</strong>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 'normal' }}>
+                  Invisível no catálogo. Acesso apenas por link compartilhado.
+                </span>
               </button>
             </div>
           </div>
@@ -846,7 +808,7 @@ function CadastrarEventoForm() {
               border: '1px solid #c4b5fd',
             }}>
               <label htmlFor="accessPassword" style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#5b21b6' }}>
-                🔒 Senha de Acesso do Evento Privado *
+                Senha de Acesso do Evento Privado *
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -914,7 +876,7 @@ function CadastrarEventoForm() {
             }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.9rem', fontWeight: '600', color: '#166534' }}>
-                  🔒 Proteção da Inscrição Gratuita
+                  Proteção da Inscrição Gratuita
                 </label>
                 <span style={{ fontSize: '0.82rem', color: '#15803d' }}>
                   Escolha se o evento gratuito será aberto a qualquer visitante ou exigirá senha para confirmação.
@@ -937,7 +899,7 @@ function CadastrarEventoForm() {
                     textAlign: 'center',
                   }}
                 >
-                  🌐 Sem Senha (Aberto a todos)
+                  Sem Senha (Aberto a todos)
                 </button>
 
                 <button
@@ -955,7 +917,7 @@ function CadastrarEventoForm() {
                     textAlign: 'center',
                   }}
                 >
-                  🔐 Com Senha (Restrito)
+                  Com Senha (Restrito)
                 </button>
               </div>
 
@@ -1018,6 +980,74 @@ function CadastrarEventoForm() {
               )}
             </div>
           ) : null}
+          </Card>
+
+          <Card title="Tipo de evento e vagas" subtitle="Gratuito ou pago, e quantas pessoas podem participar.">
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
+              Tipo de Evento *
+            </label>
+
+            {isEventTypeLocked && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.65rem 0.9rem', marginBottom: '0.75rem',
+                background: '#fffbeb', border: '1px solid #fde68a',
+                borderRadius: '8px', fontSize: '0.83rem', color: '#92400e',
+              }}>
+
+                <span>O tipo de evento não pode ser alterado após publicação ou aprovação.</span>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <button
+                type="button"
+                disabled={isEventTypeLocked}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, eventType: 'PAID' }))}
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  border: formData.eventType === 'PAID' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                  background: formData.eventType === 'PAID' ? '#f0f9ff' : '#ffffff',
+                  color: formData.eventType === 'PAID' ? '#0369a1' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
+                  fontWeight: formData.eventType === 'PAID' ? 700 : 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
+                  fontSize: '0.95rem',
+                  opacity: isEventTypeLocked && formData.eventType !== 'PAID' ? 0.5 : 1,
+                }}
+              >
+                Evento Pago
+              </button>
+
+              <button
+                type="button"
+                disabled={isEventTypeLocked}
+                onClick={() => !isEventTypeLocked && setFormData((prev) => ({ ...prev, eventType: 'FREE', price: '0' }))}
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  border: formData.eventType === 'FREE' ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                  background: formData.eventType === 'FREE' ? '#f0fdf4' : '#ffffff',
+                  color: formData.eventType === 'FREE' ? '#15803d' : (isEventTypeLocked ? '#94a3b8' : '#475569'),
+                  fontWeight: formData.eventType === 'FREE' ? 700 : 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
+                  fontSize: '0.95rem',
+                  opacity: isEventTypeLocked && formData.eventType !== 'FREE' ? 0.5 : 1,
+                }}
+              >
+                Evento Gratuito (RSVP)
+              </button>
+            </div>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: formData.eventType === 'FREE' ? '1fr' : '1fr 1fr', gap: '0.75rem' }}>
             <div>
@@ -1098,6 +1128,7 @@ function CadastrarEventoForm() {
               </div>
             )}
           </div>
+          </Card>
 
           {formData.eventType === 'PAID' && (
             <section style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1px solid #e2e8f0' }}>
@@ -1109,7 +1140,7 @@ function CadastrarEventoForm() {
                 </p>
                 {isEventTypeLocked && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.4rem', fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '2px 8px' }}>
-                    🔒 Não editável após publicação
+                    Não editável após publicação
                   </span>
                 )}
               </div>
@@ -1321,6 +1352,14 @@ function CadastrarEventoForm() {
               ))}
             </div>
           </section>
+
+          <CustomFieldsEditor
+            fields={customFields}
+            onChange={(next) => {
+              setCustomFields(next)
+              setCustomFieldsDirty(true)
+            }}
+          />
           </fieldset>
 
           <div style={{ display: 'flex', gap: '0.85rem', marginTop: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>

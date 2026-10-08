@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AdminEventItem, CheckinAccess, CheckinRecord, Event, EventInvitation, EventMember } from '@mypass360/types'
+import type { AdminEventItem, CheckinAccess, CheckinRecord, Event, EventCustomField, EventInvitation, EventMember } from '@mypass360/types'
+import { fetchActiveCustomFields, fetchAllCustomFields } from '@/features/custom-fields/custom-fields.service'
 import {
   createEventCheckinAccess,
   deleteEventCheckin,
@@ -33,7 +34,7 @@ interface EventDetailsModalProps {
 
 type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'tickets' | 'partners'
 
-type TicketColumnKey = 'name' | 'code' | 'type' | 'price' | 'cpf' | 'email' | 'status' | 'issuedAt'
+type TicketColumnKey = string
 
 const TICKET_COLUMNS: { key: TicketColumnKey; label: string }[] = [
   { key: 'name', label: 'Nome' },
@@ -106,13 +107,37 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   const [searchTicket, setSearchTicket] = useState('')
   const [ticketColumns, setTicketColumns] = useState<TicketColumnKey[]>(['name', 'code', 'type'])
   const [showColumnPicker, setShowColumnPicker] = useState(false)
+  const [customFields, setCustomFields] = useState<EventCustomField[]>([])
+
+  const allColumns: { key: TicketColumnKey; label: string }[] = [
+    ...TICKET_COLUMNS,
+    ...customFields.map((f) => ({
+      key: `custom:${f.id}`,
+      label: f.is_active === false ? `${f.label} (desativado)` : f.label,
+    })),
+  ]
+  const visibleColumns = allColumns.filter((c) => ticketColumns.includes(c.key))
+  const columnValue = (a: AdminAttendee, key: TicketColumnKey): string => {
+    if (key.startsWith('custom:')) return a.customAnswers?.[key.slice(7)] || '—'
+    switch (key) {
+      case 'name': return a.name || 'Sem nome'
+      case 'code': return a.publicCode || a.ticketId
+      case 'type': return a.ticketTypeName
+      case 'price': return a.price ? formatCurrency(a.price) : 'Gratuito'
+      case 'cpf': return formatCpf(a.cpf)
+      case 'email': return a.email || '—'
+      case 'status': return a.status
+      case 'issuedAt': return formatDateTime(a.issuedAt)
+      default: return '—'
+    }
+  }
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('mypass360:ticket-columns')
       if (saved) {
-        const parsed = (JSON.parse(saved) as string[]).filter((k): k is TicketColumnKey =>
-          TICKET_COLUMNS.some((c) => c.key === k)
+        const parsed = (JSON.parse(saved) as string[]).filter(
+          (k) => TICKET_COLUMNS.some((c) => c.key === k) || k.startsWith('custom:')
         )
         if (parsed.length > 0) setTicketColumns(parsed)
       }
@@ -122,20 +147,9 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
   }, [])
 
   function handleExportPdf(list: AdminAttendee[]) {
-    const cols = TICKET_COLUMNS.filter((c) => ticketColumns.includes(c.key))
+    const cols = visibleColumns
     const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string))
-    const value = (a: AdminAttendee, key: TicketColumnKey): string => {
-      switch (key) {
-        case 'name': return a.name || 'Sem nome'
-        case 'code': return a.publicCode || a.ticketId
-        case 'type': return a.ticketTypeName
-        case 'price': return a.price ? formatCurrency(a.price) : 'Gratuito'
-        case 'cpf': return formatCpf(a.cpf)
-        case 'email': return a.email || '—'
-        case 'status': return a.status
-        case 'issuedAt': return formatDateTime(a.issuedAt)
-      }
-    }
+    const value = columnValue
     const win = window.open('', '_blank', 'width=900,height=700')
     if (!win) return
     const title = `Lista de Ingressos — ${event.title}`
@@ -165,7 +179,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
     setTicketColumns((current) => {
       const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key]
       if (next.length === 0) return current
-      const ordered = TICKET_COLUMNS.map((c) => c.key).filter((k) => next.includes(k))
+      const ordered = allColumns.map((c) => c.key).filter((k) => next.includes(k))
       localStorage.setItem('mypass360:ticket-columns', JSON.stringify(ordered))
       return ordered
     })
@@ -176,6 +190,15 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
     fetchEventAttendees(event.id)
       .then(setAttendees)
       .catch((e) => setAttendeesError(e instanceof Error ? e.message : 'Erro ao carregar ingressos.'))
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (!data.session) throw new Error('sem sessão')
+        return fetchAllCustomFields(event.id, data.session.access_token)
+      })
+      .catch(() => fetchActiveCustomFields(event.id))
+      .then(setCustomFields)
+      .catch(() => setCustomFields([]))
   }, [activeTab, attendees, event.id])
 
   // Formulário de novo acesso
@@ -1648,7 +1671,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                         onClick={() => setShowColumnPicker((v) => !v)}
                         style={{ padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: showColumnPicker ? '#eef2ff' : '#fff', color: '#334155', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
                       >
-                        Colunas ({ticketColumns.length})
+                        Colunas ({visibleColumns.length})
                       </button>
                       <button
                         type="button"
@@ -1661,7 +1684,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                     </div>
                     {showColumnPicker && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#f8fafc' }}>
-                        {TICKET_COLUMNS.map((c) => (
+                        {allColumns.map((c) => (
                           <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
@@ -1683,35 +1706,30 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                       </p>
                     ) : (
                       <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${ticketColumns.length * 140}px` }}>
-                          <thead>
-                            <tr>
-                              {TICKET_COLUMNS.filter((c) => ticketColumns.includes(c.key)).map((c) => (
-                                <th key={c.key} style={head}>{c.label}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {list.map((a) => (
-                              <tr key={a.ticketId}>
-                                {ticketColumns.includes('name') && (
-                                  <td style={cell}>{a.name || <span style={{ color: '#94a3b8' }}>Sem nome</span>}</td>
-                                )}
-                                {ticketColumns.includes('code') && (
-                                  <td style={{ ...cell, fontFamily: 'monospace' }}>{a.publicCode || a.ticketId}</td>
-                                )}
-                                {ticketColumns.includes('type') && <td style={cell}>{a.ticketTypeName}</td>}
-                                {ticketColumns.includes('price') && (
-                                  <td style={cell}>{a.price ? formatCurrency(a.price) : 'Gratuito'}</td>
-                                )}
-                                {ticketColumns.includes('cpf') && <td style={cell}>{formatCpf(a.cpf)}</td>}
-                                {ticketColumns.includes('email') && <td style={cell}>{a.email || '—'}</td>}
-                                {ticketColumns.includes('status') && <td style={cell}>{a.status}</td>}
-                                {ticketColumns.includes('issuedAt') && <td style={cell}>{formatDateTime(a.issuedAt)}</td>}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <table style={{ width: '100%', borderCollapse: 'collapse',                         minWidth: `${visibleColumns.length * 140}px` }}>
+                                                  <thead>
+                                                    <tr>
+                                                      {visibleColumns.map((c) => (
+                                                        <th key={c.key} style={head}>{c.label}</th>
+                                                      ))}
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {list.map((a) => (
+                                                      <tr key={a.ticketId}>
+                                                        {visibleColumns.map((c) =>
+                                                          c.key === 'name' ? (
+                                                            <td key={c.key} style={cell}>{a.name || <span style={{ color: '#94a3b8' }}>Sem nome</span>}</td>
+                                                          ) : c.key === 'code' ? (
+                                                            <td key={c.key} style={{ ...cell, fontFamily: 'monospace' }}>{columnValue(a, c.key)}</td>
+                                                          ) : (
+                                                            <td key={c.key} style={cell}>{columnValue(a, c.key)}</td>
+                                                          )
+                                                        )}
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
                       </div>
                     )}
                   </div>

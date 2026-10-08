@@ -20,6 +20,7 @@ export interface AdminAttendee {
   price: number
   status: string
   issuedAt: string | null
+  customAnswers: Record<string, string>
 }
 
 type EventRow = {
@@ -686,8 +687,23 @@ export class AdminRepository {
       }
     }
 
+    const ticketIds = (tickets ?? []).map((t: any) => t.id)
+    const answersByTicket = new Map<string, Record<string, string>>()
+    if (ticketIds.length > 0) {
+      const { data: values } = await client
+        .from('ticket_custom_field_values')
+        .select('ticket_id, field_id, value')
+        .in('ticket_id', ticketIds)
+      for (const row of values ?? []) {
+        const current = answersByTicket.get((row as any).ticket_id) ?? {}
+        current[(row as any).field_id] = (row as any).value
+        answersByTicket.set((row as any).ticket_id, current)
+      }
+    }
+
     return (tickets ?? []).map((t: any) => ({
       ticketId: t.id,
+      customAnswers: answersByTicket.get(t.id) ?? {},
       publicCode: t.public_code ?? '',
       name: t.buyer_name ?? null,
       cpf: t.buyer_cpf ?? null,

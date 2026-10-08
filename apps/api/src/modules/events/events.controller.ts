@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Delete,
+  Put,
   Body,
   Param,
   UseGuards,
@@ -14,6 +15,7 @@ import { UpdateEventDto } from './dto/update-event.dto'
 import { ScheduleEventDto } from './dto/schedule-event.dto'
 import { RequestEventDeletionDto } from './dto/request-event-deletion.dto'
 import { ReplyAdminMessageDto } from './dto/reply-admin-message.dto'
+import type { CustomFieldInput } from '@/modules/custom-fields/custom-fields.service'
 import { AuthGuard, type AuthenticatedUser } from '@/common/guards/auth.guard'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 
@@ -156,6 +158,30 @@ export class EventsController {
   @UseGuards(AuthGuard)
   getEventDetails(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eventsService.getEventDetails(id, user.id)
+  }
+
+  /** GET /events/:id/custom-fields — campos ativos (público) */
+  @Get(':id/custom-fields')
+  getCustomFields(@Param('id') id: string) {
+    return this.eventsService.getActiveCustomFields(id)
+  }
+
+  /** GET /events/:id/custom-fields/all — todos os campos, inclusive desativados (protegido) */
+  @Get(':id/custom-fields/all')
+  @UseGuards(AuthGuard)
+  getAllCustomFields(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.getAllCustomFields(id, user.id)
+  }
+
+  /** PUT /events/:id/custom-fields — salva configuração dos campos (protegido) */
+  @Put(':id/custom-fields')
+  @UseGuards(AuthGuard)
+  syncCustomFields(
+    @Param('id') id: string,
+    @Body() body: { fields: CustomFieldInput[] },
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.eventsService.syncCustomFields(id, user, body?.fields ?? [])
   }
 
   /** GET /events/:id/attendees — ingressos emitidos do evento (protegido) */

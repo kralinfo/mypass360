@@ -307,6 +307,7 @@ export class PaymentsService {
             unit_price,
             nominee_names,
             nominee_cpfs,
+            custom_answers,
             ticket_types (
               id,
               name,
@@ -340,6 +341,7 @@ export class PaymentsService {
         ticketTypeDescription: item.ticket_types?.description,
         nomineeNames: item.nominee_names,
         nomineeCpfs: item.nominee_cpfs,
+        customAnswers: item.custom_answers,
       }))
 
       const tickets = await this.ticketsService.generateForOrder(

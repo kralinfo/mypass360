@@ -11,13 +11,17 @@ import * as QRCode from 'qrcode'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { AuthenticatedUser } from '@/common/guards/auth.guard'
 import type { FreeRegistrationDto } from './dto/free-registration.dto'
+import { CustomFieldsService } from '@/modules/custom-fields/custom-fields.service'
 
 const TOKEN_SECRET = process.env.JWT_SECRET || 'mypass360_free_rsvp_token_secret_2026'
 const TOKEN_TTL_MS = 15 * 60 * 1000 // 15 minutos
 
 @Injectable()
 export class FreeRegistrationService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly customFields: CustomFieldsService
+  ) {}
 
   /**
    * Valida a senha de acesso de um evento gratuito e gera um registration_token temporário.
@@ -128,6 +132,7 @@ export class FreeRegistrationService {
     }
 
     // 5. Gerar ingresso / comprovante de presença gratuito
+    const [validatedAnswers] = await this.customFields.validateAnswers(eventId, [dto.custom_answers ?? {}], 1)
     const ticketId = randomUUID()
     const publicCode = 'FR-' + randomUUID().substring(0, 6).toUpperCase()
 
@@ -171,6 +176,8 @@ export class FreeRegistrationService {
     if (insertError) {
       throw new BadRequestException(`Erro ao registrar presença: ${insertError.message}`)
     }
+
+    await this.customFields.saveForTickets([{ ticketId, answers: validatedAnswers }])
 
     return ticket
   }

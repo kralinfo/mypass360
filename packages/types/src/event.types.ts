@@ -132,6 +132,24 @@ export interface FreeRegistrationPayload {
   participant_name?: string
   participant_cpf?: string
   registration_token?: string
+  custom_answers?: Record<string, string>
+}
+
+export type EventCustomFieldType = 'text' | 'number' | 'select'
+
+export interface EventCustomFieldOption {
+  id?: string
+  label: string
+  is_active?: boolean
+}
+
+export interface EventCustomField {
+  id?: string
+  label: string
+  field_type: EventCustomFieldType
+  required: boolean
+  is_active?: boolean
+  options: EventCustomFieldOption[]
 }
 
 /**

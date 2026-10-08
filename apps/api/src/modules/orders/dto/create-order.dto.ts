@@ -22,6 +22,10 @@ export class CreateOrderItemDto {
   @IsArray()
   @IsString({ each: true })
   nomineeCpfs?: string[]
+
+  @IsOptional()
+  @IsArray()
+  customAnswers?: Record<string, string>[]
 }
 
 export class CreateOrderDto {

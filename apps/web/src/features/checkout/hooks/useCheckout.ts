@@ -15,6 +15,7 @@ interface SelectedTicketType {
   unitPrice: number
   nomineeNames?: string[]
   nomineeCpfs?: string[]
+  customAnswers?: Record<string, string>[]
 }
 
 interface UseCheckoutResult {
@@ -30,6 +31,7 @@ interface UseCheckoutResult {
   hydrateSelectedItems: (items: SelectedTicketType[]) => void
   updateNomineeName: (ticketTypeId: string, index: number, name: string) => void
   updateNomineeCpf: (ticketTypeId: string, index: number, cpf: string) => void
+  updateCustomAnswer: (ticketTypeId: string, index: number, fieldId: string, value: string) => void
   handleSubmit: (eventId: string) => Promise<{ orderId: string; amount: number } | null>
 }
 
@@ -76,6 +78,8 @@ export function useCheckout(): UseCheckoutResult {
       const existingCpfs = existingItem?.nomineeCpfs ?? []
       const newNames = Array.from({ length: quantity }, (_, idx) => existingNames[idx] ?? '')
       const newCpfs = Array.from({ length: quantity }, (_, idx) => existingCpfs[idx] ?? '')
+      const existingAnswers = existingItem?.customAnswers ?? []
+      const newAnswers = Array.from({ length: quantity }, (_, idx) => existingAnswers[idx] ?? {})
 
       return [
         ...withoutCurrent,
@@ -85,10 +89,25 @@ export function useCheckout(): UseCheckoutResult {
           unitPrice: ticketType.price,
           nomineeNames: newNames,
           nomineeCpfs: newCpfs,
+          customAnswers: newAnswers,
         },
       ]
     })
   }, [])
+
+  const updateCustomAnswer = useCallback(
+    (ticketTypeId: string, index: number, fieldId: string, value: string): void => {
+      setSelectedItemsState((previous) =>
+        previous.map((item) => {
+          if (item.ticketTypeId !== ticketTypeId) return item
+          const answers = Array.from({ length: item.quantity }, (_, idx) => ({ ...(item.customAnswers?.[idx] ?? {}) }))
+          answers[index] = { ...answers[index], [fieldId]: value }
+          return { ...item, customAnswers: answers }
+        })
+      )
+    },
+    []
+  )
 
   const updateNomineeName = useCallback((ticketTypeId: string, index: number, name: string): void => {
     setSelectedItemsState((previous) =>
@@ -169,6 +188,7 @@ export function useCheckout(): UseCheckoutResult {
     hydrateSelectedItems,
     updateNomineeName,
     updateNomineeCpf,
+    updateCustomAnswer,
     handleSubmit,
   }
 }

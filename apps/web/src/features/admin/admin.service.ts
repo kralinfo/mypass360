@@ -25,6 +25,7 @@ export interface AdminAttendee {
   price?: number
   status: string
   issuedAt: string | null
+  customAnswers?: Record<string, string>
 }
 
 export interface EventTicketTypeSummary {

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCheckout } from '../hooks/useCheckout'
 import { useCart } from '@/features/cart/cart-context'
+import type { EventCustomField } from '@mypass360/types'
+import { CustomFieldInputs } from '@/features/custom-fields/CustomFieldInputs'
+import { fetchActiveCustomFields, findMissingRequiredField } from '@/features/custom-fields/custom-fields.service'
 
 interface CheckoutFormProps {
   eventId: string
@@ -60,10 +63,12 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
     hydrateSelectedItems,
     updateNomineeName,
     updateNomineeCpf,
+    updateCustomAnswer,
     handleSubmit,
   } = useCheckout()
   const router = useRouter()
   const { getItemsForEvent } = useCart()
+  const [customFields, setCustomFields] = useState<EventCustomField[]>([])
   const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
   const hydratedFromCartRef = useRef(false)
   const hydratedFromDirectCheckoutRef = useRef(false)
@@ -84,6 +89,16 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   useEffect(() => {
     loadCheckout(eventId)
   }, [eventId, loadCheckout])
+
+  useEffect(() => {
+    let active = true
+    fetchActiveCustomFields(eventId)
+      .then((fields) => active && setCustomFields(fields))
+      .catch(() => active && setCustomFields([]))
+    return () => {
+      active = false
+    }
+  }, [eventId])
 
   useEffect(() => {
     if (from !== 'event' || hydratedFromDirectCheckoutRef.current || !event) {
@@ -136,6 +151,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
         unitPrice: number
         nomineeNames?: string[]
         nomineeCpfs?: string[]
+        customAnswers?: Record<string, string>[]
       }>
       const validIds = new Set(ticketTypes.map((t) => t.id))
       const filtered = parsed.filter((item) => validIds.has(item.ticketTypeId) && item.quantity > 0)
@@ -217,6 +233,18 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
         for (let i = 0; i < item.quantity; i++) {
           if (!names[i]?.trim()) {
             alert(`Ingresso #${i + 1}: Nome completo é obrigatório.`)
+            return
+          }
+        }
+      }
+    }
+
+    if (customFields.length > 0) {
+      for (const item of selectedItems) {
+        for (let i = 0; i < item.quantity; i++) {
+          const missing = findMissingRequiredField(customFields, item.customAnswers?.[i] ?? {})
+          if (missing) {
+            alert(`Ingresso #${i + 1}: ${missing}`)
             return
           }
         }
@@ -435,6 +463,27 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                             </div>
                           )}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {quantity > 0 && customFields.length > 0 && (
+                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
+                      Informações adicionais
+                    </p>
+                    {Array.from({ length: quantity }).map((_, idx) => (
+                      <div key={idx} style={{ display: 'grid', gap: '0.6rem', background: '#f8fafc', borderRadius: '8px', padding: '0.75rem' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', margin: 0 }}>
+                          Ingresso #{idx + 1}
+                        </p>
+                        <CustomFieldInputs
+                          fields={customFields}
+                          values={itemState?.customAnswers?.[idx] ?? {}}
+                          onChange={(fieldId, value) => updateCustomAnswer(ticketType.id, idx, fieldId, value)}
+                          idPrefix={`custom-${ticketType.id}-${idx}`}
+                        />
                       </div>
                     ))}
                   </div>

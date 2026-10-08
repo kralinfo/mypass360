@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { SupabaseService } from '@/common/supabase/supabase.service'
 import type { ValidateTicketDto } from './dto/validate-ticket.dto'
 import { randomUUID } from 'crypto'
+import { CustomFieldsService } from '@/modules/custom-fields/custom-fields.service'
 import * as QRCode from 'qrcode'
 
 export interface OrderItemForTicketGeneration {
@@ -13,13 +14,17 @@ export interface OrderItemForTicketGeneration {
   ticketTypeDescription?: string
   nomineeNames?: string[]
   nomineeCpfs?: string[]
+  customAnswers?: Record<string, string>[]
 }
 
 @Injectable()
 export class TicketsRepository {
   private readonly table = 'tickets'
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly customFields: CustomFieldsService
+  ) {}
 
   async findById(id: string) {
     const { data, error } = await this.supabase
@@ -181,7 +186,7 @@ export class TicketsRepository {
     buyerDisplayName?: string
   ) {
     const ticketsToInsert = []
-
+    const answersToSave: Array<{ ticketId: string; answers: Record<string, string> }> = []
     // Buscar participant_id_type UMA vez antes do loop (evita N queries desnecessárias)
     let pIdType = 'name'
     if (eventId) {
@@ -219,7 +224,7 @@ export class TicketsRepository {
         }
 
         const nomineeCpf = item.nomineeCpfs?.[i] || null
-
+        answersToSave.push({ ticketId, answers: item.customAnswers?.[i] ?? {} })
         ticketsToInsert.push({
           id: ticketId,
           public_code: publicCode,
@@ -275,12 +280,14 @@ export class TicketsRepository {
         }
 
         console.warn('[TicketsRepository] IMPORTANTE: Execute a migration SQL para habilitar todos os campos de tickets.')
+        await this.customFields.saveForTickets(answersToSave)
         return fallbackData ?? []
       }
 
       throw new Error(`Falha ao gerar tickets: ${error.message}`)
     }
 
+    await this.customFields.saveForTickets(answersToSave)
     return data ?? []
   }
 

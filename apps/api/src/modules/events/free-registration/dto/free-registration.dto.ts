@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator'
+import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class FreeRegistrationDto {
   @IsString()
@@ -12,4 +12,8 @@ export class FreeRegistrationDto {
   @IsString()
   @IsOptional()
   registration_token?: string
+
+  @IsOptional()
+  @IsObject()
+  custom_answers?: Record<string, string>
 }
