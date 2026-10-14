@@ -184,6 +184,25 @@ export class EventsController {
     return this.eventsService.syncCustomFields(id, user, body?.fields ?? [])
   }
 
+  /** GET /events/:id/checkin-display-fields — obtém campos adicionais exibidos no check-in (protegido) */
+  @Get(':id/checkin-display-fields')
+  @UseGuards(AuthGuard)
+  getCheckinDisplayFields(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.getCheckinDisplayFields(id, user.id)
+  }
+
+  /** PUT /events/:id/checkin-display-fields — define campos adicionais exibidos no check-in (máx 3) (protegido) */
+  @Put(':id/checkin-display-fields')
+  @UseGuards(AuthGuard)
+  setCheckinDisplayFields(
+    @Param('id') id: string,
+    @Body() body: { fieldIds: string[] },
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.eventsService.setCheckinDisplayFields(id, user.id, body?.fieldIds ?? [])
+  }
+
+
   /** GET /events/:id/attendees — ingressos emitidos do evento (protegido) */
   @Get(':id/attendees')
   @UseGuards(AuthGuard)

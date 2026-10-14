@@ -34,6 +34,19 @@ export class EventsService {
     return this.customFieldsService.sync(eventId, fields)
   }
 
+  /** Retorna campos adicionais configurados para exibição no Check-in (dono/sócio). */
+  async getCheckinDisplayFields(eventId: string, userId: string) {
+    await this.assertAccess(eventId, userId)
+    return this.customFieldsService.getCheckinDisplayFields(eventId)
+  }
+
+  /** Salva configuração dos campos adicionais no Check-in (dono/sócio). */
+  async setCheckinDisplayFields(eventId: string, userId: string, fieldIds: string[]) {
+    await this.assertAccess(eventId, userId)
+    return this.customFieldsService.setCheckinDisplayFields(eventId, fieldIds)
+  }
+
+
   /** Lista eventos públicos (publicados + published_at já atingido). */
   findAll() {
     return this.eventsRepository.findAll()

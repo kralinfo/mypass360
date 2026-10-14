@@ -732,7 +732,45 @@ export function CheckinTerminal({ authData, onLogout }: CheckinTerminalProps) {
                       </strong>
                     </div>
                   </div>
+
+                  {/* ── Campos Adicionais Personalizados (Configurados pelo Organizador - Máx 3) ── */}
+                  {result.customFields && result.customFields.length > 0 && (
+                    <div
+                      style={{
+                        borderTop: '1px dashed #bbf7d0',
+                        paddingTop: '0.45rem',
+                        marginTop: '0.2rem',
+                        display: 'grid',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      {result.customFields.map((field, idx) => (
+                        <div
+                          key={field.fieldId ?? idx}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '0.6rem',
+                            padding: '0.3rem 0.55rem',
+                            borderRadius: '6px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.82rem',
+                          }}
+                        >
+                          <span style={{ color: '#475569', fontWeight: 600 }}>
+                            {field.label}:
+                          </span>
+                          <strong style={{ color: '#0f172a', fontWeight: 700, textAlign: 'right' }}>
+                            {field.value}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
 
                 {/* Botão "Nova leitura" ou "Concluir check-in" CENTRALIZADO ABAIXO do card do participante */}
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '0.1rem' }}>
