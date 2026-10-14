@@ -1747,9 +1747,6 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               {/* ── TAB 3: CHECK-INS REALIZADOS ── */}
               {activeTab === 'checkins' && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
-                  {/* Seção de Configuração dos Campos Adicionais no Check-in */}
-                  <CheckinDisplayFieldsConfig eventId={event.id} />
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
 
                     <div style={{ flex: 1, minWidth: '240px' }}>
