@@ -45,6 +45,24 @@ function Card({ title, subtitle, children }: { title: string; subtitle: string; 
   )
 }
 
+interface FormBatchItem {
+  name: string
+  price: string
+  quantity: string
+  isUnlimited: boolean
+  status?: string
+}
+
+interface FormTicketType {
+  name: string
+  price: string
+  quantity: string
+  description: string
+  isUnlimited: boolean
+  useBatches?: boolean
+  batches?: FormBatchItem[]
+}
+
 function CadastrarEventoForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -88,8 +106,19 @@ function CadastrarEventoForm() {
     participantIdType: '' as '' | 'none' | 'name',
     isCapacityUnlimited: false,
     ticketTypes: [
-      { name: 'Inteira', price: '', quantity: '', description: '', isUnlimited: false },
-    ],
+      {
+        name: 'Inteira',
+        price: '',
+        quantity: '',
+        description: '',
+        isUnlimited: false,
+        useBatches: false,
+        batches: [
+          { name: '1º Lote', price: '', quantity: '', isUnlimited: false },
+          { name: '2º Lote', price: '', quantity: '', isUnlimited: false },
+        ],
+      },
+    ] as FormTicketType[],
   })
 
   // Carregar dados do evento em modo edição
@@ -123,16 +152,64 @@ function CadastrarEventoForm() {
         const timeStr = eventDate.toTimeString().slice(0, 5)
 
         // Se o evento já tiver ticket_types, carrega do banco. Caso contrário, inicia vazios/padrão
-        const mappedTicketTypes = event.ticket_types && event.ticket_types.length > 0
-          ? event.ticket_types.map((tt: { name: string; price: number; quantity: number; description?: string; is_unlimited?: boolean }) => ({
-              name: tt.name,
-              price: String(tt.price),
-              quantity: String(tt.quantity),
-              description: tt.description ?? '',
-              isUnlimited: Boolean(tt.is_unlimited),
-            }))
+        interface LoadedBatch {
+          name: string
+          price: number
+          quantity: number
+          is_unlimited?: boolean
+          display_order?: number
+          status?: string
+        }
+        interface LoadedTicketType {
+          name: string
+          price: number
+          quantity: number
+          description?: string | null
+          is_unlimited?: boolean
+          batch_mode?: boolean
+          ticket_batches?: LoadedBatch[]
+        }
+
+        const mappedTicketTypes: FormTicketType[] = event.ticket_types && event.ticket_types.length > 0
+          ? (event.ticket_types as unknown as LoadedTicketType[]).map((tt) => {
+              const hasBatches = Boolean(tt.batch_mode && tt.ticket_batches && tt.ticket_batches.length > 0)
+              const sortedBatches = hasBatches
+                ? [...(tt.ticket_batches || [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                : []
+              return {
+                name: tt.name,
+                price: String(tt.price),
+                quantity: String(tt.quantity),
+                description: tt.description ?? '',
+                isUnlimited: Boolean(tt.is_unlimited),
+                useBatches: hasBatches,
+                batches: hasBatches
+                  ? sortedBatches.map((b) => ({
+                      name: b.name,
+                      price: String(b.price),
+                      quantity: String(b.quantity),
+                      isUnlimited: Boolean(b.is_unlimited),
+                      status: b.status,
+                    }))
+                  : [
+                      { name: '1º Lote', price: String(tt.price), quantity: String(tt.quantity), isUnlimited: Boolean(tt.is_unlimited) },
+                      { name: '2º Lote', price: '', quantity: '', isUnlimited: false },
+                    ],
+              }
+            })
           : [
-              { name: 'Inteira', price: event.price ? String(event.price) : '', quantity: '', description: '', isUnlimited: false },
+              {
+                name: 'Inteira',
+                price: event.price ? String(event.price) : '',
+                quantity: '',
+                description: '',
+                isUnlimited: false,
+                useBatches: false,
+                batches: [
+                  { name: '1º Lote', price: '', quantity: '', isUnlimited: false },
+                  { name: '2º Lote', price: '', quantity: '', isUnlimited: false },
+                ],
+              },
             ]
 
         const isCancelledOrDeleted = event.deletion_status === 'approved' || event.status === 'cancelled'
@@ -191,16 +268,30 @@ function CadastrarEventoForm() {
   useEffect(() => {
     if (formData.eventType !== 'PAID') return
 
-    const totalCapacity = formData.ticketTypes.reduce(
-      (acc, item) => acc + (item.isUnlimited ? 0 : (parseInt(item.quantity, 10) || 0)),
-      0
-    )
-    const totalRevenue = formData.ticketTypes.reduce(
-      (acc, item) => acc + ((parseFloat(item.price) || 0) * (item.isUnlimited ? 0 : (parseInt(item.quantity, 10) || 0))),
-      0
-    )
-    const avgPrice = totalCapacity > 0 ? totalRevenue / totalCapacity : 0
+    let totalCapacity = 0
+    let totalRevenue = 0
 
+    for (const item of formData.ticketTypes) {
+      if (item.useBatches && item.batches && item.batches.length > 0) {
+        for (const b of item.batches) {
+          if (!b.isUnlimited) {
+            const qty = parseInt(b.quantity, 10) || 0
+            const prc = parseFloat(b.price) || 0
+            totalCapacity += qty
+            totalRevenue += prc * qty
+          }
+        }
+      } else {
+        if (!item.isUnlimited) {
+          const qty = parseInt(item.quantity, 10) || 0
+          const prc = parseFloat(item.price) || 0
+          totalCapacity += qty
+          totalRevenue += prc * qty
+        }
+      }
+    }
+
+    const avgPrice = totalCapacity > 0 ? totalRevenue / totalCapacity : 0
     const newCapStr = String(totalCapacity)
     const newPriceStr = avgPrice > 0 ? avgPrice.toFixed(2) : '0'
 
@@ -253,10 +344,102 @@ function CadastrarEventoForm() {
     })
   }
 
+  const toggleTicketBatches = (index: number) => {
+    setFormData((prev) => {
+      const ticketTypes = [...prev.ticketTypes]
+      const current = ticketTypes[index]
+      const nextUseBatches = !current.useBatches
+      const currentBatches = current.batches && current.batches.length > 0
+        ? current.batches
+        : [
+            { name: '1º Lote', price: current.price || '', quantity: current.quantity || '', isUnlimited: current.isUnlimited },
+            { name: '2º Lote', price: '', quantity: '', isUnlimited: false },
+          ]
+      ticketTypes[index] = {
+        ...current,
+        useBatches: nextUseBatches,
+        batches: currentBatches,
+      }
+      return { ...prev, ticketTypes }
+    })
+  }
+
+  const handleBatchChange = (
+    ticketIndex: number,
+    batchIndex: number,
+    field: 'name' | 'price' | 'quantity',
+    value: string
+  ) => {
+    setFormData((prev) => {
+      const ticketTypes = [...prev.ticketTypes]
+      const batches = [...(ticketTypes[ticketIndex].batches || [])]
+      batches[batchIndex] = { ...batches[batchIndex], [field]: value }
+      ticketTypes[ticketIndex] = { ...ticketTypes[ticketIndex], batches }
+      return { ...prev, ticketTypes }
+    })
+  }
+
+  const handleBatchUnlimitedChange = (
+    ticketIndex: number,
+    batchIndex: number,
+    isUnlimited: boolean
+  ) => {
+    setFormData((prev) => {
+      const ticketTypes = [...prev.ticketTypes]
+      const batches = [...(ticketTypes[ticketIndex].batches || [])]
+      batches[batchIndex] = {
+        ...batches[batchIndex],
+        isUnlimited,
+        quantity: isUnlimited ? '' : batches[batchIndex].quantity,
+      }
+      ticketTypes[ticketIndex] = { ...ticketTypes[ticketIndex], batches }
+      return { ...prev, ticketTypes }
+    })
+  }
+
+  const addBatchToTicket = (ticketIndex: number) => {
+    setFormData((prev) => {
+      const ticketTypes = [...prev.ticketTypes]
+      const batches = [...(ticketTypes[ticketIndex].batches || [])]
+      const nextNum = batches.length + 1
+      batches.push({
+        name: `${nextNum}º Lote`,
+        price: '',
+        quantity: '',
+        isUnlimited: false,
+      })
+      ticketTypes[ticketIndex] = { ...ticketTypes[ticketIndex], batches }
+      return { ...prev, ticketTypes }
+    })
+  }
+
+  const removeBatchFromTicket = (ticketIndex: number, batchIndex: number) => {
+    setFormData((prev) => {
+      const ticketTypes = [...prev.ticketTypes]
+      const batches = (ticketTypes[ticketIndex].batches || []).filter((_, i) => i !== batchIndex)
+      ticketTypes[ticketIndex] = { ...ticketTypes[ticketIndex], batches }
+      return { ...prev, ticketTypes }
+    })
+  }
+
   const addTicketType = () => {
     setFormData((prev) => ({
       ...prev,
-      ticketTypes: [...prev.ticketTypes, { name: '', price: '', quantity: '', description: '', isUnlimited: false }],
+      ticketTypes: [
+        ...prev.ticketTypes,
+        {
+          name: '',
+          price: '',
+          quantity: '',
+          description: '',
+          isUnlimited: false,
+          useBatches: false,
+          batches: [
+            { name: '1º Lote', price: '', quantity: '', isUnlimited: false },
+            { name: '2º Lote', price: '', quantity: '', isUnlimited: false },
+          ],
+        },
+      ],
     }))
   }
 
@@ -331,13 +514,35 @@ function CadastrarEventoForm() {
           ? []
           : formData.ticketTypes
               .filter((ticketType) => ticketType.name.trim().length > 0)
-              .map((ticketType) => ({
-                name: ticketType.name.trim(),
-                price: parseFloat(ticketType.price) || 0,
-                quantity: parseInt(ticketType.quantity, 10) || 0,
-                is_unlimited: ticketType.isUnlimited,
-                description: ticketType.description?.trim() || null,
-              })),
+              .map((ticketType) => {
+                const hasBatches = Boolean(ticketType.useBatches && ticketType.batches && ticketType.batches.length > 0)
+                const firstBatchPrice = hasBatches
+                  ? parseFloat(ticketType.batches![0].price) || 0
+                  : parseFloat(ticketType.price) || 0
+                const totalBatchQty = hasBatches
+                  ? ticketType.batches!.reduce((sum, b) => sum + (b.isUnlimited ? 0 : (parseInt(b.quantity, 10) || 0)), 0)
+                  : parseInt(ticketType.quantity, 10) || 0
+                const isUnlimited = hasBatches
+                  ? ticketType.batches!.some((b) => b.isUnlimited)
+                  : ticketType.isUnlimited
+
+                return {
+                  name: ticketType.name.trim(),
+                  price: firstBatchPrice,
+                  quantity: totalBatchQty,
+                  is_unlimited: isUnlimited,
+                  description: ticketType.description?.trim() || null,
+                  batch_mode: hasBatches,
+                  batches: hasBatches
+                    ? ticketType.batches!.map((b) => ({
+                        name: b.name.trim(),
+                        price: parseFloat(b.price) || 0,
+                        quantity: b.isUnlimited ? 0 : (parseInt(b.quantity, 10) || 0),
+                        is_unlimited: b.isUnlimited,
+                      }))
+                    : undefined,
+                }
+              }),
       }
 
       // ticket_layout e participant_id_type são imutáveis após a criação
@@ -429,11 +634,31 @@ function CadastrarEventoForm() {
       }
       for (let i = 0; i < activeTickets.length; i++) {
         const tt = activeTickets[i]
-        const priceNum = parseFloat(tt.price)
-        const qtyNum = parseInt(tt.quantity, 10)
-        if (!tt.name.trim() || isNaN(priceNum) || priceNum < 0 || (!tt.isUnlimited && (isNaN(qtyNum) || qtyNum <= 0))) {
-          setError(`Preencha corretamente os campos do ingresso #${i + 1} (${tt.name || 'Sem nome'}).`)
+        if (!tt.name.trim()) {
+          setError(`Preencha o nome do ingresso #${i + 1}.`)
           return false
+        }
+        if (tt.useBatches) {
+          if (!tt.batches || tt.batches.length === 0) {
+            setError(`Adicione ao menos um lote para o ingresso "${tt.name}".`)
+            return false
+          }
+          for (let bIdx = 0; bIdx < tt.batches.length; bIdx++) {
+            const b = tt.batches[bIdx]
+            const bPrice = parseFloat(b.price)
+            const bQty = parseInt(b.quantity, 10)
+            if (!b.name.trim() || isNaN(bPrice) || bPrice < 0 || (!b.isUnlimited && (isNaN(bQty) || bQty <= 0))) {
+              setError(`Preencha corretamente o lote #${bIdx + 1} do ingresso "${tt.name}".`)
+              return false
+            }
+          }
+        } else {
+          const priceNum = parseFloat(tt.price)
+          const qtyNum = parseInt(tt.quantity, 10)
+          if (isNaN(priceNum) || priceNum < 0 || (!tt.isUnlimited && (isNaN(qtyNum) || qtyNum <= 0))) {
+            setError(`Preencha corretamente os campos do ingresso #${i + 1} (${tt.name || 'Sem nome'}).`)
+            return false
+          }
         }
       }
     } else {
@@ -1180,7 +1405,9 @@ function CadastrarEventoForm() {
                 }}
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center' }}>
-                  <label style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Tipo de ingresso</label>
+                  <label style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>
+                    Tipo de ingresso #{index + 1}
+                  </label>
                   {!isEventTypeLocked && (
                   <button
                     type="button"
@@ -1199,102 +1426,374 @@ function CadastrarEventoForm() {
                   </button>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
-                      Nome do tipo <span style={{ color: '#ef4444' }}>*</span>
-                      {isEventTypeLocked && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.35rem' }}>(fixo)</span>}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      readOnly={isEventTypeLocked}
-                      value={ticketType.name}
-                      onChange={(event) => !isEventTypeLocked && handleTicketTypeChange(index, 'name', event.target.value)}
-                      placeholder="Ex: Inteira, VIP"
-                      style={{
-                        width: '100%',
-                        padding: '0.6rem 0.75rem',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        fontSize: '0.9rem',
-                        boxSizing: 'border-box',
-                        backgroundColor: isEventTypeLocked ? '#f1f5f9' : '#fff',
-                        cursor: isEventTypeLocked ? 'not-allowed' : 'text',
-                        color: isEventTypeLocked ? '#64748b' : '#0f172a',
-                      }}
-                    />
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                    Nome do tipo <span style={{ color: '#ef4444' }}>*</span>
+                    {isEventTypeLocked && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.35rem' }}>(fixo)</span>}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    readOnly={isEventTypeLocked}
+                    value={ticketType.name}
+                    onChange={(event) => !isEventTypeLocked && handleTicketTypeChange(index, 'name', event.target.value)}
+                    placeholder="Ex: Inteira, VIP, Meia-Entrada"
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.75rem',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
+                      boxSizing: 'border-box',
+                      backgroundColor: isEventTypeLocked ? '#f1f5f9' : '#fff',
+                      cursor: isEventTypeLocked ? 'not-allowed' : 'text',
+                      color: isEventTypeLocked ? '#64748b' : '#0f172a',
+                    }}
+                  />
+                </div>
+
+                {/* Opção de Venda por Lotes */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.75rem 0.95rem',
+                  background: ticketType.useBatches ? '#f0fdf4' : '#f8fafc',
+                  border: ticketType.useBatches ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  marginTop: '0.25rem',
+                  gap: '1rem',
+                  transition: 'all 0.2s ease',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      background: ticketType.useBatches ? '#dcfce7' : '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem',
+                      flexShrink: 0,
+                    }}>
+                      🎫
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: ticketType.useBatches ? '#15803d' : '#1e293b' }}>
+                        Vender este ingresso por lotes (1º Lote, 2º Lote...)
+                      </span>
+                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                        Defina preços e vagas por lote. O sistema avança automaticamente ao esgotar.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
-                      Preço (R$) <span style={{ color: '#ef4444' }}>*</span>
-                      {isEventTypeLocked && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.35rem' }}>(fixo)</span>}
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      readOnly={isEventTypeLocked}
-                      value={ticketType.price}
-                      onChange={(event) => !isEventTypeLocked && handleTicketTypeChange(index, 'price', event.target.value)}
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      style={{
-                        width: '100%',
-                        padding: '0.6rem 0.75rem',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        fontSize: '0.9rem',
-                        boxSizing: 'border-box',
-                        backgroundColor: isEventTypeLocked ? '#f1f5f9' : '#fff',
-                        cursor: isEventTypeLocked ? 'not-allowed' : 'text',
-                        color: isEventTypeLocked ? '#64748b' : '#0f172a',
-                      }}
-                    />
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(ticketType.useBatches)}
+                    disabled={isEventTypeLocked}
+                    onClick={() => !isEventTypeLocked && toggleTicketBatches(index)}
+                    title={ticketType.useBatches ? 'Clique para desativar vendas por lote' : 'Clique para ativar vendas por lote'}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      background: ticketType.useBatches ? '#dcfce7' : '#ffffff',
+                      border: ticketType.useBatches ? '1px solid #86efac' : '1px solid #cbd5e1',
+                      cursor: isEventTypeLocked ? 'not-allowed' : 'pointer',
+                      padding: '0.4rem 0.75rem',
+                      borderRadius: '9999px',
+                      flexShrink: 0,
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                    }}
+                  >
+                    <span style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      color: ticketType.useBatches ? '#15803d' : '#475569',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {ticketType.useBatches ? 'Lotes Ativados' : 'Habilitar Lotes'}
+                    </span>
+                    {/* Switch Toggle */}
+                    <div style={{
+                      width: '38px',
+                      height: '22px',
+                      borderRadius: '9999px',
+                      backgroundColor: ticketType.useBatches ? '#16a34a' : '#cbd5e1',
+                      position: 'relative',
+                      transition: 'background-color 0.2s ease',
+                      flexShrink: 0,
+                    }}>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: '#ffffff',
+                        position: 'absolute',
+                        top: '3px',
+                        left: ticketType.useBatches ? '19px' : '3px',
+                        transition: 'left 0.2s ease',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.25)',
+                      }} />
+                    </div>
+                  </button>
+                </div>
+
+                {ticketType.useBatches ? (
+                  /* Editor de Lotes */
+                  <div style={{
+                    display: 'grid',
+                    gap: '0.75rem',
+                    padding: '0.85rem',
+                    background: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                          Lotes configurados
+                        </span>
+                        <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                          O 1º lote abre automaticamente. Ao esgotar, o próximo é liberado.
+                        </p>
+                      </div>
+                      {!isEventTypeLocked && (
+                        <button
+                          type="button"
+                          onClick={() => addBatchToTicket(index)}
+                          style={{
+                            background: '#0284c7',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          + Adicionar Lote
+                        </button>
+                      )}
+                    </div>
+
+                    {(ticketType.batches || []).map((batch, bIdx) => (
+                      <div
+                        key={bIdx}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr)) auto',
+                          gap: '0.65rem',
+                          alignItems: 'start',
+                          padding: '0.75rem',
+                          background: '#fff',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                            <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>
+                              Nome do lote <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            {batch.status === 'open' ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#15803d', background: '#dcfce7', padding: '1px 5px', borderRadius: '4px' }}>
+                                🟢 Vigente
+                              </span>
+                            ) : batch.status === 'closed' ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>
+                                🔒 Encerrado
+                              </span>
+                            ) : batch.status === 'sold_out' ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px' }}>
+                                🔥 Esgotado
+                              </span>
+                            ) : bIdx === 0 && !batch.status ? (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '1px 5px', borderRadius: '4px' }}>
+                                1º a abrir
+                              </span>
+                            ) : null}
+                          </div>
+                          <input
+                            type="text"
+                            required
+                            readOnly={isEventTypeLocked}
+                            value={batch.name}
+                            onChange={(e) => handleBatchChange(index, bIdx, 'name', e.target.value)}
+                            placeholder="Ex: 1º Lote"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.6rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>
+                            Preço (R$) <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            readOnly={isEventTypeLocked}
+                            value={batch.price}
+                            onChange={(e) => handleBatchChange(index, bIdx, 'price', e.target.value)}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.6rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>
+                            Quantidade {!batch.isUnlimited && <span style={{ color: '#ef4444' }}>*</span>}
+                          </label>
+                          <input
+                            type="number"
+                            required={!batch.isUnlimited}
+                            disabled={batch.isUnlimited || isEventTypeLocked}
+                            value={batch.isUnlimited ? '' : batch.quantity}
+                            onChange={(e) => handleBatchChange(index, bIdx, 'quantity', e.target.value)}
+                            min="1"
+                            placeholder={batch.isUnlimited ? 'Sem limite' : '0'}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.6rem',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                              backgroundColor: batch.isUnlimited ? '#f1f5f9' : '#fff',
+                            }}
+                          />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem', fontSize: '0.74rem', color: '#475569' }}>
+                            <input
+                              type="checkbox"
+                              disabled={isEventTypeLocked}
+                              checked={batch.isUnlimited}
+                              onChange={(e) => handleBatchUnlimitedChange(index, bIdx, e.target.checked)}
+                            />
+                            Sem limite
+                          </label>
+                        </div>
+
+                        {!isEventTypeLocked && (ticketType.batches || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeBatchFromTicket(index, bIdx)}
+                            title="Remover este lote"
+                            style={{
+                              padding: '0.5rem',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginTop: '1.2rem',
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
-                      Quantidade {!ticketType.isUnlimited && <span style={{ color: '#ef4444' }}>*</span>}
-                      {isEventTypeLocked && <span style={{ color: '#16a34a', fontWeight: 400, marginLeft: '0.35rem' }}>(editável)</span>}
-                    </label>
-                    <input
-                      type="number"
-                      required={!ticketType.isUnlimited}
-                      disabled={ticketType.isUnlimited}
-                      value={ticketType.isUnlimited ? '' : ticketType.quantity}
-                      onChange={(event) => handleTicketTypeChange(index, 'quantity', event.target.value)}
-                      min="1"
-                      placeholder={ticketType.isUnlimited ? 'Sem limite' : '0'}
-                      style={{
-                        width: '100%',
-                        padding: '0.6rem 0.75rem',
-                        border: isEventTypeLocked ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        fontSize: '0.9rem',
-                        boxSizing: 'border-box',
-                        backgroundColor: ticketType.isUnlimited ? '#f1f5f9' : (isEventTypeLocked ? '#f0fdf4' : '#fff'),
-                      }}
-                    />
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                ) : (
+                  /* Modo Preço Único tradicional */
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                        Preço (R$) <span style={{ color: '#ef4444' }}>*</span>
+                        {isEventTypeLocked && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '0.35rem' }}>(fixo)</span>}
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={ticketType.isUnlimited}
-                        onChange={(event) => {
-                          setFormData((prev) => {
-                            const ticketTypes = [...prev.ticketTypes]
-                            ticketTypes[index] = {
-                              ...ticketTypes[index],
-                              isUnlimited: event.target.checked,
-                              quantity: event.target.checked ? '' : ticketTypes[index].quantity,
-                            }
-                            return { ...prev, ticketTypes }
-                          })
+                        type="number"
+                        required
+                        readOnly={isEventTypeLocked}
+                        value={ticketType.price}
+                        onChange={(event) => !isEventTypeLocked && handleTicketTypeChange(index, 'price', event.target.value)}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 0.75rem',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '0.9rem',
+                          boxSizing: 'border-box',
+                          backgroundColor: isEventTypeLocked ? '#f1f5f9' : '#fff',
+                          cursor: isEventTypeLocked ? 'not-allowed' : 'text',
+                          color: isEventTypeLocked ? '#64748b' : '#0f172a',
                         }}
                       />
-                      Sem limite de quantidade
-                    </label>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>
+                        Quantidade {!ticketType.isUnlimited && <span style={{ color: '#ef4444' }}>*</span>}
+                        {isEventTypeLocked && <span style={{ color: '#16a34a', fontWeight: 400, marginLeft: '0.35rem' }}>(editável)</span>}
+                      </label>
+                      <input
+                        type="number"
+                        required={!ticketType.isUnlimited}
+                        disabled={ticketType.isUnlimited}
+                        value={ticketType.isUnlimited ? '' : ticketType.quantity}
+                        onChange={(event) => handleTicketTypeChange(index, 'quantity', event.target.value)}
+                        min="1"
+                        placeholder={ticketType.isUnlimited ? 'Sem limite' : '0'}
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 0.75rem',
+                          border: isEventTypeLocked ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '0.9rem',
+                          boxSizing: 'border-box',
+                          backgroundColor: ticketType.isUnlimited ? '#f1f5f9' : (isEventTypeLocked ? '#f0fdf4' : '#fff'),
+                        }}
+                      />
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.45rem', fontSize: '0.78rem', color: '#475569' }}>
+                        <input
+                          type="checkbox"
+                          checked={ticketType.isUnlimited}
+                          onChange={(event) => {
+                            setFormData((prev) => {
+                              const ticketTypes = [...prev.ticketTypes]
+                              ticketTypes[index] = {
+                                ...ticketTypes[index],
+                                isUnlimited: event.target.checked,
+                                quantity: event.target.checked ? '' : ticketTypes[index].quantity,
+                              }
+                              return { ...prev, ticketTypes }
+                            })
+                          }}
+                        />
+                        Sem limite de quantidade
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
+
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.8rem', fontWeight: '600', color: '#475569', marginTop: '0.25rem' }}>
                     Descrição (opcional)

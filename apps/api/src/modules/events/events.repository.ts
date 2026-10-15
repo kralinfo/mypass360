@@ -138,7 +138,7 @@ export class EventsRepository {
     const { data, error } = await this.supabase
       .getClient()
       .from(this.table)
-      .select('*, ticket_types(*)')
+      .select('*, ticket_types(*, ticket_batches(*))')
       .eq('id', id)
       .single()
 
@@ -219,23 +219,58 @@ export class EventsRepository {
     if (eventError) throw new Error(eventError.message)
 
     if (dto.ticket_types && dto.ticket_types.length > 0) {
-      const ticketTypesToInsert = dto.ticket_types.map((ticketType) => ({
-        event_id: event.id,
-        name: ticketType.name,
-        price: eventType === 'FREE' ? 0 : ticketType.price,
-        quantity: ticketType.quantity,
-        is_unlimited: ticketType.is_unlimited ?? false,
-        description: ticketType.description ?? null,
-        sold: ticketType.sold ?? 0,
-      }))
+      for (const ticketType of dto.ticket_types) {
+        const hasBatches = Boolean(ticketType.batch_mode && ticketType.batches && ticketType.batches.length > 0)
+        const firstBatchPrice = hasBatches ? ticketType.batches![0].price : ticketType.price
+        const totalBatchQty = hasBatches
+          ? ticketType.batches!.reduce((sum, b) => sum + (b.is_unlimited ? 0 : b.quantity), 0)
+          : ticketType.quantity
+        const isUnlimited = hasBatches
+          ? ticketType.batches!.some((b) => b.is_unlimited)
+          : (ticketType.is_unlimited ?? false)
 
-      const { error: ticketsError } = await this.supabase
-        .getClient()
-        .from('ticket_types')
-        .insert(ticketTypesToInsert)
+        const { data: insertedType, error: ticketsError } = await this.supabase
+          .getClient()
+          .from('ticket_types')
+          .insert({
+            event_id: event.id,
+            name: ticketType.name,
+            price: eventType === 'FREE' ? 0 : firstBatchPrice,
+            quantity: totalBatchQty,
+            is_unlimited: isUnlimited,
+            description: ticketType.description ?? null,
+            sold: ticketType.sold ?? 0,
+            batch_mode: hasBatches || Boolean(ticketType.batch_mode),
+          })
+          .select()
+          .single()
 
-      if (ticketsError) {
-        throw new Error(ticketsError.message)
+        if (ticketsError) {
+          throw new Error(ticketsError.message)
+        }
+
+        if (hasBatches && insertedType) {
+          const batchesToInsert = ticketType.batches!.map((batch, idx) => ({
+            ticket_type_id: insertedType.id,
+            name: batch.name,
+            price: eventType === 'FREE' ? 0 : batch.price,
+            quantity: batch.quantity,
+            is_unlimited: batch.is_unlimited ?? false,
+            display_order: idx,
+            status: idx === 0 ? 'open' : 'future',
+            sold: 0,
+            reserved: 0,
+          }))
+
+          const { error: batchErr } = await this.supabase
+            .getClient()
+            .from('ticket_batches')
+            .insert(batchesToInsert)
+
+          if (batchErr) {
+            throw new Error(batchErr.message)
+          }
+        }
       }
     }
 
@@ -347,48 +382,86 @@ export class EventsRepository {
         processedNames.add(key)
 
         const existing = existingMap.get(key)
+        const hasBatches = Boolean(tt.batch_mode && tt.batches && tt.batches.length > 0)
+        const firstBatchPrice = hasBatches ? tt.batches![0].price : tt.price
+        const totalBatchQty = hasBatches
+          ? tt.batches!.reduce((sum, b) => sum + (b.is_unlimited ? 0 : b.quantity), 0)
+          : tt.quantity
+        const isUnlimited = hasBatches
+          ? tt.batches!.some((b) => b.is_unlimited)
+          : (tt.is_unlimited ?? false)
+
         if (existing) {
-          // Já existe -> Atualiza (quantidade, preço, descrição)
-          toUpdate.push({
-            id: existing.id,
-            name: tt.name.trim(),
-            price: tt.price,
-            quantity: tt.quantity,
-            is_unlimited: tt.is_unlimited ?? false,
-            description: tt.description ?? null,
-          })
+          // Já existe -> Atualiza (quantidade, preço, descrição, batch_mode)
+          await this.supabase
+            .getClient()
+            .from('ticket_types')
+            .update({
+              name: tt.name.trim(),
+              price: firstBatchPrice,
+              quantity: totalBatchQty,
+              is_unlimited: isUnlimited,
+              description: tt.description ?? null,
+              batch_mode: hasBatches || Boolean(tt.batch_mode),
+            })
+            .eq('id', existing.id)
+
+          // Se tiver lotes e ainda não foram criados, insere
+          if (hasBatches) {
+            const { count } = await this.supabase
+              .getClient()
+              .from('ticket_batches')
+              .select('id', { count: 'exact', head: true })
+              .eq('ticket_type_id', existing.id)
+
+            if (!count || count === 0) {
+              const batchesToInsert = tt.batches!.map((batch, idx) => ({
+                ticket_type_id: existing.id,
+                name: batch.name,
+                price: batch.price,
+                quantity: batch.quantity,
+                is_unlimited: batch.is_unlimited ?? false,
+                display_order: idx,
+                status: idx === 0 ? 'open' : 'future',
+                sold: 0,
+                reserved: 0,
+              }))
+              await this.supabase.getClient().from('ticket_batches').insert(batchesToInsert)
+            }
+          }
         } else {
           // Novo -> Insere
-          toInsert.push({
-            event_id: id,
-            name: tt.name.trim(),
-            price: tt.price,
-            quantity: tt.quantity,
-            is_unlimited: tt.is_unlimited ?? false,
-            description: tt.description ?? null,
-            sold: 0,
-          })
+          const { data: inserted, error: insertErr } = await this.supabase
+            .getClient()
+            .from('ticket_types')
+            .insert({
+              event_id: id,
+              name: tt.name.trim(),
+              price: firstBatchPrice,
+              quantity: totalBatchQty,
+              is_unlimited: isUnlimited,
+              description: tt.description ?? null,
+              sold: 0,
+              batch_mode: hasBatches || Boolean(tt.batch_mode),
+            })
+            .select()
+            .single()
+
+          if (!insertErr && inserted && hasBatches) {
+            const batchesToInsert = tt.batches!.map((batch, idx) => ({
+              ticket_type_id: inserted.id,
+              name: batch.name,
+              price: batch.price,
+              quantity: batch.quantity,
+              is_unlimited: batch.is_unlimited ?? false,
+              display_order: idx,
+              status: idx === 0 ? 'open' : 'future',
+              sold: 0,
+              reserved: 0,
+            }))
+            await this.supabase.getClient().from('ticket_batches').insert(batchesToInsert)
+          }
         }
-      }
-
-      // Executar Updates individuais
-      for (const item of toUpdate) {
-        await this.supabase
-          .getClient()
-          .from('ticket_types')
-          .update({
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            is_unlimited: item.is_unlimited,
-            description: item.description,
-          })
-          .eq('id', item.id)
-      }
-
-      // Executar Inserts em lote
-      if (toInsert.length > 0) {
-        await this.supabase.getClient().from('ticket_types').insert(toInsert)
       }
 
       // Executar Deletes apenas dos tipos que foram removidos e não possuem vendas

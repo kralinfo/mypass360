@@ -6,6 +6,7 @@ import { MercadoPagoGatewayService } from './payment-gateway.service'
 import { TicketsService } from '../tickets/tickets.service'
 import { PaymentMailService } from './payment-mail.service'
 import { SupabaseService } from '@/common/supabase/supabase.service'
+import { TicketBatchesService } from '@/modules/ticket-batches/ticket-batches.service'
 import { randomUUID } from 'crypto'
 
 interface MercadoPagoWebhookPayload {
@@ -27,6 +28,7 @@ export class PaymentsService {
     private readonly ticketsService: TicketsService,
     private readonly paymentMailService: PaymentMailService,
     private readonly supabase: SupabaseService,
+    private readonly ticketBatchesService: TicketBatchesService,
   ) {}
 
   async findById(id: string) {
@@ -118,6 +120,19 @@ export class PaymentsService {
   }
 
   async create(dto: CreatePaymentDto) {
+    if (dto.orderId) {
+      const { data: order } = await this.supabase
+        .getClient()
+        .from('orders')
+        .select('total')
+        .eq('id', dto.orderId)
+        .single()
+
+      if (order && order.total != null) {
+        dto.amount = Number(order.total)
+      }
+    }
+
     const initializationData =
       dto.provider === 'pix'
         ? await this.paymentGateway.createPixPayment(dto)
@@ -152,11 +167,29 @@ export class PaymentsService {
   }
 
   async createPreference(dto: CreatePreferenceDto) {
-    const preference = await this.paymentGateway.createCheckoutPreference(dto)
+    let authoritativeAmount = dto.amount
+
+    if (dto.orderId) {
+      const { data: order } = await this.supabase
+        .getClient()
+        .from('orders')
+        .select('total')
+        .eq('id', dto.orderId)
+        .single()
+
+      if (order && order.total != null) {
+        authoritativeAmount = Number(order.total)
+      }
+    }
+
+    const preference = await this.paymentGateway.createCheckoutPreference({
+      ...dto,
+      amount: authoritativeAmount,
+    })
 
     await this.paymentsRepository.createPendingCheckoutPreference({
       orderId: dto.orderId,
-      amount: dto.amount,
+      amount: authoritativeAmount,
       externalId: preference.preferenceId,
     })
 
@@ -291,6 +324,7 @@ export class PaymentsService {
   /**
    * Busca os order_items do pedido e gera um ticket por unidade adquirida.
    * Chamado tanto pelo webhook oficial quanto pela confirmação manual.
+   * Também confirma as vendas nos lotes (reserved → sold).
    */
   private async generateTicketsForOrder(orderId: string) {
     try {
@@ -303,6 +337,7 @@ export class PaymentsService {
           order_items (
             id,
             ticket_type_id,
+            ticket_batch_id,
             quantity,
             unit_price,
             nominee_names,
@@ -321,6 +356,20 @@ export class PaymentsService {
       if (orderError || !order) {
         this.logger.error(`Pedido '${orderId}' não encontrado ao gerar tickets`)
         return
+      }
+
+      // Confirmar venda nos lotes (mover reserved → sold)
+      for (const item of (order.order_items ?? []) as any[]) {
+        if (item.ticket_batch_id) {
+          try {
+            await this.ticketBatchesService.confirmSale(item.ticket_batch_id, item.quantity)
+          } catch (batchErr) {
+            this.logger.error(
+              `Erro ao confirmar venda no lote ${item.ticket_batch_id}: ${batchErr instanceof Error ? batchErr.message : String(batchErr)}`
+            )
+            // Continua mesmo com erro para não bloquear geração dos tickets
+          }
+        }
       }
 
       // Buscar email e nome do comprador

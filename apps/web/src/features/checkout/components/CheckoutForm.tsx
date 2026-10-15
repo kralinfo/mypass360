@@ -69,7 +69,6 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   const router = useRouter()
   const { getItemsForEvent } = useCart()
   const [customFields, setCustomFields] = useState<EventCustomField[]>([])
-  const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
   const hydratedFromCartRef = useRef(false)
   const hydratedFromDirectCheckoutRef = useRef(false)
   const hydratedFromSnapshotRef = useRef(false)
@@ -101,7 +100,7 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
   }, [eventId])
 
   useEffect(() => {
-    if (from !== 'event' || hydratedFromDirectCheckoutRef.current || !event) {
+    if (from !== 'event' || hydratedFromDirectCheckoutRef.current || !event || ticketTypes.length === 0) {
       return
     }
 
@@ -120,7 +119,15 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
       }
 
       const validTicketTypes = new Set(ticketTypes.map((ticketType) => ticketType.id))
-      const directItems = parsed.items.filter((item) => validTicketTypes.has(item.ticketTypeId))
+      const directItems = parsed.items
+        .filter((item) => validTicketTypes.has(item.ticketTypeId))
+        .map((item) => {
+          const match = ticketTypes.find((t) => t.id === item.ticketTypeId)
+          return {
+            ...item,
+            unitPrice: match ? match.price : item.unitPrice,
+          }
+        })
 
       if (directItems.length === 0) {
         return
@@ -154,7 +161,15 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
         customAnswers?: Record<string, string>[]
       }>
       const validIds = new Set(ticketTypes.map((t) => t.id))
-      const filtered = parsed.filter((item) => validIds.has(item.ticketTypeId) && item.quantity > 0)
+      const filtered = parsed
+        .filter((item) => validIds.has(item.ticketTypeId) && item.quantity > 0)
+        .map((item) => {
+          const match = ticketTypes.find((t) => t.id === item.ticketTypeId)
+          return {
+            ...item,
+            unitPrice: match ? match.price : item.unitPrice,
+          }
+        })
       if (filtered.length > 0) {
         hydrateSelectedItems(filtered)
         // Marcar todos os mecanismos como já hidratados para evitar sobreposição
@@ -370,8 +385,26 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', width: '100%' }}>
                   <div>
-                    <h3 style={{ marginBottom: '0.25rem', fontSize: '1rem' }}>{ticketType.name}</h3>
-                    <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{ticketType.name}</h3>
+                      {ticketType.batch_name && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.2rem',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '9999px',
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          color: '#1d4ed8',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                        }}>
+                          🎫 {ticketType.batch_name}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '0.25rem', marginBottom: 0 }}>
                       {ticketType.price.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
@@ -391,99 +424,157 @@ export function CheckoutForm({ eventId, from, slug }: CheckoutFormProps) {
                     <span style={{ minWidth: '24px', textAlign: 'center' }}>{quantity}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setUnavailableTickets((current) => ({ ...current, [ticketType.id]: quantity + 1 > available }))
-                        setTicketQuantity(ticketType, Math.min(quantity + 1, available))
+                      onClick={() => setTicketQuantity(ticketType, Math.min(quantity + 1, available))}
+                      disabled={available <= 0 || quantity >= available}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: (available > 0 && quantity < available) ? '#fff' : '#f8fafc',
+                        color: (available > 0 && quantity < available) ? '#0f172a' : '#cbd5e1',
+                        cursor: (available > 0 && quantity < available) ? 'pointer' : 'not-allowed',
                       }}
-                      style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
                     >
                       +
                     </button>
                   </div>
                 </div>
 
-                {unavailableTickets[ticketType.id] && (
-                  <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
-                    Não há ingressos suficientes para essa quantidade.
-                  </p>
-                )}
-
-                {/* Campos de identificação do participante */}
-                {quantity > 0 && requiresName && (
-                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
-                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
-                      {requiresCpf ? '🪪 Identificação do Participante (obrigatória)' : 'Nome do Portador (obrigatório)'}
-                    </p>
-                    {Array.from({ length: quantity }).map((_, idx) => (
-                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: requiresCpf ? '#f8fafc' : 'transparent', borderRadius: '8px', padding: requiresCpf ? '0.75rem' : '0' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', margin: 0 }}>
-                          Ingresso #{idx + 1}
-                        </p>
-                        <div style={{ display: 'grid', gap: '0.4rem', gridTemplateColumns: requiresCpf ? '1fr 1fr' : '1fr' }}>
-                          {/* Nome */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            <label htmlFor={`nominee-name-${ticketType.id}-${idx}`} style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>
-                              NOME COMPLETO{requiresName ? ' *' : ''}
-                            </label>
-                            <input
-                              id={`nominee-name-${ticketType.id}-${idx}`}
-                              type="text"
-                              value={nomineeNames[idx] ?? ''}
-                              onChange={(e) => updateNomineeName(ticketType.id, idx, e.target.value)}
-                              placeholder="Nome completo"
-                              required={requiresName}
-                              style={inputStyle}
-                            />
-                          </div>
-
-                          {/* CPF — apenas para formal_pdf */}
-                          {requiresCpf && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                              <label htmlFor={`nominee-cpf-${ticketType.id}-${idx}`} style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>
-                                CPF *
-                              </label>
-                              <input
-                                id={`nominee-cpf-${ticketType.id}-${idx}`}
-                                type="text"
-                                value={nomineeCpfs[idx] ?? ''}
-                                onChange={(e) => updateNomineeCpf(ticketType.id, idx, formatCpf(e.target.value))}
-                                placeholder="000.000.000-00"
-                                required
-                                maxLength={14}
-                                style={{
-                                  ...inputStyle,
-                                  borderColor: nomineeCpfs[idx] && nomineeCpfs[idx].replace(/\D/g, '').length === 11
-                                    ? isValidCpf(nomineeCpfs[idx]) ? '#22c55e' : '#ef4444'
-                                    : '#cbd5e1',
-                                }}
-                              />
-                              {nomineeCpfs[idx] && nomineeCpfs[idx].replace(/\D/g, '').length === 11 && !isValidCpf(nomineeCpfs[idx]) && (
-                                <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>CPF inválido</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                {quantity >= available && available > 0 && !ticketType.is_unlimited && (
+                  <div style={{
+                    fontSize: '0.8rem',
+                    color: '#475569',
+                    fontWeight: 600,
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    background: '#f1f5f9',
+                    padding: '0.4rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                  }}>
+                    <span style={{ fontSize: '0.9rem' }}>ℹ️</span>
+                    <span>
+                      Limite disponível atingido ({available} {available === 1 ? 'ingresso disponível' : 'ingressos disponíveis'}{ticketType.batch_name ? ` no ${ticketType.batch_name}` : ''}).
+                    </span>
                   </div>
                 )}
 
-                {quantity > 0 && customFields.length > 0 && (
-                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
-                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', margin: 0 }}>
-                      Informações adicionais
+                {/* Dados dos participantes e campos adicionais agrupados por ingresso */}
+                {quantity > 0 && (requiresName || customFields.length > 0) && (
+                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', width: '100%' }}>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', margin: 0 }}>
+                      {requiresCpf
+                        ? '🪪 Dados e Identificação por Ingresso'
+                        : requiresName
+                        ? '👤 Identificação dos Portadores'
+                        : '📋 Informações Adicionais por Ingresso'}
                     </p>
+
                     {Array.from({ length: quantity }).map((_, idx) => (
-                      <div key={idx} style={{ display: 'grid', gap: '0.6rem', background: '#f8fafc', borderRadius: '8px', padding: '0.75rem' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', margin: 0 }}>
-                          Ingresso #{idx + 1}
-                        </p>
-                        <CustomFieldInputs
-                          fields={customFields}
-                          values={itemState?.customAnswers?.[idx] ?? {}}
-                          onChange={(fieldId, value) => updateCustomAnswer(ticketType.id, idx, fieldId, value)}
-                          idPrefix={`custom-${ticketType.id}-${idx}`}
-                        />
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '1rem',
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderBottom: '1px solid #e2e8f0',
+                          paddingBottom: '0.5rem',
+                        }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                            🎫 Ingresso #{idx + 1}
+                          </span>
+                          {ticketType.batch_name && (
+                            <span style={{
+                              fontSize: '0.72rem',
+                              color: '#1d4ed8',
+                              fontWeight: 600,
+                              background: '#eff6ff',
+                              border: '1px solid #dbeafe',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '6px',
+                            }}>
+                              {ticketType.batch_name}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Nome e CPF (se exigidos pelo evento) */}
+                        {requiresName && (
+                          <div style={{ display: 'grid', gap: '0.65rem', gridTemplateColumns: requiresCpf ? '1fr 1fr' : '1fr' }}>
+                            {/* Nome */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              <label htmlFor={`nominee-name-${ticketType.id}-${idx}`} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                                Nome completo{requiresName ? ' *' : ''}
+                              </label>
+                              <input
+                                id={`nominee-name-${ticketType.id}-${idx}`}
+                                type="text"
+                                value={nomineeNames[idx] ?? ''}
+                                onChange={(e) => updateNomineeName(ticketType.id, idx, e.target.value)}
+                                placeholder="Nome completo do portador"
+                                required={requiresName}
+                                style={inputStyle}
+                              />
+                            </div>
+
+                            {/* CPF — apenas se requiresCpf */}
+                            {requiresCpf && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                <label htmlFor={`nominee-cpf-${ticketType.id}-${idx}`} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                                  CPF *
+                                </label>
+                                <input
+                                  id={`nominee-cpf-${ticketType.id}-${idx}`}
+                                  type="text"
+                                  value={nomineeCpfs[idx] ?? ''}
+                                  onChange={(e) => updateNomineeCpf(ticketType.id, idx, formatCpf(e.target.value))}
+                                  placeholder="000.000.000-00"
+                                  required
+                                  maxLength={14}
+                                  style={{
+                                    ...inputStyle,
+                                    borderColor: nomineeCpfs[idx] && nomineeCpfs[idx].replace(/\D/g, '').length === 11
+                                      ? isValidCpf(nomineeCpfs[idx]) ? '#22c55e' : '#ef4444'
+                                      : '#cbd5e1',
+                                  }}
+                                />
+                                {nomineeCpfs[idx] && nomineeCpfs[idx].replace(/\D/g, '').length === 11 && !isValidCpf(nomineeCpfs[idx]) && (
+                                  <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>CPF inválido</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Campos personalizados (ex: tamanho de camisa, etc.) deste mesmo ingresso */}
+                        {customFields.length > 0 && (
+                          <div style={{
+                            display: 'grid',
+                            gap: '0.65rem',
+                            borderTop: requiresName ? '1px dashed #cbd5e1' : 'none',
+                            paddingTop: requiresName ? '0.65rem' : '0',
+                          }}>
+                            <CustomFieldInputs
+                              fields={customFields}
+                              values={itemState?.customAnswers?.[idx] ?? {}}
+                              onChange={(fieldId, value) => updateCustomAnswer(ticketType.id, idx, fieldId, value)}
+                              idPrefix={`custom-${ticketType.id}-${idx}`}
+                            />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

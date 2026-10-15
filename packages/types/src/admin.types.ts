@@ -1,4 +1,4 @@
-import type { ApprovalStatus, DeletionStatus, EventStatus } from './event.types'
+import type { ApprovalStatus, DeletionStatus, EventStatus, EventType } from './event.types'
 
 export interface AdminDashboardMetrics {
   totalEvents: number
@@ -33,6 +33,17 @@ export interface AdminEventItem {
   capacity: number
   is_capacity_unlimited?: boolean
   price: number
+  event_type?: EventType
+  eventType?: EventType
+  ticket_types?: Array<{
+    id: string
+    name: string
+    price: number
+    quantity: number
+    sold?: number
+    is_unlimited?: boolean
+    description?: string
+  }>
   createdAt: string
   totalOrders: number
   paidOrders: number

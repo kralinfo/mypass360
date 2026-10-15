@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/features/cart/cart-context'
 import { BackButton } from '@/components/BackButton'
@@ -24,7 +23,6 @@ function formatDate(value: string) {
 export default function CartPage() {
   const router = useRouter()
   const { eventGroups, totalAmount, totalQuantity, setItemQuantity, removeItem, clearCart } = useCart()
-  const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
 
   const handleCheckout = (eventId: string) => {
     router.push(`/checkout?eventId=${eventId}&from=cart`)
@@ -128,15 +126,48 @@ export default function CartPage() {
                     }}
                   >
                     <div>
-                      <h3 style={{ marginBottom: '0.25rem', color: '#0f172a' }}>{item.ticketTypeName}</h3>
-                      <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1rem', fontWeight: 700 }}>{item.ticketTypeName}</h3>
+                        {item.batchName && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '9999px',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            color: '#1d4ed8',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                          }}>
+                            🎫 {item.batchName}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ color: '#6b7280', fontSize: '0.9rem', marginTop: '0.25rem', marginBottom: 0 }}>
                         {formatCurrency(item.unitPrice)}
                         {item.available <= 0 ? ' • Sem vagas disponíveis' : ''}
                       </p>
-                      {unavailableTickets[item.ticketTypeId] && (
-                        <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: '0.25rem 0 0' }}>
-                          Não há ingressos suficientes para essa quantidade.
-                        </p>
+                      {item.quantity >= item.available && item.available > 0 && (
+                        <div style={{
+                          fontSize: '0.8rem',
+                          color: '#475569',
+                          fontWeight: 600,
+                          margin: '0.35rem 0 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          background: '#f1f5f9',
+                          padding: '0.35rem 0.6rem',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                        }}>
+                          <span style={{ fontSize: '0.9rem' }}>ℹ️</span>
+                          <span>
+                            Limite disponível atingido ({item.available} {item.available === 1 ? 'ingresso disponível' : 'ingressos disponíveis'}{item.batchName ? ` no ${item.batchName}` : ''}).
+                          </span>
+                        </div>
                       )}
                     </div>
 
@@ -161,20 +192,16 @@ export default function CartPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          setUnavailableTickets((current) => ({
-                            ...current,
-                            [item.ticketTypeId]: item.quantity + 1 > item.available,
-                          }))
-                          setItemQuantity(item.eventId, item.ticketTypeId, item.quantity + 1)
-                        }}
+                        onClick={() => setItemQuantity(item.eventId, item.ticketTypeId, item.quantity + 1)}
+                        disabled={item.available <= 0 || item.quantity >= item.available}
                         style={{
                           width: '36px',
                           height: '36px',
                           borderRadius: '10px',
                           border: '1px solid #d1d5db',
-                          background: '#fff',
-                          cursor: 'pointer',
+                          background: (item.available > 0 && item.quantity < item.available) ? '#fff' : '#f8fafc',
+                          color: (item.available > 0 && item.quantity < item.available) ? '#0f172a' : '#cbd5e1',
+                          cursor: (item.available > 0 && item.quantity < item.available) ? 'pointer' : 'not-allowed',
                           fontSize: '1rem',
                         }}
                       >

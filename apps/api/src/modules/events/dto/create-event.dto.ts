@@ -12,6 +12,23 @@ import {
   ValidateNested,
 } from 'class-validator'
 
+export class CreateTicketBatchItemDto {
+  @IsString()
+  name!: string
+
+  @IsNumber()
+  @Min(0)
+  price!: number
+
+  @IsNumber()
+  @Min(0)
+  quantity!: number
+
+  @IsBoolean()
+  @IsOptional()
+  is_unlimited?: boolean
+}
+
 export class CreateEventTicketTypeDto {
   @IsString()
   name!: string
@@ -38,6 +55,16 @@ export class CreateEventTicketTypeDto {
   @Min(0)
   @IsOptional()
   sold?: number | null
+
+  @IsBoolean()
+  @IsOptional()
+  batch_mode?: boolean
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTicketBatchItemDto)
+  @IsOptional()
+  batches?: CreateTicketBatchItemDto[]
 }
 
 export class CreateEventDto {

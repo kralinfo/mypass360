@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   fetchCheckoutData,
@@ -42,6 +42,24 @@ export function useCheckout(): UseCheckoutResult {
   const [event, setEvent] = useState<Event | null>(null)
   const [ticketTypes, setTicketTypes] = useState<CheckoutTicketType[]>([])
   const [selectedItems, setSelectedItemsState] = useState<SelectedTicketType[]>([])
+
+  // Sincronizar automaticamente unitPrice de selectedItems com o lote vigente em ticketTypes
+  useEffect(() => {
+    if (ticketTypes.length === 0) return
+    setSelectedItemsState((prev) => {
+      if (prev.length === 0) return prev
+      let hasChanges = false
+      const updated = prev.map((item) => {
+        const match = ticketTypes.find((t) => t.id === item.ticketTypeId)
+        if (match && match.price !== item.unitPrice) {
+          hasChanges = true
+          return { ...item, unitPrice: match.price }
+        }
+        return item
+      })
+      return hasChanges ? updated : prev
+    })
+  }, [ticketTypes])
 
   const total = selectedItems.reduce(
     (accumulator, item) => accumulator + item.quantity * item.unitPrice,
@@ -132,13 +150,17 @@ export function useCheckout(): UseCheckoutResult {
   }, [])
 
   const hydrateSelectedItems = useCallback((items: SelectedTicketType[]): void => {
-    const itemsWithNames = items.map((item) => ({
-      ...item,
-      nomineeNames: item.nomineeNames ?? Array.from({ length: item.quantity }, () => ''),
-      nomineeCpfs: item.nomineeCpfs ?? Array.from({ length: item.quantity }, () => ''),
-    }))
+    const itemsWithNames = items.map((item) => {
+      const match = ticketTypes.find((t) => t.id === item.ticketTypeId)
+      return {
+        ...item,
+        unitPrice: match ? match.price : item.unitPrice,
+        nomineeNames: item.nomineeNames ?? Array.from({ length: item.quantity }, () => ''),
+        nomineeCpfs: item.nomineeCpfs ?? Array.from({ length: item.quantity }, () => ''),
+      }
+    })
     setSelectedItemsState(itemsWithNames)
-  }, [])
+  }, [ticketTypes])
 
   const handleSubmit = useCallback(async (eventId: string): Promise<{ orderId: string; amount: number } | null> => {
     if (selectedItems.length === 0) {
@@ -166,7 +188,10 @@ export function useCheckout(): UseCheckoutResult {
         items: selectedItems,
       })
 
-      return { orderId: order.id, amount: total }
+      // SEMPRE usar o total oficial calculado pelo backend (com preço do lote ativo)
+      const finalAmount = order.total != null ? Number(order.total) : total
+
+      return { orderId: order.id, amount: finalAmount }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao processar checkout')
       return null

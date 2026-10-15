@@ -123,6 +123,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
   const [resolvedEventId, setResolvedEventId] = useState(eventId)
   const [resolvedSlug, setResolvedSlug] = useState(slug)
   const [resolvedFrom, setResolvedFrom] = useState(from)
+  const [orderAmount, setOrderAmount] = useState<number>(amount)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -283,6 +284,19 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
 
         if (cancelled) return
 
+        // Garantir que o valor exibido e cobrado seja o total oficial do pedido (lote vigente)
+        if (orderId) {
+          const supabase = createClient()
+          const { data: orderData } = await supabase
+            .from('orders')
+            .select('total')
+            .eq('id', orderId)
+            .single()
+          if (!cancelled && orderData?.total != null) {
+            setOrderAmount(Number(orderData.total))
+          }
+        }
+
         setPayment(found)
 
         if (found?.status === 'approved') {
@@ -331,7 +345,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
 
       const preference = await createCheckoutPreference({
         orderId,
-        amount,
+        amount: orderAmount,
         payerEmail: user.email,
       })
 
@@ -421,7 +435,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
           <div style={{ textAlign: 'right' }}>
             <p style={{ color: '#6b7280', fontSize: '0.85rem', margin: '0 0 2px' }}>Total a pagar</p>
             <strong style={{ fontSize: '1.2rem', color: '#0f172a' }}>
-              {amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {orderAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </strong>
           </div>
         </div>
