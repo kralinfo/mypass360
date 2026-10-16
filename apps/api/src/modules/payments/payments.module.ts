@@ -7,9 +7,10 @@ import { TicketsModule } from '../tickets/tickets.module'
 import { MailModule } from '@/common/mail/mail.module'
 import { PaymentMailService } from './payment-mail.service'
 import { SupabaseModule } from '@/common/supabase/supabase.module'
+import { TicketBatchesModule } from '@/modules/ticket-batches/ticket-batches.module'
 
 @Module({
-  imports: [TicketsModule, MailModule, SupabaseModule],
+  imports: [TicketsModule, MailModule, SupabaseModule, TicketBatchesModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, PaymentsRepository, MercadoPagoGatewayService, PaymentMailService],
 })

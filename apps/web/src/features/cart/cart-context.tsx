@@ -19,6 +19,7 @@ export interface CartItem {
   eventLocation: string
   ticketTypeId: string
   ticketTypeName: string
+  batchName?: string
   unitPrice: number
   quantity: number
   available: number

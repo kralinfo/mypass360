@@ -40,6 +40,20 @@ export interface CheckinAuthResponse {
   event: CheckinEventInfo
 }
 
+export interface CheckinCustomFieldDisplay {
+  fieldId: string
+  label: string
+  value: string
+}
+
+export interface CheckinDisplayFieldConfig {
+  id: string
+  eventId: string
+  fieldId: string
+  displayOrder: number
+  label?: string
+}
+
 export interface CheckinValidationResult {
   valid: boolean
   reason?: string
@@ -63,6 +77,8 @@ export interface CheckinValidationResult {
     ticketLayout: 'ticket' | 'formal_pdf'
     participantIdType: 'none' | 'name' | 'name_cpf'
   }
+  /** Campos adicionais personalizados configurados para exibição no check-in (máximo 3) */
+  customFields?: CheckinCustomFieldDisplay[]
 }
 
 export interface CreateCheckinAccessInput {
@@ -73,3 +89,4 @@ export interface UpdateCheckinAccessInput {
   name?: string
   isActive?: boolean
 }
+

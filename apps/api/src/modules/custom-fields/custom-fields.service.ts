@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SupabaseService } from '@/common/supabase/supabase.service'
+import type { CheckinCustomFieldDisplay, CheckinDisplayFieldConfig } from '@mypass360/types'
 
 export type CustomFieldType = 'text' | 'number' | 'select'
 
@@ -296,5 +297,164 @@ export class CustomFieldsService {
       map.set((row as any).ticket_id, current)
     }
     return map
+  }
+
+  /**
+   * Lista os campos adicionais configurados para exibição no check-in deste evento (máx 3).
+   */
+  async getCheckinDisplayFields(eventId: string): Promise<CheckinDisplayFieldConfig[]> {
+    const client = this.supabase.getClient()
+
+    const { data, error } = await client
+      .from('event_checkin_display_fields')
+      .select(`
+        id,
+        event_id,
+        field_id,
+        display_order,
+        event_custom_fields (
+          id,
+          label,
+          is_active
+        )
+      `)
+      .eq('event_id', eventId)
+      .order('display_order', { ascending: true })
+
+    if (error) {
+      return []
+    }
+
+    if (!data || data.length === 0) return []
+
+    return data
+      .filter((row: any) => row.event_custom_fields && row.event_custom_fields.is_active !== false)
+      .map((row: any) => ({
+        id: row.id,
+        eventId: row.event_id,
+        fieldId: row.field_id,
+        displayOrder: row.display_order,
+        label: row.event_custom_fields?.label ?? '',
+      }))
+  }
+
+  /**
+   * Salva a lista ordenada de campos adicionais exibidos no check-in (máximo 3).
+   */
+  async setCheckinDisplayFields(eventId: string, fieldIds: string[]): Promise<CheckinDisplayFieldConfig[]> {
+    if (!Array.isArray(fieldIds)) {
+      throw new BadRequestException('Lista de campos inválida.')
+    }
+
+    if (fieldIds.length > 3) {
+      throw new BadRequestException('Você pode exibir no máximo 3 informações adicionais no Check-in.')
+    }
+
+    if (new Set(fieldIds).size !== fieldIds.length) {
+      throw new BadRequestException('Campos duplicados não são permitidos.')
+    }
+
+    const client = this.supabase.getClient()
+
+    // Valida que todos os campos existem, pertencem ao evento e estão ativos
+    if (fieldIds.length > 0) {
+      const activeFields = await this.listActive(eventId)
+      const validFieldIds = new Set(activeFields.map((f) => f.id))
+
+      for (const fieldId of fieldIds) {
+        if (!validFieldIds.has(fieldId)) {
+          throw new BadRequestException('Um ou mais campos selecionados não pertencem a este evento ou estão inativos.')
+        }
+      }
+    }
+
+    // Remove configurações anteriores deste evento
+    const { error: delError } = await client
+      .from('event_checkin_display_fields')
+      .delete()
+      .eq('event_id', eventId)
+
+    if (delError) {
+      throw new Error(`Falha ao atualizar configuração do check-in: ${delError.message}`)
+    }
+
+    // Insere nova ordem se houver campos selecionados
+    if (fieldIds.length > 0) {
+      const rows = fieldIds.map((fieldId, index) => ({
+        event_id: eventId,
+        field_id: fieldId,
+        display_order: index,
+      }))
+
+      const { error: insError } = await client
+        .from('event_checkin_display_fields')
+        .insert(rows)
+
+      if (insError) {
+        throw new Error(`Falha ao salvar configuração do check-in: ${insError.message}`)
+      }
+    }
+
+    return this.getCheckinDisplayFields(eventId)
+  }
+
+  /**
+   * Busca os campos configurados e as respectivas respostas de um participante para o Check-in.
+   * Não expõe outros campos nem valores vazios.
+   */
+  async getCheckinFieldsForTicket(eventId: string, ticketId: string): Promise<CheckinCustomFieldDisplay[]> {
+    const client = this.supabase.getClient()
+
+    const { data: displayConfigs, error: cfgErr } = await client
+      .from('event_checkin_display_fields')
+      .select(`
+        field_id,
+        display_order,
+        event_custom_fields (
+          id,
+          label,
+          is_active
+        )
+      `)
+      .eq('event_id', eventId)
+      .order('display_order', { ascending: true })
+      .limit(3)
+
+    if (cfgErr || !displayConfigs || displayConfigs.length === 0) return []
+
+    const validConfigs = displayConfigs.filter(
+      (cfg: any) => cfg.event_custom_fields && cfg.event_custom_fields.is_active !== false
+    )
+    if (validConfigs.length === 0) return []
+
+    const fieldIds = validConfigs.map((cfg: any) => cfg.field_id)
+
+    const { data: answers, error: ansErr } = await client
+      .from('ticket_custom_field_values')
+      .select('field_id, value')
+      .eq('ticket_id', ticketId)
+      .in('field_id', fieldIds)
+
+    if (ansErr || !answers || answers.length === 0) return []
+
+    const answerMap = new Map<string, string>()
+    for (const a of answers as any[]) {
+      const val = (a.value ?? '').trim()
+      if (val) answerMap.set(a.field_id, val)
+    }
+
+    const result: CheckinCustomFieldDisplay[] = []
+    for (const cfg of validConfigs) {
+      const val = answerMap.get(cfg.field_id)
+      if (val) {
+        result.push({
+          fieldId: cfg.field_id,
+          label: (cfg.event_custom_fields as any)?.label ?? '',
+          value: val,
+        })
+      }
+    }
+
+    return result
   }
 }

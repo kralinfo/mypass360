@@ -65,6 +65,25 @@ export async function updateAdminEventStatus(eventId: string, status: EventStatu
   return api.patch<AdminEventItem>(`/admin/events/${eventId}/status`, { status })
 }
 
+export async function updateEventByAdmin(
+  eventId: string,
+  data: Record<string, unknown>,
+  adminMessage?: string,
+  token?: string,
+): Promise<Event> {
+  let authApi = api
+  if (token) {
+    authApi = apiWithAuth(token)
+  } else {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      authApi = apiWithAuth(session.access_token)
+    }
+  }
+  return authApi.patch<Event>(`/admin/events/${eventId}`, { data, adminMessage })
+}
+
 export async function deleteAdminEvent(eventId: string, reason?: string): Promise<{ success: boolean }> {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()

@@ -1162,7 +1162,7 @@ export function MyEventCard({ event, onStatusChange }: MyEventCardProps) {
               color: '#713f12',
               lineHeight: 1.45,
             }}>
-              <strong>Atenção:</strong> Após a publicação, <strong>dados como preços, ingressos, capacidade, modelo e modalidade não poderão mais ser alterados</strong>.
+              <strong>Atenção:</strong> Após a publicação, <strong>o modelo e a modalidade (Gratuito/Pago) não poderão mais ser alterados</strong>. Você poderá ajustar os preços e a quantidade de ingressos a qualquer momento.
             </div>
 
             <div style={{

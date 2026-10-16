@@ -3,9 +3,11 @@ import { SupabaseService } from '@/common/supabase/supabase.service'
 import type {
   CheckinAccess,
   CheckinAuthResponse,
+  CheckinCustomFieldDisplay,
   CheckinRecord,
   CheckinValidationResult,
 } from '@mypass360/types'
+
 
 @Injectable()
 export class CheckinRepository {
@@ -236,6 +238,14 @@ export class CheckinRepository {
     const participantName = isAnonymous ? null : ticket.buyer_name ?? ticket.buyer_email ?? null
     const participantCpf = isAnonymous ? null : ticket.buyer_cpf ?? null
 
+    // 10. Buscar campos adicionais configurados pelo organizador para exibição
+    let customFields: CheckinCustomFieldDisplay[] = []
+    try {
+      customFields = await this.getCheckinDisplayFieldsForTicket(event.id, ticket.id)
+    } catch (cfErr) {
+      this.logger.warn(`Erro ao buscar campos personalizados para check-in do ticket ${ticket.id}:`, cfErr)
+    }
+
     return {
       valid: true,
       ticketId: ticket.id,
@@ -253,8 +263,81 @@ export class CheckinRepository {
         ticketLayout: event.ticketLayout,
         participantIdType: event.participantIdType,
       },
+      customFields,
     }
   }
+
+  /**
+   * Busca campos personalizados configurados para exibição no Check-in (máx 3)
+   * e as respostas registradas para este ingresso específico.
+   * Não expõe dados de outros participantes nem campos não selecionados.
+   */
+  private async getCheckinDisplayFieldsForTicket(
+    eventId: string,
+    ticketId: string
+  ): Promise<CheckinCustomFieldDisplay[]> {
+    const client = this.supabase.getClient()
+
+    // 1. Busca configurações ativas de exibição para este evento (respeitando limite de 3)
+    const { data: displayConfigs, error: cfgErr } = await client
+      .from('event_checkin_display_fields')
+      .select(`
+        field_id,
+        display_order,
+        event_custom_fields (
+          id,
+          label,
+          is_active
+        )
+      `)
+      .eq('event_id', eventId)
+      .order('display_order', { ascending: true })
+      .limit(3)
+
+    if (cfgErr || !displayConfigs || displayConfigs.length === 0) {
+      return []
+    }
+
+    const activeConfigs = displayConfigs.filter(
+      (cfg: any) => cfg.event_custom_fields && cfg.event_custom_fields.is_active !== false
+    )
+    if (activeConfigs.length === 0) return []
+
+    const fieldIds = activeConfigs.map((cfg: any) => cfg.field_id)
+
+    // 2. Busca apenas as respostas deste ingresso para os campos configurados
+    const { data: answers, error: ansErr } = await client
+      .from('ticket_custom_field_values')
+      .select('field_id, value')
+      .eq('ticket_id', ticketId)
+      .in('field_id', fieldIds)
+
+    if (ansErr || !answers || answers.length === 0) {
+      return []
+    }
+
+    const answerMap = new Map<string, string>()
+    for (const a of answers as any[]) {
+      const val = (a.value ?? '').trim()
+      if (val) answerMap.set(a.field_id, val)
+    }
+
+    // 3. Monta o resultado na ordem de exibição configurada pelo organizador
+    const result: CheckinCustomFieldDisplay[] = []
+    for (const cfg of activeConfigs) {
+      const val = answerMap.get(cfg.field_id)
+      if (val) {
+        result.push({
+          fieldId: cfg.field_id,
+          label: (cfg.event_custom_fields as any)?.label ?? '',
+          value: val,
+        })
+      }
+    }
+
+    return result
+  }
+
 
   /**
    * Retorna os contadores atualizados de ingressos e check-ins para o evento.

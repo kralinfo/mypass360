@@ -9,6 +9,7 @@ import {
   createCheckoutPreference,
   fetchPaymentById,
   fetchPaymentByOrderId,
+  manualConfirmPayment,
   syncPaymentStatus,
 } from '../services/payment.service'
 import { useCart } from '@/features/cart/cart-context'
@@ -114,9 +115,15 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ── Manual confirmation (dev/test) ────────────────────────────────────────
+  const [manualCode, setManualCode] = useState('')
+  const [isManualConfirming, setIsManualConfirming] = useState(false)
+  const [manualError, setManualError] = useState<string | null>(null)
+
   const [resolvedEventId, setResolvedEventId] = useState(eventId)
   const [resolvedSlug, setResolvedSlug] = useState(slug)
   const [resolvedFrom, setResolvedFrom] = useState(from)
+  const [orderAmount, setOrderAmount] = useState<number>(amount)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -277,6 +284,19 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
 
         if (cancelled) return
 
+        // Garantir que o valor exibido e cobrado seja o total oficial do pedido (lote vigente)
+        if (orderId) {
+          const supabase = createClient()
+          const { data: orderData } = await supabase
+            .from('orders')
+            .select('total')
+            .eq('id', orderId)
+            .single()
+          if (!cancelled && orderData?.total != null) {
+            setOrderAmount(Number(orderData.total))
+          }
+        }
+
         setPayment(found)
 
         if (found?.status === 'approved') {
@@ -325,7 +345,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
 
       const preference = await createCheckoutPreference({
         orderId,
-        amount,
+        amount: orderAmount,
         payerEmail: user.email,
       })
 
@@ -376,6 +396,22 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
   }
 
 
+  // TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+  async function handleManualConfirm() {
+    setIsManualConfirming(true)
+    setManualError(null)
+
+    try {
+      const updated = await manualConfirmPayment(orderId, manualCode)
+      setManualCode('')
+      handleApproved(updated)
+    } catch (err) {
+      setManualError(err instanceof Error ? err.message : 'Erro na confirmação manual')
+    } finally {
+      setIsManualConfirming(false)
+    }
+  }
+
   // ── Loading ───────────────────────────────────────────────────────────────
   if (isLoading) return <LoadingState />
 
@@ -399,7 +435,7 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
           <div style={{ textAlign: 'right' }}>
             <p style={{ color: '#6b7280', fontSize: '0.85rem', margin: '0 0 2px' }}>Total a pagar</p>
             <strong style={{ fontSize: '1.2rem', color: '#0f172a' }}>
-              {amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {orderAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </strong>
           </div>
         </div>
@@ -434,6 +470,16 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
           >
             {isCreating ? 'Abrindo Mercado Pago...' : 'Pagar agora'}
           </button>
+
+          {/* Código de confirmação (dev/teste) */}
+          <CouponConfirmationBox
+            orderId={orderId}
+            manualCode={manualCode}
+            setManualCode={setManualCode}
+            isManualConfirming={isManualConfirming}
+            manualError={manualError}
+            onConfirm={handleManualConfirm}
+          />
         </div>
 
         {/* Modal de aviso mobile — exibido antes de sair para o Mercado Pago */}
@@ -598,7 +644,17 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
       {isApproved && <SuccessBanner />}
 
       {isPending && (
-        <FeeRefundDisclaimer variant="card" style={{ marginTop: '0.5rem' }} />
+        <>
+          <CouponConfirmationBox
+            orderId={orderId}
+            manualCode={manualCode}
+            setManualCode={setManualCode}
+            isManualConfirming={isManualConfirming}
+            manualError={manualError}
+            onConfirm={handleManualConfirm}
+          />
+          <FeeRefundDisclaimer variant="card" style={{ marginTop: '0.5rem' }} />
+        </>
       )}
 
       {(() => {
@@ -649,4 +705,146 @@ export function PaymentStatusCard({ paymentId, orderId, eventId, amount, from, s
   )
 }
 
+// ─── Componente de Código de Confirmação (Accordion) ────────────────────────
+// TODO: Remover quando a integração oficial do Mercado Pago estiver concluída.
+function CouponConfirmationBox({
+  orderId: _orderId,
+  manualCode,
+  setManualCode,
+  isManualConfirming,
+  manualError,
+  onConfirm,
+}: {
+  orderId: string
+  manualCode: string
+  setManualCode: (v: string) => void
+  isManualConfirming: boolean
+  manualError: string | null
+  onConfirm: () => void
+}) {
+  const [open, setOpen] = useState(false)
 
+  return (
+    <div
+      style={{
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        background: '#fff',
+        marginTop: '0.5rem',
+      }}
+    >
+      {/* Cabeçalho clicável */}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.9rem 1.1rem',
+          background: open ? '#f8fafc' : '#fff',
+          border: 'none',
+          cursor: 'pointer',
+          gap: '0.5rem',
+          transition: 'background 0.15s',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '1.05rem' }}>🎟️</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
+            Tenho um código de confirmação
+          </span>
+        </div>
+        {/* Seta animada */}
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#64748b"
+          strokeWidth="2.5"
+          style={{
+            flexShrink: 0,
+            transition: 'transform 0.22s ease',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Conteúdo do accordion */}
+      <div
+        style={{
+          maxHeight: open ? '240px' : '0',
+          overflow: 'hidden',
+          transition: 'max-height 0.28s ease',
+        }}
+      >
+        <div
+          style={{
+            padding: '0.25rem 1.1rem 1.1rem',
+            display: 'grid',
+            gap: '0.65rem',
+            borderTop: '1px solid #f1f5f9',
+          }}
+        >
+          <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: '0.65rem 0 0' }}>
+            Possui um código de confirmação? Digite-o abaixo para confirmar o pagamento.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Digite o código"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              style={{
+                flex: 1,
+                minWidth: '180px',
+                padding: '0.6rem 0.85rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+                outline: 'none',
+                color: '#0f172a',
+              }}
+              onFocus={(e) => (e.target.style.borderColor = '#4f46e5')}
+              onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+            />
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={isManualConfirming || !manualCode.trim()}
+              style={{
+                padding: '0.6rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#4f46e5',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                cursor: isManualConfirming || !manualCode.trim() ? 'not-allowed' : 'pointer',
+                opacity: isManualConfirming || !manualCode.trim() ? 0.6 : 1,
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+              }}
+            >
+              {isManualConfirming ? 'Aplicando...' : 'Aplicar'}
+            </button>
+          </div>
+          {manualError && (
+            <p style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>
+              {manualError}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -11,6 +11,7 @@ import { CheckinModule } from './modules/checkin/checkin.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EventMembersModule } from './modules/event-members/event-members.module'
 import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module'
+import { TicketBatchesModule } from './modules/ticket-batches/ticket-batches.module'
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module
     CheckinModule,
     NotificationsModule,
     EventMembersModule,
+    TicketBatchesModule,
   ],
 })
 export class AppModule {}
-

@@ -74,6 +74,17 @@ export function useAdminDashboard(): AdminDashboardState {
     void loadDashboardRef.current()
   })
 
+  // Sincronização imediata via evento local de atualização de eventos
+  useEffect(() => {
+    const handleEventsUpdated = () => {
+      void loadDashboardRef.current()
+    }
+    window.addEventListener('events-updated', handleEventsUpdated)
+    return () => {
+      window.removeEventListener('events-updated', handleEventsUpdated)
+    }
+  }, [])
+
   const syncCtx = useContext(_RealtimeSyncContext)
 
   const handleEventStatusChange = useCallback(async (event: AdminEventItem, status: EventStatus) => {

@@ -25,6 +25,10 @@ import {
   removePartnerMember,
 } from '@/features/events/services/my-events.service'
 import { createClient } from '@/lib/supabase/client'
+import { CheckinDisplayFieldsConfig } from '@/features/checkin/components/CheckinDisplayFieldsConfig'
+import { TicketBatchesManager } from '@/features/events/components/TicketBatchesManager'
+
+
 
 interface EventDetailsModalProps {
   event: AdminEventItem | Event
@@ -32,7 +36,8 @@ interface EventDetailsModalProps {
   onUpdated?: () => void
 }
 
-type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'tickets' | 'partners'
+type TabType = 'overview' | 'financial' | 'accesses' | 'checkins' | 'tickets' | 'partners' | 'batches'
+
 
 type TicketColumnKey = string
 
@@ -949,6 +954,27 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               Sócios & Equipe ({partners.length})
             </button>
           )}
+          {/* Tab: Lotes de Ingressos — só exibido se evento for pago */}
+          {event.event_type !== 'FREE' && (
+            <button
+              onClick={() => setActiveTab('batches')}
+              style={{
+                padding: '0.75rem 1rem',
+                border: 'none',
+                background: 'transparent',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === 'batches' ? 700 : 500,
+                color: activeTab === 'batches' ? '#4f46e5' : '#64748b',
+                borderBottom: activeTab === 'batches' ? '2px solid #4f46e5' : '2px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              🎫 Lotes de Ingressos
+            </button>
+          )}
         </div>
 
         {/* ── BODY RESPONSIVO ── */}
@@ -1187,9 +1213,31 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                               <div>
-                                <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>
-                                  {tt.name}
-                                </strong>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                  <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>
+                                    {tt.name}
+                                  </strong>
+                                  {Boolean((tt as { batch_mode?: boolean }).batch_mode) && (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.2rem',
+                                      padding: '0.1rem 0.45rem',
+                                      borderRadius: '9999px',
+                                      background: '#f0fdf4',
+                                      border: '1px solid #86efac',
+                                      color: '#15803d',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 700,
+                                    }}>
+                                      {(() => {
+                                        const batches = (tt as { ticket_batches?: Array<{ status?: string; name?: string }> }).ticket_batches
+                                        const openBatch = batches?.find((b) => b.status === 'open')
+                                        return openBatch?.name ? `🟢 Lote Vigente: ${openBatch.name}` : '🎫 Modo Lotes Ativo'
+                                      })()}
+                                    </span>
+                                  )}
+                                </div>
                                 {tt.description && (
                                   <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
                                     {tt.description}
@@ -1641,8 +1689,14 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                       </table>
                     </div>
                   )}
+
+                  {/* Seção de Configuração dos Campos Adicionais no Check-in */}
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <CheckinDisplayFieldsConfig eventId={event.id} />
+                  </div>
                 </div>
               )}
+
 
               {/* ── TAB: INGRESSOS EMITIDOS ── */}
               {activeTab === 'tickets' && (() => {
@@ -1740,6 +1794,7 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
               {activeTab === 'checkins' && (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+
                     <div style={{ flex: 1, minWidth: '240px' }}>
                       <input
                         type="text"
@@ -1979,6 +2034,63 @@ export function EventDetailsModal({ event, onClose, onUpdated }: EventDetailsMod
                       </table>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── TAB: LOTES DE INGRESSOS ── */}
+              {activeTab === 'batches' && (
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div style={{ padding: '0.75rem 1rem', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', fontSize: '0.82rem', color: '#0369a1' }}>
+                    <strong>Venda por Lotes:</strong> Configure preços e quantidades diferentes em cada lote.
+                    O sistema avança automaticamente para o próximo lote quando o atual esgotar.
+                    Você pode <strong>editar o preço de qualquer lote</strong> a qualquer momento — os pedidos já realizados nunca são alterados.
+                  </div>
+
+                  {(!details || !('ticket_types' in details)) && (
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '2rem 0' }}>
+                      Carregando tipos de ingresso...
+                    </p>
+                  )}
+
+                  {/* Renderiza um gerenciador de lotes por ticket_type */}
+                  {(() => {
+                    const ticketTypes =
+                      event.ticket_types ??
+                      details?.ticket_types ??
+                      details?.ticketTypes ??
+                      []
+                    if (ticketTypes.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '2rem 0', color: '#64748b', fontSize: '0.85rem' }}>
+                          Este evento ainda não possui tipos de ingresso configurados.
+                          <br />
+                          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                            Edite o evento e adicione ao menos um tipo de ingresso para usar lotes.
+                          </span>
+                        </div>
+                      )
+                    }
+                    return ticketTypes.map((tt) => (
+                      <div
+                        key={tt.id}
+                        style={{
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '1.25rem',
+                          background: '#fff',
+                        }}
+                      >
+                        <TicketBatchesManager
+                          eventId={event.id}
+                          ticketTypeId={tt.id}
+                          ticketTypeName={tt.name}
+                          onBatchesChange={() => {
+                            // Opcional: forçar refresh se necessário
+                          }}
+                        />
+                      </div>
+                    ))
+                  })()}
                 </div>
               )}
 

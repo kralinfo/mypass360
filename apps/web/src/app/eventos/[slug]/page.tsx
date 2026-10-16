@@ -22,7 +22,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   const [ticketTypes, setTicketTypes] = useState<CheckoutTicketType[]>([])
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [expandedTickets, setExpandedTickets] = useState<Record<string, boolean>>({})
-  const [unavailableTickets, setUnavailableTickets] = useState<Record<string, boolean>>({})
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -95,7 +94,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
   }
 
   function setTicketQuantity(ticketTypeId: string, quantity: number, available: number) {
-    setUnavailableTickets((current) => ({ ...current, [ticketTypeId]: quantity > available }))
     setQuantities((current) => ({
       ...current,
       [ticketTypeId]: Math.max(0, Math.min(quantity, available)),
@@ -116,6 +114,7 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
         eventLocation: event.location,
         ticketTypeId: ticketType.id,
         ticketTypeName: ticketType.name,
+        batchName: ticketType.batch_name,
         unitPrice: ticketType.price,
         available: ticketType.is_unlimited
           ? Number.MAX_SAFE_INTEGER
@@ -740,7 +739,26 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                         onClick={() => setExpandedTickets(prev => ({ ...prev, [ticketType.id]: !isExpanded }))}
                       >
                         <div>
-                          <h3 className="ticket-header-title">{ticketType.name}</h3>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            <h3 className="ticket-header-title">{ticketType.name}</h3>
+                            {ticketType.batch_name && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '9999px',
+                                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                                border: '1px solid #93c5fd',
+                                color: '#1d4ed8',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                letterSpacing: '0.01em',
+                              }}>
+                                🎫 {ticketType.batch_name}
+                              </span>
+                            )}
+                          </div>
                           {available <= 0 && (
                             <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>
                               Sem vagas disponíveis
@@ -761,6 +779,23 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                       {/* Corpo que só renderiza quando expandido */}
                       {isExpanded && (
                         <div className="ticket-body">
+                          {ticketType.batch_name && (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              background: '#eff6ff',
+                              padding: '0.3rem 0.65rem',
+                              borderRadius: '6px',
+                              border: '1px solid #bfdbfe',
+                              fontSize: '0.78rem',
+                              color: '#1e40af',
+                              width: 'fit-content',
+                            }}>
+                              <span style={{ fontWeight: 700 }}>● {ticketType.batch_name}</span>
+                              <span style={{ color: '#3b82f6' }}>— Lote vigente</span>
+                            </div>
+                          )}
                           {ticketType.description && (
                             <p style={{ color: '#475569', fontSize: '0.85rem', lineHeight: 1.45, margin: 0 }}>
                               {ticketType.description}
@@ -817,17 +852,17 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                               <button
                                 type="button"
                                 onClick={() => setTicketQuantity(ticketType.id, quantity + 1, available)}
-                                disabled={available <= 0}
+                                disabled={available <= 0 || quantity >= available}
                                 style={{
                                   width: '36px',
                                   height: '36px',
                                   border: 'none',
                                   borderRadius: '8px',
-                                  background: available > 0 ? '#f1f5f9' : '#f8fafc',
-                                  cursor: available > 0 ? 'pointer' : 'not-allowed',
+                                  background: (available > 0 && quantity < available) ? '#f1f5f9' : '#f8fafc',
+                                  cursor: (available > 0 && quantity < available) ? 'pointer' : 'not-allowed',
                                   fontWeight: 700,
                                   fontSize: '1.2rem',
-                                  color: available > 0 ? '#0f172a' : '#cbd5e1',
+                                  color: (available > 0 && quantity < available) ? '#0f172a' : '#cbd5e1',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -840,9 +875,24 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
                               </button>
                             </div>
 
-                            {unavailableTickets[ticketType.id] && (
-                              <div style={{ width: '100%', fontSize: '0.82rem', color: '#dc2626', fontWeight: 600 }}>
-                                Não há ingressos suficientes para essa quantidade. Reduza a quantidade para continuar.
+                            {quantity >= available && available > 0 && !ticketType.is_unlimited && (
+                              <div style={{
+                                width: '100%',
+                                fontSize: '0.8rem',
+                                color: '#475569',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                background: '#f1f5f9',
+                                padding: '0.4rem 0.65rem',
+                                borderRadius: '6px',
+                                border: '1px solid #e2e8f0',
+                              }}>
+                                <span style={{ fontSize: '0.9rem' }}>ℹ️</span>
+                                <span>
+                                  Limite disponível atingido ({available} {available === 1 ? 'ingresso disponível' : 'ingressos disponíveis'}{ticketType.batch_name ? ` no ${ticketType.batch_name}` : ''}).
+                                </span>
                               </div>
                             )}
 

@@ -3,11 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "type-check": "turbo run type-check",
+    "dev": "pnpm --filter \"./apps/*\" --parallel run dev",
+    "dev:turbo": "turbo run dev",
+    "build": "pnpm --filter \"./apps/*\" run build",
+    "build:turbo": "turbo run build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "type-check": "pnpm -r run type-check",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore"
   },
   "devDependencies": {
