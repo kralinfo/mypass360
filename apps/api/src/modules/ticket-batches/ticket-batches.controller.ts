@@ -103,6 +103,21 @@ export class TicketBatchesController {
   }
 
   /**
+   * PATCH /ticket-batches/:batchId/reopen
+   * Reabre um lote anterior (esgotado ou encerrado) como lote vigente. Protegido.
+   */
+  @Patch('ticket-batches/:batchId/reopen')
+  @UseGuards(AuthGuard)
+  async reopenBatch(
+    @Param('batchId') batchId: string,
+    @Body() dto: { quantity?: number; price?: number; is_unlimited?: boolean },
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    await this.assertBatchOwnership(batchId, user.id)
+    return this.batchesService.reopenBatch(batchId, dto)
+  }
+
+  /**
    * DELETE /ticket-batches/:batchId
    * Deleta um lote sem vendas. Protegido.
    */

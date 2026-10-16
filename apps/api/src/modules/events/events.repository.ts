@@ -299,8 +299,50 @@ export class EventsRepository {
       updated_at: new Date().toISOString(),
     }
 
-    if (isAdmin && (dto as any).status !== undefined) {
-      updatePayload.status = (dto as any).status
+    if (isAdmin) {
+      if ((dto as any).status !== undefined) {
+        updatePayload.status = (dto as any).status
+      }
+      if ((dto as any).organizer_id !== undefined) {
+        updatePayload.organizer_id = (dto as any).organizer_id
+      }
+      if ((dto as any).approval_status !== undefined) {
+        updatePayload.approval_status = (dto as any).approval_status
+        if ((dto as any).approval_status === 'approved') {
+          updatePayload.approved_by = userId
+          updatePayload.approval_reviewed_at = new Date().toISOString()
+        }
+      }
+      if ((dto as any).approval_rejection_reason !== undefined) {
+        updatePayload.approval_rejection_reason = (dto as any).approval_rejection_reason
+      }
+      if ((dto as any).deletion_status !== undefined) {
+        updatePayload.deletion_status = (dto as any).deletion_status
+      }
+      if ((dto as any).deletion_reason !== undefined) {
+        updatePayload.deletion_reason = (dto as any).deletion_reason
+      }
+      if ((dto as any).deletion_rejection_reason !== undefined) {
+        updatePayload.deletion_rejection_reason = (dto as any).deletion_rejection_reason
+      }
+      if ((dto as any).checkin_enabled !== undefined) {
+        updatePayload.checkin_enabled = Boolean((dto as any).checkin_enabled)
+      }
+      if ((dto as any).ticket_layout !== undefined) {
+        updatePayload.ticket_layout = (dto as any).ticket_layout
+      }
+      if ((dto as any).participant_id_type !== undefined) {
+        updatePayload.participant_id_type = (dto as any).participant_id_type
+      }
+      if ((dto as any).image_url !== undefined) {
+        updatePayload.image_url = (dto as any).image_url
+      }
+      if ((dto as any).slug !== undefined) {
+        updatePayload.slug = (dto as any).slug
+      }
+      if ((dto as any).is_capacity_unlimited !== undefined) {
+        updatePayload.is_capacity_unlimited = Boolean((dto as any).is_capacity_unlimited)
+      }
     }
 
     if (dto.event_type !== undefined) {
@@ -373,8 +415,6 @@ export class EventsRepository {
 
       const existingMap = new Map((existingTypes ?? []).map((t) => [t.name.trim().toLowerCase(), t]))
 
-      const toInsert = []
-      const toUpdate = []
       const processedNames = new Set<string>()
 
       for (const tt of dto.ticket_types) {
@@ -406,27 +446,80 @@ export class EventsRepository {
             })
             .eq('id', existing.id)
 
-          // Se tiver lotes e ainda não foram criados, insere
-          if (hasBatches) {
-            const { count } = await this.supabase
+          // Se tiver lotes e for enviado batches
+          if (hasBatches && tt.batches) {
+            const { data: existingBatches } = await this.supabase
               .getClient()
               .from('ticket_batches')
-              .select('id', { count: 'exact', head: true })
+              .select('*')
               .eq('ticket_type_id', existing.id)
 
-            if (!count || count === 0) {
-              const batchesToInsert = tt.batches!.map((batch, idx) => ({
+            if (!existingBatches || existingBatches.length === 0) {
+              const batchesToInsert = tt.batches.map((batch, idx) => ({
                 ticket_type_id: existing.id,
                 name: batch.name,
                 price: batch.price,
                 quantity: batch.quantity,
                 is_unlimited: batch.is_unlimited ?? false,
                 display_order: idx,
-                status: idx === 0 ? 'open' : 'future',
+                status: (batch as any).status ?? (idx === 0 ? 'open' : 'future'),
                 sold: 0,
                 reserved: 0,
               }))
               await this.supabase.getClient().from('ticket_batches').insert(batchesToInsert)
+            } else {
+              const existingBatchMap = new Map(existingBatches.map((b: any) => [b.id, b]))
+              const processedBatchIds = new Set<string>()
+
+              for (let idx = 0; idx < tt.batches.length; idx++) {
+                const batch = tt.batches[idx] as any
+                if (batch.id && existingBatchMap.has(batch.id)) {
+                  processedBatchIds.add(batch.id)
+                  const updateBatchPayload: Record<string, any> = {
+                    name: batch.name,
+                    price: batch.price,
+                    quantity: batch.quantity,
+                    is_unlimited: batch.is_unlimited ?? false,
+                    display_order: idx,
+                    updated_at: new Date().toISOString(),
+                  }
+                  if (batch.status) {
+                    updateBatchPayload.status = batch.status
+                  }
+                  await this.supabase
+                    .getClient()
+                    .from('ticket_batches')
+                    .update(updateBatchPayload)
+                    .eq('id', batch.id)
+                } else {
+                  await this.supabase
+                    .getClient()
+                    .from('ticket_batches')
+                    .insert({
+                      ticket_type_id: existing.id,
+                      name: batch.name,
+                      price: batch.price,
+                      quantity: batch.quantity,
+                      is_unlimited: batch.is_unlimited ?? false,
+                      display_order: idx,
+                      status: batch.status ?? (idx === 0 ? 'open' : 'future'),
+                      sold: 0,
+                      reserved: 0,
+                    })
+                }
+              }
+
+              // Deletar lotes removidos que possuem 0 vendidos e 0 reservados
+              const toDeleteBatches = existingBatches.filter(
+                (b: any) => !processedBatchIds.has(b.id) && (b.sold ?? 0) === 0 && (b.reserved ?? 0) === 0
+              )
+              if (toDeleteBatches.length > 0) {
+                await this.supabase
+                  .getClient()
+                  .from('ticket_batches')
+                  .delete()
+                  .in('id', toDeleteBatches.map((b: any) => b.id))
+              }
             }
           }
         } else {
@@ -447,15 +540,15 @@ export class EventsRepository {
             .select()
             .single()
 
-          if (!insertErr && inserted && hasBatches) {
-            const batchesToInsert = tt.batches!.map((batch, idx) => ({
+          if (!insertErr && inserted && hasBatches && tt.batches) {
+            const batchesToInsert = tt.batches.map((batch, idx) => ({
               ticket_type_id: inserted.id,
               name: batch.name,
               price: batch.price,
               quantity: batch.quantity,
               is_unlimited: batch.is_unlimited ?? false,
               display_order: idx,
-              status: idx === 0 ? 'open' : 'future',
+              status: (batch as any).status ?? (idx === 0 ? 'open' : 'future'),
               sold: 0,
               reserved: 0,
             }))

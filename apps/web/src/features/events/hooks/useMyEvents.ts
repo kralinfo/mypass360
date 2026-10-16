@@ -124,5 +124,16 @@ export function useMyEvents(): UseMyEventsResult {
     }
   }, [])
 
+  // Sincronização imediata via evento local de atualização de eventos
+  useEffect(() => {
+    const handleEventsUpdated = () => {
+      refetchRef.current()
+    }
+    window.addEventListener('events-updated', handleEventsUpdated)
+    return () => {
+      window.removeEventListener('events-updated', handleEventsUpdated)
+    }
+  }, [])
+
   return { events, isLoading, error, refetch }
 }

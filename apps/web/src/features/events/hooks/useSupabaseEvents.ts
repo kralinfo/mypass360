@@ -63,5 +63,16 @@ export function useSupabaseEvents(): UseSupabaseEventsResult {
     }
   }, [loadEvents])
 
+  // 3. Sincronização imediata via evento local de atualização de eventos
+  useEffect(() => {
+    const handleEventsUpdated = () => {
+      void loadEvents()
+    }
+    window.addEventListener('events-updated', handleEventsUpdated)
+    return () => {
+      window.removeEventListener('events-updated', handleEventsUpdated)
+    }
+  }, [loadEvents])
+
   return { events, isLoading, error, refetch: loadEvents }
 }

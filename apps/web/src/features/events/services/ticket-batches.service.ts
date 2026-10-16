@@ -91,6 +91,14 @@ export async function closeBatch(batchId: string): Promise<TicketBatch> {
   return apiWithAuth(token).patch<TicketBatch>(`/ticket-batches/${batchId}/close`, {})
 }
 
+export async function reopenBatch(
+  batchId: string,
+  input?: { quantity?: number; price?: number; is_unlimited?: boolean }
+): Promise<TicketBatch> {
+  const token = await getAuthToken()
+  return apiWithAuth(token).patch<TicketBatch>(`/ticket-batches/${batchId}/reopen`, input ?? {})
+}
+
 export async function deleteBatch(batchId: string): Promise<void> {
   const token = await getAuthToken()
   return apiWithAuth(token).delete<void>(`/ticket-batches/${batchId}`)

@@ -742,10 +742,10 @@ export class AdminRepository {
       .eq('event_id', eventId)
       .in('status', ['CHECKED_IN', 'used'])
 
-    // Buscar tipos de ingresso com quantidades e vendas
+    // Buscar tipos de ingresso com quantidades, vendas e lotes
     const { data: ticketTypes } = await client
       .from('ticket_types')
-      .select('id, name, price, quantity, sold, description, is_unlimited')
+      .select('id, name, price, quantity, sold, description, is_unlimited, batch_mode, ticket_batches(*)')
       .eq('event_id', eventId)
       .order('price', { ascending: false })
 
@@ -782,12 +782,29 @@ export class AdminRepository {
       const sold = Number(tt.sold) || 0
       const price = Number(tt.price) || 0
       const quantity = Number(tt.quantity) || 0
+      const rawBatches = (tt.ticket_batches ?? []) as any[]
+      const batches = rawBatches
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+        .map((b) => ({
+          id: b.id,
+          name: b.name,
+          price: Number(b.price) || 0,
+          quantity: Number(b.quantity) || 0,
+          is_unlimited: Boolean(b.is_unlimited),
+          display_order: b.display_order ?? 0,
+          status: b.status ?? 'future',
+          sold: Number(b.sold) || 0,
+          reserved: Number(b.reserved) || 0,
+        }))
+
       return {
         id: tt.id,
         name: tt.name,
         price,
         quantity,
         is_unlimited: Boolean(tt.is_unlimited),
+        batch_mode: Boolean(tt.batch_mode),
+        batches,
         sold,
         description: tt.description ?? '',
         revenue: sold * price,

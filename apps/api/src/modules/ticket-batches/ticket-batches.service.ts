@@ -371,6 +371,16 @@ export class TicketBatchesService {
           )
         }
       }
+      if (dto.status === 'open') {
+        // Ao abrir este lote, qualquer outro lote 'open' do mesmo tipo volta para 'future'
+        await this.supabase
+          .getClient()
+          .from('ticket_batches')
+          .update({ status: 'future', updated_at: new Date().toISOString() })
+          .eq('ticket_type_id', b.ticket_type_id)
+          .eq('status', 'open')
+          .neq('id', batchId)
+      }
       updatePayload.status = dto.status
     }
 
@@ -384,6 +394,89 @@ export class TicketBatchesService {
 
     if (error) throw new Error(error.message)
     return data as TicketBatch
+  }
+
+  /**
+   * Reabre um lote anterior (esgotado ou encerrado), permitindo ao organizador
+   * voltar para ele e aumentar a quantidade de ingressos.
+   *
+   * Ao reabrir:
+   * 1. Valida que a nova quantidade é maior que o já vendido + reservado (se não for ilimitado).
+   * 2. Qualquer outro lote do mesmo ticket_type que esteja 'open' é revertido para 'future'.
+   * 3. O lote alvo é atualizado com status 'open', nova quantidade e preço (se alterados).
+   */
+  async reopenBatch(
+    batchId: string,
+    dto?: { quantity?: number; price?: number; is_unlimited?: boolean }
+  ): Promise<TicketBatch> {
+    const { data: batch, error: fetchErr } = await this.supabase
+      .getClient()
+      .from('ticket_batches')
+      .select('*')
+      .eq('id', batchId)
+      .single()
+
+    if (fetchErr || !batch) {
+      throw new NotFoundException(`Lote '${batchId}' não encontrado`)
+    }
+
+    const b = batch as TicketBatch
+
+    const isUnlimited = dto?.is_unlimited ?? b.is_unlimited
+    const newQty = dto?.quantity !== undefined ? dto.quantity : b.quantity
+    const newPrice = dto?.price !== undefined ? dto.price : b.price
+
+    if (!isUnlimited) {
+      const minRequired = b.sold + b.reserved
+      if (newQty <= minRequired) {
+        throw new BadRequestException(
+          `Para reabrir o lote "${b.name}", a quantidade total (${newQty}) deve ser maior que os ingressos já vendidos e reservados (${minRequired}).`
+        )
+      }
+    }
+
+    if (newPrice < 0) {
+      throw new BadRequestException('O preço do lote não pode ser negativo.')
+    }
+
+    // 1. Reverter qualquer outro lote que esteja 'open' deste mesmo tipo de ingresso para 'future'
+    const { error: revertErr } = await this.supabase
+      .getClient()
+      .from('ticket_batches')
+      .update({ status: 'future', updated_at: new Date().toISOString() })
+      .eq('ticket_type_id', b.ticket_type_id)
+      .eq('status', 'open')
+      .neq('id', batchId)
+
+    if (revertErr) {
+      this.logger.error(`Erro ao reverter lotes abertos para future: ${revertErr.message}`)
+    }
+
+    // 2. Reabrir o lote alvo como 'open'
+    const { data: updated, error: updateErr } = await this.supabase
+      .getClient()
+      .from('ticket_batches')
+      .update({
+        status: 'open',
+        quantity: isUnlimited ? 0 : newQty,
+        is_unlimited: isUnlimited,
+        price: newPrice,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', batchId)
+      .select('*')
+      .single()
+
+    if (updateErr || !updated) {
+      throw new Error(updateErr?.message || 'Erro ao reabrir lote')
+    }
+
+    this.logger.log(
+      `Lote ${b.name} (${batchId}) reaberto com sucesso como lote vigente. ` +
+      `Nova capacidade: ${isUnlimited ? 'ilimitada' : newQty}, preço: ${newPrice}.`
+    )
+
+    return updated as TicketBatch
   }
 
   /**

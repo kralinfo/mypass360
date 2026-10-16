@@ -12,6 +12,7 @@ import {
   createBatch,
   updateBatch,
   closeBatch,
+  reopenBatch,
   deleteBatch,
 } from '../services/ticket-batches.service'
 
@@ -54,6 +55,17 @@ export function TicketBatchesManager({
     quantity: string
     is_unlimited: boolean
   }>({ name: '', price: '', quantity: '', is_unlimited: false })
+
+  const [reopeningBatch, setReopeningBatch] = useState<{
+    id: string
+    name: string
+    sold: number
+    reserved: number
+    currentQuantity: number
+    newQuantity: string
+    price: string
+    is_unlimited: boolean
+  } | null>(null)
 
   const loadBatches = useCallback(async () => {
     try {
@@ -153,6 +165,46 @@ export function TicketBatchesManager({
       showSuccess('Lote encerrado com sucesso!')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao encerrar lote')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  async function handleReopen(e: React.FormEvent) {
+    e.preventDefault()
+    if (!reopeningBatch) return
+    setError(null)
+    setProcessingId(reopeningBatch.id)
+    try {
+      const isUnlimited = reopeningBatch.is_unlimited
+      const qty = isUnlimited ? 0 : parseInt(reopeningBatch.newQuantity, 10)
+      const price = parseFloat(reopeningBatch.price.replace(',', '.'))
+      const minRequired = reopeningBatch.sold + reopeningBatch.reserved
+
+      if (!isUnlimited && (isNaN(qty) || qty <= minRequired)) {
+        setError(`A nova quantidade deve ser maior que ${minRequired} (ingressos já vendidos e reservados).`)
+        setProcessingId(null)
+        return
+      }
+      if (isNaN(price) || price < 0) {
+        setError('Informe um preço válido.')
+        setProcessingId(null)
+        return
+      }
+
+      await reopenBatch(reopeningBatch.id, {
+        quantity: isUnlimited ? 0 : qty,
+        price,
+        is_unlimited: isUnlimited,
+      })
+
+      const targetName = reopeningBatch.name
+      setReopeningBatch(null)
+      await loadBatches()
+      onBatchesChange?.()
+      showSuccess(`O ${targetName} foi reativado com sucesso como lote vigente!`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao reabrir lote')
     } finally {
       setProcessingId(null)
     }
@@ -502,25 +554,61 @@ export function TicketBatchesManager({
                 </span>
 
                 {/* Ações */}
-                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                  {batch.status !== 'closed' && batch.status !== 'sold_out' && (
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Botão de Voltar para este lote (Reabrir) */}
+                  {(batch.status === 'sold_out' || batch.status === 'closed') && (
                     <button
                       type="button"
-                      style={btnSecondary}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '6px',
+                        border: '1px solid #86efac',
+                        background: '#f0fdf4',
+                        color: '#15803d',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      }}
                       disabled={isProcessing}
                       onClick={() =>
-                        setEditingBatch({
+                        setReopeningBatch({
                           id: batch.id,
                           name: batch.name,
+                          sold: batch.sold,
+                          reserved: batch.reserved,
+                          currentQuantity: batch.quantity,
+                          newQuantity: String(Math.max(batch.quantity + 10, batch.sold + batch.reserved + 10)),
                           price: String(batch.price),
-                          quantity: String(batch.quantity),
                           is_unlimited: batch.is_unlimited,
                         })
                       }
+                      title={`Voltar para o ${batch.name} e aumentar quantidade`}
                     >
-                      ✏️ Editar
+                      <span>↩️</span>
+                      <span>Voltar para este lote</span>
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    style={btnSecondary}
+                    disabled={isProcessing}
+                    onClick={() =>
+                      setEditingBatch({
+                        id: batch.id,
+                        name: batch.name,
+                        price: String(batch.price),
+                        quantity: String(batch.quantity),
+                        is_unlimited: batch.is_unlimited,
+                      })
+                    }
+                  >
+                    ✏️ Editar
+                  </button>
                   {(batch.status === 'open' || batch.status === 'future') && (
                     <button
                       type="button"
@@ -629,6 +717,173 @@ export function TicketBatchesManager({
           {batches.some((b) => b.is_unlimited)
             ? 'Quantidade ilimitada em algum lote'
             : `${batches.reduce((sum, b) => sum + b.quantity, 0)} ingressos configurados no total`}
+        </div>
+      )}
+
+      {/* Modal de Reabertura de Lote (Voltar para o Lote Anterior) */}
+      {reopeningBatch && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={() => !processingId && setReopeningBatch(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '1.5rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: '#dcfce7',
+                color: '#15803d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.3rem',
+                flexShrink: 0,
+              }}>
+                ↩️
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a', fontWeight: 800 }}>
+                  Voltar para o {reopeningBatch.name}
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Reativar vendas com o preço e condições deste lote
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '10px',
+              padding: '0.75rem 0.9rem',
+              fontSize: '0.82rem',
+              color: '#166534',
+              lineHeight: 1.45,
+            }}>
+              Ao reabrir este lote, ele voltará imediatamente a ser o <strong>lote vigente para vendas</strong>. Qualquer lote posterior que estava aberto será pausado e continuará automaticamente quando este esgotar novamente.
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '0.75rem 0.9rem',
+              fontSize: '0.8rem',
+              color: '#475569',
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}>
+              <span>Ingressos já vendidos neste lote:</span>
+              <strong style={{ color: '#0f172a' }}>{reopeningBatch.sold} vendidos ({reopeningBatch.reserved} reservados)</strong>
+            </div>
+
+            <form onSubmit={(e) => void handleReopen(e)} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                  Nova Quantidade Total de Ingressos {!reopeningBatch.is_unlimited && '*'}
+                </label>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  disabled={reopeningBatch.is_unlimited}
+                  min={reopeningBatch.sold + reopeningBatch.reserved + 1}
+                  value={reopeningBatch.is_unlimited ? '' : reopeningBatch.newQuantity}
+                  onChange={(e) => setReopeningBatch((prev) => prev && ({ ...prev, newQuantity: e.target.value }))}
+                  placeholder={`Mínimo: ${reopeningBatch.sold + reopeningBatch.reserved + 1}`}
+                  required={!reopeningBatch.is_unlimited}
+                />
+                {!reopeningBatch.is_unlimited && (
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
+                    {(() => {
+                      const qty = parseInt(reopeningBatch.newQuantity, 10)
+                      const minReq = reopeningBatch.sold + reopeningBatch.reserved
+                      if (!isNaN(qty) && qty > minReq) {
+                        return `✨ Serão disponibilizados ${qty - minReq} novos ingressos para venda imediata.`
+                      }
+                      return `Informe mais de ${minReq} ingressos para haver vagas disponíveis.`
+                    })()}
+                  </span>
+                )}
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', color: '#334155', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={reopeningBatch.is_unlimited}
+                  onChange={(e) => setReopeningBatch((prev) => prev && ({ ...prev, is_unlimited: e.target.checked }))}
+                />
+                Deixar quantidade ilimitada
+              </label>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                  Preço por Ingresso (R$) *
+                </label>
+                <input
+                  style={inputStyle}
+                  type="text"
+                  inputMode="decimal"
+                  value={reopeningBatch.price}
+                  onChange={(e) => setReopeningBatch((prev) => prev && ({ ...prev, price: e.target.value }))}
+                  placeholder="0,00"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  style={btnSecondary}
+                  disabled={processingId === reopeningBatch.id}
+                  onClick={() => setReopeningBatch(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={processingId === reopeningBatch.id}
+                  style={{
+                    padding: '0.55rem 1.1rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#16a34a',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: processingId === reopeningBatch.id ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)',
+                  }}
+                >
+                  {processingId === reopeningBatch.id ? 'Reativando...' : `Confirmar e Voltar para o ${reopeningBatch.name}`}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
